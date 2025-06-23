@@ -1,0 +1,213 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "seriesoftubes"
+dynamic = ["version"]
+description = "LLM Workflow Orchestration Platform"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "Nelson Love", email = "nelson@nelson.love" },
+]
+keywords = ["llm", "workflow", "orchestration", "dag", "ai"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "click>=8.1.0",
+    "pydantic>=2.0.0",
+    "pyyaml>=6.0",
+    "jinja2>=3.1.0",
+    "httpx>=0.25.0",
+    "rich>=13.0.0",
+    "typer>=0.9.0",
+]
+
+[project.optional-dependencies]
+api = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "python-multipart>=0.0.6",
+]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "mypy>=1.6.0",
+    "ruff>=0.1.0",
+    "black>=23.9.0",
+    "pre-commit>=3.5.0",
+    "httpx>=0.25.0",  # for testing
+]
+all = [
+    "seriesoftubes[api,dev]",
+]
+
+[project.urls]
+Homepage = "https://github.com/nelsonlove/seriesoftubes"
+Repository = "https://github.com/nelsonlove/seriesoftubes"
+Issues = "https://github.com/nelsonlove/seriesoftubes/issues"
+
+[project.scripts]
+s10s = "seriesoftubes.cli:app"
+
+[tool.hatch.version]
+path = "src/seriesoftubes/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/seriesoftubes"]
+
+[tool.hatch.envs.default]
+dependencies = [
+    "pytest",
+    "pytest-cov",
+    "mypy",
+]
+
+[tool.hatch.envs.default.scripts]
+test = "pytest {args:tests}"
+test-cov = "pytest --cov-report=term-missing --cov-config=pyproject.toml --cov=seriesoftubes --cov=tests {args}"
+cov-report = ["test-cov", "coverage report"]
+cov-html = ["test-cov", "coverage html"]
+type-check = "mypy --install-types --non-interactive {args:src/seriesoftubes tests}"
+
+[tool.hatch.envs.lint]
+detached = true
+dependencies = [
+    "black",
+    "ruff",
+]
+
+[tool.hatch.envs.lint.scripts]
+typing = "mypy --install-types --non-interactive {args:src/seriesoftubes tests}"
+style = [
+    "ruff {args:.}",
+    "black --check --diff {args:.}",
+]
+fmt = [
+    "black {args:.}",
+    "ruff --fix {args:.}",
+    "style",
+]
+all = [
+    "style",
+    "typing",
+]
+
+[tool.hatch.envs.api]
+extra-dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+]
+
+[tool.hatch.envs.api.scripts]
+serve = "uvicorn seriesoftubes.api.main:app --reload --host 0.0.0.0 --port 8000"
+serve-prod = "uvicorn seriesoftubes.api.main:app --host 0.0.0.0 --port 8000"
+
+# Tool configurations
+[tool.coverage.run]
+source_pkgs = ["seriesoftubes", "tests"]
+branch = true
+parallel = true
+omit = [
+    "src/seriesoftubes/__about__.py",
+]
+
+[tool.coverage.paths]
+seriesoftubes = ["src/seriesoftubes", "*/seriesoftubes/src/seriesoftubes"]
+tests = ["tests", "*/seriesoftubes/tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "no cov",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+select = [
+    "A",
+    "ARG",
+    "B",
+    "C",
+    "DTZ",
+    "E",
+    "EM",
+    "F",
+    "FBT",
+    "I",
+    "ICN",
+    "ISC",
+    "N",
+    "PLC",
+    "PLE",
+    "PLR",
+    "PLW",
+    "Q",
+    "RUF",
+    "S",
+    "T",
+    "TID",
+    "UP",
+    "W",
+    "YTT",
+]
+ignore = [
+    # Allow non-abstract empty methods in abstract base classes
+    "B027",
+    # Allow boolean positional values in function calls, like `dict.get(... True)`
+    "FBT003",
+    # Ignore checks for possible passwords
+    "S105", "S106", "S107",
+    # Ignore complexity
+    "C901", "PLR0911", "PLR0912", "PLR0913", "PLR0915",
+]
+unfixable = [
+    # Don't touch unused imports
+    "F401",
+]
+
+[tool.ruff.isort]
+known-first-party = ["seriesoftubes"]
+
+[tool.ruff.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.ruff.per-file-ignores]
+# Tests can use magic values, assertions, and relative imports
+"tests/**/*" = ["PLR2004", "S101", "TID252"]
+
+[tool.black]
+target-version = ["py310"]
+line-length = 88
+skip-string-normalization = true 
