@@ -10,7 +10,7 @@ llm:
 http:
   timeout: 30
   retry_attempts: 3
-  
+
 execution:
   max_duration: 300  # 5 minutes
   save_intermediate: true
