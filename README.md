@@ -7,6 +7,23 @@ seriesoftubes is an LLM workflow orchestration platform that uses DAG-based YAML
 
 **Core Philosophy**: Workflows are directed acyclic graphs (DAGs) of nodes. Each node does one thing well. Data flows explicitly between nodes. Everything is version-controlled YAML and Jinja2 templates.
 
+## Quick Start
+
+```bash
+# Install
+pip install -e ".[dev]"
+
+# Configure API keys
+cp .tubes.example.yaml .tubes.yaml
+# Edit .tubes.yaml with your OpenAI/Anthropic API key
+
+# Run example workflow
+s10s run examples/simple-test/workflow.yaml --inputs company_name="OpenAI"
+
+# See available workflows
+s10s list
+```
+
 ## Key Commands
 
 ```bash
@@ -14,11 +31,16 @@ seriesoftubes is an LLM workflow orchestration platform that uses DAG-based YAML
 s10s run workflow.yaml
 s10s run workflow.yaml --inputs company="Acme Corp" location="Boston"
 s10s list                          # List available workflows
+s10s list -e ".*" -e "test/*"      # List with exclusions
+
+# Testing workflows
+s10s test workflow.yaml --dry-run  # Test without executing external calls
 
 # Development
 pip install -e ".[dev]"            # Install with dev dependencies
-s10s validate workflow.yaml        # Validate workflow structure
-s10s test workflow.yaml --dry-run  # Test without executing external calls
+pytest                             # Run test suite
+mypy src/                          # Type checking
+pre-commit run --all-files         # Run all linters
 ```
 
 ## Architecture
@@ -49,16 +71,17 @@ analyze_company:
 
 **2. `http` Node**
 ```yaml
-fetch_fda:
+fetch_github:
   type: http
   depends_on: [classify_company]
   config:
-    url: "https://api.fda.gov/drug/enforcement.json"
+    url: "https://api.github.com/search/repositories"
     method: GET  # default
     params:
-      search: "{{ inputs.company_name }}"
+      q: "{{ inputs.company_name }}"
+      sort: "stars"
     headers:
-      Authorization: "Bearer {{ env.FDA_API_KEY }}"
+      Accept: "application/vnd.github.v3+json"
 ```
 
 **3. `route` Node**
@@ -84,10 +107,10 @@ Data passes explicitly through context mappings:
 ```yaml
 synthesize_report:
   type: llm
-  depends_on: [fetch_fda, fetch_news, analyze_company]
+  depends_on: [fetch_github, fetch_news, analyze_company]
   config:
     context:
-      fda_data: fetch_fda
+      github_data: fetch_github
       news: fetch_news
       analysis: analyze_company
     prompt_template: "prompts/synthesis.j2"
@@ -99,9 +122,9 @@ In the Jinja2 template:
 Based on the analysis:
 {{ analysis.summary }}
 
-FDA Compliance Issues:
-{% for issue in fda_data.results %}
-- {{ issue.report_date }}: {{ issue.reason }}
+GitHub Activity:
+{% for repo in github_data.items[:5] %}
+- {{ repo.name }}: {{ repo.stargazers_count }} stars
 {% endfor %}
 
 Recent News:
@@ -130,11 +153,21 @@ my-workflow/
 
 ### Example Workflow
 
+A working example is provided in `examples/simple-test/workflow.yaml` that:
+1. Classifies a company using an LLM
+2. Fetches GitHub repositories for the company
+3. Routes to different analysis paths based on company size
+4. Generates a summary using the fetched data
+
+Run it with: `s10s run examples/simple-test/workflow.yaml --inputs company_name="YourCompany"`
+
+Here's a more complex example:
+
 ```yaml
 # workflow.yaml
 name: company-enrichment
 version: 1.0
-description: Enrich company data with FDA compliance and news
+description: Enrich company data with GitHub activity and news
 
 inputs:
   company_name:
@@ -151,22 +184,22 @@ nodes:
     config:
       prompt: |
         Classify this company: {{ inputs.company_name }}
-        Return size, industry, and whether it's FDA regulated.
+        Return size, industry, and whether it's a tech company.
       schema:
         size: enum[startup, smb, enterprise]
         industry: string
-        fda_regulated: boolean
+        is_tech: boolean
 
   # Parallel data fetching
-  fetch_fda:
+  fetch_github_activity:
     type: http
     depends_on: [classify_company]
     config:
       context:
         company: classify_company
-      url: "https://api.fda.gov/drug/enforcement.json"
+      url: "https://api.github.com/search/repositories"
       params:
-        search: "{{ inputs.company_name }}"
+        q: "{{ inputs.company_name }}"
 
   fetch_news:
     type: http
@@ -187,20 +220,20 @@ nodes:
       context:
         classification: classify_company
       routes:
-        - when: classification.fda_regulated == true
-          to: fda_analysis
+        - when: classification.is_tech == true
+          to: tech_analysis
         - default: standard_analysis
 
-  # FDA-specific analysis
-  fda_analysis:
+  # Tech-specific analysis
+  tech_analysis:
     type: llm
-    depends_on: [fetch_fda, fetch_news]
+    depends_on: [fetch_github_activity, fetch_news]
     config:
       context:
-        fda_data: fetch_fda
+        github_data: fetch_github_activity
         news: fetch_news
         classification: classify_company
-      prompt_template: "prompts/fda-analysis.j2"
+      prompt_template: "prompts/tech-analysis.j2"
 
   # Standard analysis
   standard_analysis:
@@ -215,11 +248,17 @@ nodes:
   # Final report (waits for whichever analysis ran)
   generate_report:
     type: llm
-    depends_on: [fda_analysis, standard_analysis]
+    depends_on: [tech_analysis, standard_analysis]
     config:
       context:
-        analysis: _previous  # Special: gets output from whatever ran
-      prompt: "Create an executive summary of this analysis: {{ analysis }}"
+        # Note: route nodes return the selected path name, not the output
+        # To get the actual output, reference the specific analysis nodes
+        tech_result: tech_analysis
+        standard_result: standard_analysis
+      prompt: |
+        Create an executive summary of the analysis.
+        Tech analysis: {{ tech_result or "N/A" }}
+        Standard analysis: {{ standard_result or "N/A" }}"
 
 outputs:
   report: generate_report
@@ -286,30 +325,35 @@ def execute_workflow(workflow, inputs):
 - Executors handle context resolution and output formatting
 - All data is JSON-serializable
 - Large data should be referenced, not embedded
+- Template context uses DotDict wrapper for safe dot notation (prevents `data.items` ambiguity)
 
 ### Testing Strategy
 ```bash
 # Dry run shows execution plan
 s10s test workflow.yaml --dry-run
 
-# Test with mocked external calls
-s10s test workflow.yaml --mock-http --mock-llm
+# Verbose mode shows detailed output
+s10s test workflow.yaml --dry-run --verbose
 ```
 
 ## Current Status
 
 **Implemented:**
-- Basic project structure with Hatchling build system
-- CLI skeleton (`s10s`) with Typer
-- FastAPI application skeleton at `/api`
-- Development tooling (pytest, mypy, ruff, black)
+- ✅ Basic project structure with Hatchling build system
+- ✅ Full CLI implementation with `run`, `list`, and `test` commands
+- ✅ FastAPI application skeleton at `/api`
+- ✅ Development tooling (pytest, mypy, ruff, black, pre-commit)
+- ✅ Complete workflow execution engine with DAG validation
+- ✅ All three node types (llm, http, route) with Jinja2 templating
+- ✅ YAML parsing and validation with Pydantic v2
+- ✅ Context resolution system with safe dot notation
+- ✅ Output storage with JSON files per execution
+- ✅ Configuration system with environment variable support
+- ✅ Input validation with default values
+- ✅ DotDict wrapper to prevent Jinja2 ambiguity
 
-**Not Yet Implemented:**
-- Workflow execution engine
-- Node types (llm, http, route)
-- YAML parsing and validation
-- Context resolution system
-- Output storage
+**Ready for Use:**
+The MVP is fully functional! You can now create and run workflows with LLM calls, HTTP requests, and conditional routing.
 
 ## Future Considerations (Post-MVP)
 
@@ -319,6 +363,7 @@ s10s test workflow.yaml --mock-http --mock-llm
 4. **Enhanced Web UI**: Full dashboard beyond basic API
 5. **Debugging**: Step-through debugger, node replay
 6. **Hub**: Share/discover workflow templates
+7. **Tool-Using LLM Nodes**: Allow LLM nodes to act as agents with tool access
 
 ## Development Setup
 
@@ -336,10 +381,11 @@ cp .tubes.example.yaml .tubes.yaml
 
 # Run CLI
 s10s --help
-s10s run workflow.yaml  # Not implemented yet
-s10s validate workflow.yaml  # Not implemented yet
+s10s run examples/simple-test/workflow.yaml --inputs company_name="OpenAI"
+s10s list
+s10s test examples/simple-test/workflow.yaml --dry-run
 
-# Run API server (basic skeleton exists)
+# Run API server (basic skeleton)
 pip install -e ".[api]"
 uvicorn seriesoftubes.api.main:app --reload
 # API available at http://localhost:8000
