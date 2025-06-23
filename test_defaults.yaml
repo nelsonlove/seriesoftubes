@@ -1,0 +1,43 @@
+name: test-defaults
+version: "1.0"
+description: Test workflow for default values
+
+inputs:
+  message:
+    type: string
+    required: true
+  include_details:
+    type: boolean
+    default: false
+  prefix:
+    type: string
+    default: "Hello"
+
+nodes:
+  router:
+    type: route
+    config:
+      routes:
+        - when: "inputs.include_details"
+          to: "detailed"
+        - default: true
+          to: "simple"
+  
+  simple:
+    type: route
+    depends_on: [router]
+    config:
+      routes:
+        - default: true
+          to: "simple"
+  
+  detailed:
+    type: route  
+    depends_on: [router]
+    config:
+      routes:
+        - default: true
+          to: "detailed"
+
+outputs:
+  result: router

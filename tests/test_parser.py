@@ -23,6 +23,7 @@ def test_parse_simple_workflow():
     assert "company_name" in workflow.inputs
     assert workflow.inputs["company_name"].required is True
     assert workflow.inputs["include_news"].default is False
+    assert workflow.inputs["include_news"].required is False  # Has default, so not required
 
     # Check nodes
     assert len(workflow.nodes) == 6
@@ -147,3 +148,51 @@ nodes:
     workflow = parse_workflow_yaml(bad_route_yaml)
     with pytest.raises(WorkflowParseError, match="non-existent node"):
         validate_dag(workflow)
+
+
+def test_input_with_default_not_required(tmp_path):
+    """Test that inputs with defaults are automatically not required"""
+    test_yaml = tmp_path / "test_defaults.yaml"
+    test_yaml.write_text(
+        """
+name: test-defaults
+inputs:
+  with_default:
+    type: string
+    default: "hello"
+  without_default:
+    type: string
+  explicit_required:
+    type: string
+    required: true
+    default: "world"
+  boolean_default:
+    type: boolean
+    default: false
+nodes:
+  dummy:
+    type: route
+    config:
+      routes:
+        - default: true
+          to: dummy
+"""
+    )
+
+    workflow = parse_workflow_yaml(test_yaml)
+    
+    # Input with default should not be required
+    assert not workflow.inputs["with_default"].required
+    assert workflow.inputs["with_default"].default == "hello"
+    
+    # Input without default should be required
+    assert workflow.inputs["without_default"].required
+    assert workflow.inputs["without_default"].default is None
+    
+    # Even if explicitly marked required, having a default makes it not required
+    assert not workflow.inputs["explicit_required"].required
+    assert workflow.inputs["explicit_required"].default == "world"
+    
+    # Boolean default should also work
+    assert not workflow.inputs["boolean_default"].required
+    assert workflow.inputs["boolean_default"].default is False

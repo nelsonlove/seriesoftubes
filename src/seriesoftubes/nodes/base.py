@@ -6,6 +6,7 @@ from typing import Any, Protocol
 from pydantic import BaseModel
 
 from seriesoftubes.models import Node
+from seriesoftubes.utils import wrap_context_data
 
 
 class NodeResult(BaseModel):
@@ -62,8 +63,10 @@ class NodeExecutor(ABC):
             for var_name, node_name in node.config.context.items():
                 data[var_name] = context.get_output(node_name)
 
-        # Add inputs
+        # Add inputs - get all inputs from the workflow context
         data["inputs"] = {}
-        # We'll need to enhance this to get all input names from workflow
+        if hasattr(context, "inputs"):
+            data["inputs"] = context.inputs
 
-        return data
+        # Wrap the data to make dot notation safe in templates
+        return wrap_context_data(data)
