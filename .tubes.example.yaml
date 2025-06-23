@@ -1,0 +1,21 @@
+# Example configuration for seriesoftubes
+# Copy this to .tubes.yaml and fill in your API keys
+
+llm:
+  provider: openai  # or anthropic
+  model: gpt-4o
+  api_key_env: OPENAI_API_KEY
+  temperature: 0.7
+
+http:
+  timeout: 30
+  retry_attempts: 3
+  
+execution:
+  max_duration: 300  # 5 minutes
+  save_intermediate: true
+
+# Environment variables for API keys
+# Set these in your shell or .env file:
+# OPENAI_API_KEY=your-key-here
+# ANTHROPIC_API_KEY=your-key-here
