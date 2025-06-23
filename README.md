@@ -88,7 +88,7 @@ synthesize_report:
   config:
     context:
       fda_data: fetch_fda
-      news: fetch_news  
+      news: fetch_news
       analysis: analyze_company
     prompt_template: "prompts/synthesis.j2"
 ```
@@ -167,7 +167,7 @@ nodes:
       url: "https://api.fda.gov/drug/enforcement.json"
       params:
         search: "{{ inputs.company_name }}"
-      
+
   fetch_news:
     type: http
     depends_on: [classify_company]
@@ -202,7 +202,7 @@ nodes:
         classification: classify_company
       prompt_template: "prompts/fda-analysis.j2"
 
-  # Standard analysis  
+  # Standard analysis
   standard_analysis:
     type: llm
     depends_on: [fetch_news]
@@ -239,7 +239,7 @@ llm:
 http:
   timeout: 30
   retry_attempts: 3
-  
+
 execution:
   max_duration: 300  # 5 minutes
   save_intermediate: true
@@ -314,7 +314,7 @@ s10s test workflow.yaml --mock-http --mock-llm
 ## Future Considerations (Post-MVP)
 
 1. **Parallel Execution**: Use asyncio for parallel nodes
-2. **Caching**: Redis/disk cache for expensive operations  
+2. **Caching**: Redis/disk cache for expensive operations
 3. **Streaming**: Server-sent events for real-time progress
 4. **Enhanced Web UI**: Full dashboard beyond basic API
 5. **Debugging**: Step-through debugger, node replay
@@ -353,6 +353,15 @@ mypy src/
 hatch run test  # Run tests
 hatch run lint:fmt  # Format code
 hatch run lint:all  # Run all linters
+```
+
+### Pre-commit hooks
+
+To enforce code formatting and type safety:
+
+```bash
+pip install -e ".[dev]"
+pre-commit install
 ```
 
 ## Design Principles
