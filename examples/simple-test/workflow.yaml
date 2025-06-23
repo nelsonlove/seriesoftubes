@@ -1,0 +1,91 @@
+name: simple-test
+version: "1.0"
+description: A simple test workflow
+
+inputs:
+  company_name:
+    type: string
+    required: true
+  include_news:
+    type: boolean
+    default: false
+
+nodes:
+  classify_company:
+    type: llm
+    depends_on: []
+    config:
+      prompt: |
+        Classify this company: {{ inputs.company_name }}
+
+        Return a JSON object with:
+        - industry: string
+        - size: "startup" | "smb" | "enterprise"
+        - public: boolean
+      schema:
+        industry: string
+        size: string
+        public: boolean
+
+  fetch_data:
+    type: http
+    depends_on: [classify_company]
+    config:
+      context:
+        company: classify_company
+      url: "https://api.example.com/companies"
+      params:
+        name: "{{ inputs.company_name }}"
+        type: "{{ company.industry }}"
+
+  decide_analysis:
+    type: route
+    depends_on: [classify_company]
+    config:
+      context:
+        company: classify_company
+      routes:
+        - when: company.size == "enterprise"
+          to: deep_analysis
+        - when: company.size == "startup"
+          to: quick_analysis
+        - default: true
+          to: standard_analysis
+
+  deep_analysis:
+    type: llm
+    depends_on: [fetch_data]
+    config:
+      context:
+        data: fetch_data
+        company: classify_company
+      prompt: |
+        Perform deep analysis of {{ inputs.company_name }}:
+        Classification: {{ company }}
+        Data: {{ data }}
+
+  quick_analysis:
+    type: llm
+    depends_on: [fetch_data]
+    config:
+      context:
+        data: fetch_data
+      prompt: |
+        Quick summary of {{ inputs.company_name }}: {{ data }}
+
+  standard_analysis:
+    type: llm
+    depends_on: [fetch_data]
+    config:
+      context:
+        data: fetch_data
+        company: classify_company
+      prompt: |
+        Standard analysis of {{ inputs.company_name }}:
+        - Industry: {{ company.industry }}
+        - Size: {{ company.size }}
+        - Data: {{ data }}
+
+outputs:
+  classification: classify_company
+  analysis: decide_analysis  # Will contain whichever analysis ran
