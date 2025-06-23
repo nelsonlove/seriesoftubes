@@ -103,6 +103,36 @@ def parse_workflow_yaml(yaml_path: Path) -> Workflow:
         raise WorkflowParseError(msg) from e
 
 
+def topological_sort(workflow: Workflow) -> list[str]:
+    """Perform topological sort on workflow nodes
+
+    Returns:
+        List of node names in execution order
+    """
+    nodes = workflow.nodes
+    in_degree = {name: len(node.depends_on) for name, node in nodes.items()}
+    queue = [name for name, degree in in_degree.items() if degree == 0]
+    result = []
+
+    while queue:
+        # Take node with no dependencies
+        current = queue.pop(0)
+        result.append(current)
+
+        # Find nodes that depend on current
+        for name, node in nodes.items():
+            if current in node.depends_on:
+                in_degree[name] -= 1
+                if in_degree[name] == 0:
+                    queue.append(name)
+
+    if len(result) != len(nodes):
+        msg = "Workflow contains a cycle"
+        raise WorkflowParseError(msg)
+
+    return result
+
+
 def validate_dag(workflow: Workflow) -> None:
     """Validate the workflow DAG structure"""
     nodes = workflow.nodes
