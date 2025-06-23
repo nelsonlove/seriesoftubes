@@ -296,12 +296,27 @@ s10s test workflow.yaml --dry-run
 s10s test workflow.yaml --mock-http --mock-llm
 ```
 
+## Current Status
+
+**Implemented:**
+- Basic project structure with Hatchling build system
+- CLI skeleton (`s10s`) with Typer
+- FastAPI application skeleton at `/api`
+- Development tooling (pytest, mypy, ruff, black)
+
+**Not Yet Implemented:**
+- Workflow execution engine
+- Node types (llm, http, route)
+- YAML parsing and validation
+- Context resolution system
+- Output storage
+
 ## Future Considerations (Post-MVP)
 
 1. **Parallel Execution**: Use asyncio for parallel nodes
 2. **Caching**: Redis/disk cache for expensive operations  
 3. **Streaming**: Server-sent events for real-time progress
-4. **Web UI**: FastAPI + React dashboard
+4. **Enhanced Web UI**: Full dashboard beyond basic API
 5. **Debugging**: Step-through debugger, node replay
 6. **Hub**: Share/discover workflow templates
 
@@ -319,12 +334,25 @@ pip install -e ".[dev]"
 cp .tubes.example.yaml .tubes.yaml
 # Edit .tubes.yaml with your API keys
 
+# Run CLI
+s10s --help
+s10s run workflow.yaml  # Not implemented yet
+s10s validate workflow.yaml  # Not implemented yet
+
+# Run API server (basic skeleton exists)
+pip install -e ".[api]"
+uvicorn seriesoftubes.api.main:app --reload
+# API available at http://localhost:8000
+# Docs at http://localhost:8000/docs
+
 # Run tests
 pytest
 mypy src/
 
-# Try example workflow
-s10s run examples/company-enrichment.yaml --inputs company="OpenAI"
+# Development commands
+hatch run test  # Run tests
+hatch run lint:fmt  # Format code
+hatch run lint:all  # Run all linters
 ```
 
 ## Design Principles
