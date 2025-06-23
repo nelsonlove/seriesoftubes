@@ -50,6 +50,8 @@ dev = [
     "black>=23.9.0",
     "pre-commit>=3.5.0",
     "httpx>=0.25.0",  # for testing
+    "types-click>=7.1.8",
+    "types-PyYAML>=6.0.12.20250516",
 ]
 all = [
     "seriesoftubes[api,dev]",
@@ -152,9 +154,15 @@ warn_unused_ignores = true
 module = "tests.*"
 disallow_untyped_defs = false
 
+[[tool.mypy.overrides]]
+module = ["typer", "rich.*", "fastapi", "uvicorn"]
+ignore_missing_imports = true
+
 [tool.ruff]
 target-version = "py310"
 line-length = 88
+
+[tool.ruff.lint]
 select = [
     "A",
     "ARG",
@@ -197,17 +205,17 @@ unfixable = [
     "F401",
 ]
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 known-first-party = ["seriesoftubes"]
 
-[tool.ruff.flake8-tidy-imports]
+[tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 # Tests can use magic values, assertions, and relative imports
 "tests/**/*" = ["PLR2004", "S101", "TID252"]
 
 [tool.black]
 target-version = ["py310"]
 line-length = 88
-skip-string-normalization = true 
+skip-string-normalization = true
