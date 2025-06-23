@@ -15,6 +15,12 @@ repos:
     hooks:
       - id: mypy
         args: [--install-types, --non-interactive]
+        additional_dependencies:
+          - pydantic>=2.0.0
+          - types-PyYAML
+          - typer
+          - rich
+          - fastapi
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
