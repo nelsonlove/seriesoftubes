@@ -66,12 +66,12 @@ nodes:
         company: classify_company
       prompt: |
         Based on the GitHub search results for {{ inputs.company_name }}, write a brief summary.
-        
+
         Company classification: {{ company }}
-        
-        Top repositories found: 
+
+        Top repositories found:
         {{ data.items|length }} repositories total.
-        
+
         Just provide a 2-3 sentence summary.
 
   quick_analysis:
@@ -94,7 +94,7 @@ nodes:
         GitHub analysis for {{ inputs.company_name }}:
         - Company type: {{ company.size }}
         - Total repositories found: {{ data.total_count }}
-        
+
         Provide a brief summary.
 
 outputs:

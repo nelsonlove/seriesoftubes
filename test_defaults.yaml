@@ -22,7 +22,7 @@ nodes:
           to: "detailed"
         - default: true
           to: "simple"
-  
+
   simple:
     type: route
     depends_on: [router]
@@ -30,9 +30,9 @@ nodes:
       routes:
         - default: true
           to: "simple"
-  
+
   detailed:
-    type: route  
+    type: route
     depends_on: [router]
     config:
       routes:

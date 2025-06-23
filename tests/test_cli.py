@@ -263,7 +263,7 @@ nodes:
           to: "node1"
 """
         )
-        
+
         test_dir = tmp_path / "test"
         test_dir.mkdir()
         (test_dir / "test_workflow.yaml").write_text(
@@ -278,11 +278,11 @@ nodes:
           to: "node1"
 """
         )
-        
+
         # List without exclude
         result = runner.invoke(app, ["list", "-d", str(tmp_path)])
         assert "Found 2 workflow(s)" in result.stdout
-        
+
         # List with exclude
         result = runner.invoke(app, ["list", "-d", str(tmp_path), "-e", "test/*"])
         assert "Found 1 workflow(s)" in result.stdout

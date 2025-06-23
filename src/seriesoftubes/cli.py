@@ -170,12 +170,14 @@ def list_workflows(
         Path, typer.Option("--directory", "-d", help="Directory to search")
     ] = Path("."),
     exclude: Annotated[
-        list[str] | None, 
-        typer.Option("--exclude", "-e", help="Patterns to exclude (e.g., '.*', 'test/*')")
+        list[str] | None,
+        typer.Option(
+            "--exclude", "-e", help="Patterns to exclude (e.g., '.*', 'test/*')"
+        ),
     ] = None,
 ) -> None:
     """List available workflows in the current directory
-    
+
     Examples:
         s10s list
         s10s list -d ./workflows
@@ -185,10 +187,11 @@ def list_workflows(
 
     # Find all YAML files
     yaml_files = list(directory.rglob("*.yaml")) + list(directory.rglob("*.yml"))
-    
+
     # Apply exclusion patterns
     if exclude:
         import fnmatch
+
         excluded_files = []
         for yaml_file in yaml_files:
             relative_path = yaml_file.relative_to(directory)

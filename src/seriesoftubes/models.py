@@ -157,7 +157,7 @@ class WorkflowInput(BaseModel):
     input_type: str = Field("string", description="Input type", alias="type")
     required: bool = Field(True, description="Is this input required")
     default: Any | None = Field(None, description="Default value if not provided")
-    
+
     @model_validator(mode="after")
     def validate_required_with_default(self) -> Self:
         """If a default is provided, the input is not required"""
