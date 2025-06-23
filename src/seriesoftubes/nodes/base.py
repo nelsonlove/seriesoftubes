@@ -1,0 +1,69 @@
+"""Base node executor interface"""
+
+from abc import ABC, abstractmethod
+from typing import Any, Protocol
+
+from pydantic import BaseModel
+
+from seriesoftubes.models import Node
+
+
+class NodeResult(BaseModel):
+    """Result from executing a node"""
+
+    output: Any
+    success: bool = True
+    error: str | None = None
+    metadata: dict[str, Any] | None = None
+
+
+class NodeContext(Protocol):
+    """Protocol for execution context passed to nodes"""
+
+    def get_output(self, node_name: str) -> Any:
+        """Get output from a previous node"""
+        ...
+
+    def get_input(self, input_name: str) -> Any:
+        """Get workflow input value"""
+        ...
+
+
+class NodeExecutor(ABC):
+    """Base class for node executors"""
+
+    @abstractmethod
+    async def execute(self, node: Node, context: NodeContext) -> NodeResult:
+        """Execute a node and return its result
+
+        Args:
+            node: The node to execute
+            context: Execution context with access to inputs and previous outputs
+
+        Returns:
+            NodeResult with output or error information
+        """
+        pass
+
+    def prepare_context_data(self, node: Node, context: NodeContext) -> dict[str, Any]:
+        """Prepare context data for template rendering
+
+        Args:
+            node: The node being executed
+            context: Execution context
+
+        Returns:
+            Dictionary of context variables
+        """
+        data = {}
+
+        # Add mapped context from node config
+        if node.config.context:
+            for var_name, node_name in node.config.context.items():
+                data[var_name] = context.get_output(node_name)
+
+        # Add inputs
+        data["inputs"] = {}
+        # We'll need to enhance this to get all input names from workflow
+
+        return data

@@ -100,7 +100,7 @@ class HTTPNodeConfig(BaseNodeConfig):
     method: HTTPMethod = Field(HTTPMethod.GET, description="HTTP method")
     params: dict[str, Any] | None = Field(None, description="Query parameters")
     headers: dict[str, str] | None = Field(None, description="HTTP headers")
-    body: dict[str, Any] | str | None = Field(None, description="Request body")
+    body: dict[str, Any] | None = Field(None, description="Request body (JSON)")
     timeout: int | None = Field(None, description="Request timeout in seconds")
 
 

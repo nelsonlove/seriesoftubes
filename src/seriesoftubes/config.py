@@ -41,23 +41,27 @@ class LLMConfig(BaseModel):
 class HTTPConfig(BaseModel):
     """HTTP client configuration"""
 
-    timeout: int = Field(30, description="Request timeout in seconds")
-    retry_attempts: int = Field(3, description="Number of retry attempts")
+    timeout: int = Field(default=30, description="Request timeout in seconds")
+    retry_attempts: int = Field(default=3, description="Number of retry attempts")
 
 
 class ExecutionConfig(BaseModel):
     """Workflow execution configuration"""
 
-    max_duration: int = Field(300, description="Maximum execution time in seconds")
-    save_intermediate: bool = Field(True, description="Save intermediate outputs")
+    max_duration: int = Field(
+        default=300, description="Maximum execution time in seconds"
+    )
+    save_intermediate: bool = Field(
+        default=True, description="Save intermediate outputs"
+    )
 
 
 class Config(BaseModel):
     """Application configuration"""
 
     llm: LLMConfig
-    http: HTTPConfig = Field(default_factory=HTTPConfig)
-    execution: ExecutionConfig = Field(default_factory=ExecutionConfig)
+    http: HTTPConfig = HTTPConfig()
+    execution: ExecutionConfig = ExecutionConfig()
 
     def resolve_secrets(self) -> None:
         """Resolve all secrets from environment"""
