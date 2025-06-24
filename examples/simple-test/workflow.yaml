@@ -70,7 +70,7 @@ nodes:
         Company classification: {{ company }}
 
         Top repositories found:
-        {{ data.items|length }} repositories total.
+        {{ data['items']|length }} repositories total.
 
         Just provide a 2-3 sentence summary.
 

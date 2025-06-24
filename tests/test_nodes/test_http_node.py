@@ -107,15 +107,13 @@ async def test_http_post_request_with_body():
         assert result.output == {"id": 123}
         assert result.metadata["status_code"] == 201
 
-        # TODO: This test reveals an issue with DotDict serialization in templates
-        # The template {{ previous_data }} renders to string representation of DotDict
-        # In practice, users would need to use {{ previous_data.value }}
+        # The template {{ previous_data }} renders to string representation of dict
         mock_client.request.assert_called_once_with(
             method="POST",
             url="https://api.example.com/submit",
             headers={},
             params=None,
-            json={"data": "DotDict({'value': 'test'})"},
+            json={"data": "{'value': 'test'}"},
         )
 
 

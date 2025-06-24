@@ -7,7 +7,6 @@ from typing import Any, Protocol
 from pydantic import BaseModel
 
 from seriesoftubes.models import Node
-from seriesoftubes.utils import wrap_context_data
 
 
 class NodeResult(BaseModel):
@@ -72,5 +71,6 @@ class NodeExecutor(ABC):
         # Add environment variables
         data["env"] = dict(os.environ)
 
-        # Wrap the data to make dot notation safe in templates
-        return wrap_context_data(data)
+        # Return raw data - users should use bracket notation or filters in templates
+        # e.g., data['items'] not data.items, or data|items not data.items()
+        return data
