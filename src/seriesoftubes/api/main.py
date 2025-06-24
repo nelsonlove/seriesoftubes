@@ -3,30 +3,60 @@
 import asyncio
 import json
 import logging
+import shutil
+import tempfile
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
+import yaml
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from sse_starlette.sse import EventSourceResponse
 
+from seriesoftubes.api.auth_routes import router as auth_router
 from seriesoftubes.api.execution import execution_manager
+from seriesoftubes.api.execution_routes import router as execution_router
+from seriesoftubes.api.workflow_routes import router as workflow_router
 from seriesoftubes.api.models import (
     ExecutionStatus,
+    RawWorkflowResponse,
+    RawWorkflowUpdate,
     WorkflowDetail,
     WorkflowInfo,
     WorkflowRunRequest,
     WorkflowRunResponse,
 )
+from seriesoftubes.db import init_db
 from seriesoftubes.parser import WorkflowParseError, parse_workflow_yaml
 
 logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initialize app on startup"""
+    # Initialize database
+    await init_db()
+    logger.info("Database initialized")
+
+    yield
+
+    # Cleanup on shutdown
+    logger.info("Shutting down")
+
 
 app = FastAPI(
     title="seriesoftubes API",
     description="LLM Workflow Orchestration Platform API",
     version="0.1.0",
+    lifespan=lifespan,
 )
+
+# Include routers
+app.include_router(auth_router)
+app.include_router(workflow_router)
+app.include_router(execution_router)
 
 
 @app.get("/")
@@ -120,6 +150,105 @@ async def get_workflow(workflow_path: str) -> WorkflowDetail:
         )
     except WorkflowParseError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@app.get("/workflows/{workflow_path:path}/raw", response_model=RawWorkflowResponse)
+async def get_workflow_raw(workflow_path: str) -> RawWorkflowResponse:
+    """Get raw YAML content of a workflow"""
+    path = Path(workflow_path)
+
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    try:
+        content = path.read_text()
+        stat = path.stat()
+        return RawWorkflowResponse(
+            content=content,
+            path=str(path),
+            modified=stat.st_mtime,
+        )
+    except Exception as e:
+        logger.error(f"Failed to read workflow file {path}: {e}")
+        raise HTTPException(
+            status_code=500, detail="Failed to read workflow file"
+        ) from e
+
+
+@app.put("/workflows/{workflow_path:path}/raw", response_model=dict[str, Any])
+async def update_workflow_raw(
+    workflow_path: str, request: RawWorkflowUpdate
+) -> dict[str, Any]:
+    """Update raw YAML content of a workflow"""
+    path = Path(workflow_path)
+
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    # Check for conflicts if expected_modified is provided
+    if request.expected_modified is not None:
+        current_modified = path.stat().st_mtime
+        if (
+            abs(current_modified - request.expected_modified) > 0.01
+        ):  # Small tolerance for float comparison
+            raise HTTPException(
+                status_code=409,
+                detail="File has been modified since it was loaded. Please reload and try again.",
+            )
+
+    # Validate the YAML content
+    try:
+        # First validate YAML syntax
+        yaml.safe_load(request.content)
+
+        # Then validate workflow structure by parsing
+        # We need to save to a temp file to use parse_workflow_yaml
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as tmp:
+            tmp.write(request.content)
+            tmp_path = Path(tmp.name)
+
+        try:
+            workflow = parse_workflow_yaml(tmp_path)
+        finally:
+            tmp_path.unlink()  # Clean up temp file
+
+    except yaml.YAMLError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid YAML syntax: {e}") from e
+    except WorkflowParseError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid workflow: {e}") from e
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Validation error: {e}") from e
+
+    # Create backup
+    backup_path = path.with_suffix(path.suffix + ".bak")
+    try:
+        shutil.copy2(path, backup_path)
+    except Exception as e:
+        logger.warning(f"Failed to create backup: {e}")
+
+    # Save the new content
+    try:
+        path.write_text(request.content)
+        new_stat = path.stat()
+        return {
+            "success": True,
+            "path": str(path),
+            "modified": new_stat.st_mtime,
+            "workflow": {
+                "name": workflow.name,
+                "version": workflow.version,
+            },
+        }
+    except Exception as e:
+        # Try to restore from backup
+        if backup_path.exists():
+            try:
+                shutil.copy2(backup_path, path)
+            except Exception:
+                pass
+        raise HTTPException(
+            status_code=500, detail=f"Failed to save workflow: {e}"
+        ) from e
 
 
 @app.post("/workflows/{workflow_path:path}/run", response_model=WorkflowRunResponse)
