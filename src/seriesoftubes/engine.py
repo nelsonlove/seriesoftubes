@@ -1,5 +1,6 @@
 """DAG execution engine for seriesoftubes workflows"""
 
+import asyncio
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -14,7 +15,6 @@ from seriesoftubes.nodes import (
     NodeResult,
     RouteNodeExecutor,
 )
-from seriesoftubes.parser import topological_sort
 
 
 class ExecutionContext:
@@ -75,29 +75,30 @@ class WorkflowEngine:
         # Create execution context
         context = ExecutionContext(workflow, validated_inputs)
 
-        # Get execution order
-        execution_order = topological_sort(workflow)
+        # Get execution order and groups for parallel execution
+        execution_groups = self._get_execution_groups(workflow)
 
-        # Execute nodes in order
-        for node_name in execution_order:
-            node = workflow.nodes[node_name]
-
-            # Check if we should skip this node (for routing)
-            if self._should_skip_node(node, context):
-                continue
-
-            # Execute the node
-            try:
-                result = await self._execute_node(node, context)
-                if result.success:
-                    context.set_output(node_name, result.output)
-                else:
-                    context.set_error(node_name, result.error or "Unknown error")
-                    # For now, fail fast on errors
-                    break
-            except Exception as e:
-                context.set_error(node_name, str(e))
+        # Execute nodes in parallel groups
+        for group in execution_groups:
+            # Skip if we've encountered errors (fail fast)
+            if context.errors:
                 break
+
+            # Execute all nodes in this group in parallel
+            tasks = []
+            for node_name in group:
+                node = workflow.nodes[node_name]
+
+                # Check if we should skip this node (for routing)
+                if self._should_skip_node(node, context):
+                    continue
+
+                # Create task for this node
+                tasks.append(self._execute_node_async(node_name, node, context))
+
+            # Wait for all tasks in this group to complete
+            if tasks:
+                await asyncio.gather(*tasks)
 
         return context
 
@@ -149,6 +150,56 @@ class WorkflowEngine:
 
         # Execute the node
         return await executor.execute(node, context)
+
+    async def _execute_node_async(
+        self, node_name: str, node: Node, context: ExecutionContext
+    ) -> None:
+        """Execute a node and update context (for parallel execution)"""
+        try:
+            result = await self._execute_node(node, context)
+            if result.success:
+                context.set_output(node_name, result.output)
+            else:
+                context.set_error(node_name, result.error or "Unknown error")
+        except Exception as e:
+            context.set_error(node_name, str(e))
+
+    def _get_execution_groups(self, workflow: Workflow) -> list[list[str]]:
+        """Group nodes by execution level for parallel processing
+
+        Returns list of groups where each group contains nodes that can run in parallel
+        """
+        nodes = workflow.nodes
+        levels: dict[str, int] = {}  # Node name -> execution level
+
+        # Calculate execution level for each node
+        def get_level(node_name: str) -> int:
+            if node_name in levels:
+                return levels[node_name]
+
+            node = nodes[node_name]
+            if not node.depends_on:
+                levels[node_name] = 0
+            else:
+                # Level is max of dependencies + 1
+                dep_levels = [get_level(dep) for dep in node.depends_on]
+                levels[node_name] = max(dep_levels) + 1
+
+            return levels[node_name]
+
+        # Calculate levels for all nodes
+        for node_name in nodes:
+            get_level(node_name)
+
+        # Group nodes by level
+        max_level = max(levels.values()) if levels else -1
+        groups = []
+        for level in range(max_level + 1):
+            group = [name for name, node_level in levels.items() if node_level == level]
+            if group:
+                groups.append(group)
+
+        return groups
 
 
 async def run_workflow(
