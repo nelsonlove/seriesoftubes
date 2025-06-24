@@ -2,14 +2,21 @@
 
 import asyncio
 import json
+import os
+import shutil
+import tempfile
+import zipfile
 from pathlib import Path
 from typing import Annotated, Any
 
+import httpx
 import jsonschema
 import typer
 import yaml
 from rich.console import Console
+from rich.table import Table
 
+from seriesoftubes.cli.client import APIClient, get_cli_config
 from seriesoftubes.engine import run_workflow
 from seriesoftubes.parser import WorkflowParseError, parse_workflow_yaml, validate_dag
 
@@ -53,81 +60,181 @@ def parse_input_args(input_list: list[str] | None) -> dict[str, Any]:
 
 
 @app.command()
+def auth(
+    action: Annotated[str, typer.Argument(help="Action: login, register, or status")],
+    username: Annotated[str | None, typer.Option("--username", "-u")] = None,
+    password: Annotated[str | None, typer.Option("--password", "-p")] = None,
+    email: Annotated[str | None, typer.Option("--email", "-e")] = None,
+) -> None:
+    """Authenticate with the SeriesOfTubes API
+
+    Examples:
+        s10s auth status
+        s10s auth login -u myuser
+        s10s auth register -u newuser -e user@example.com
+    """
+    with APIClient() as client:
+        if action == "status":
+            if client.token:
+                console.print("[green]✓ Authenticated[/green]")
+                console.print(f"API URL: {client.config.api_url}")
+            else:
+                console.print("[yellow]⚠ Not authenticated[/yellow]")
+                console.print("Run 's10s auth login' to authenticate")
+        
+        elif action == "login":
+            if not username:
+                username = typer.prompt("Username")
+            if not password:
+                password = typer.prompt("Password", hide_input=True)
+            
+            try:
+                result = client.login(username, password)
+                console.print(f"[green]✓ Logged in as {username}[/green]")
+            except httpx.HTTPStatusError as e:
+                console.print(f"[red]✗ Login failed: {e.response.text}[/red]")
+                raise typer.Exit(1) from e
+        
+        elif action == "register":
+            if not username:
+                username = typer.prompt("Username")
+            if not email:
+                email = typer.prompt("Email")
+            if not password:
+                password = typer.prompt("Password", hide_input=True)
+                confirm = typer.prompt("Confirm password", hide_input=True)
+                if password != confirm:
+                    console.print("[red]✗ Passwords don't match[/red]")
+                    raise typer.Exit(1)
+            
+            try:
+                result = client.register(username, email, password)
+                console.print(f"[green]✓ Registered user {username}[/green]")
+                console.print("Now run 's10s auth login' to authenticate")
+            except httpx.HTTPStatusError as e:
+                console.print(f"[red]✗ Registration failed: {e.response.text}[/red]")
+                raise typer.Exit(1) from e
+        
+        else:
+            console.print(f"[red]✗ Unknown action: {action}[/red]")
+            console.print("Valid actions: login, register, status")
+            raise typer.Exit(1)
+
+
+@app.command()
 def run(
-    workflow: Annotated[Path, typer.Argument(help="Path to workflow YAML file")],
+    workflow: Annotated[str, typer.Argument(help="Path to workflow YAML file or workflow ID")],
     inputs: Annotated[list[str] | None, typer.Option("--inputs", "-i")] = None,
     output_dir: Annotated[Path | None, typer.Option("--output-dir", "-o")] = None,
     no_save: Annotated[bool, typer.Option("--no-save")] = False,  # noqa: FBT002
+    api: Annotated[bool, typer.Option("--api", help="Run via API instead of locally")] = False,
 ) -> None:
-    """Run a workflow from a YAML file
+    """Run a workflow from a YAML file or via API
 
     Examples:
         s10s run workflow.yaml
         s10s run workflow.yaml -i text="Hello world" -i count=5
         s10s run workflow.yaml --no-save
         s10s run workflow.yaml -o ./my-outputs
+        s10s run workflow-id --api -i company="Acme Corp"
     """
-    console.print(f"[bold]Running workflow:[/bold] {workflow}")
+    # Parse inputs
+    parsed_inputs = parse_input_args(inputs)
 
-    try:
-        # Parse the workflow
-        wf = parse_workflow_yaml(workflow)
-        console.print(f"✓ Loaded workflow: [green]{wf.name} v{wf.version}[/green]")
+    if api:
+        # Run via API
+        console.print(f"[bold]Running workflow via API:[/bold] {workflow}")
+        
+        with APIClient() as client:
+            try:
+                # Run the workflow
+                result = client.run_workflow(workflow, parsed_inputs, use_db=True)
+                console.print(f"✓ Started execution: [green]{result['execution_id']}[/green]")
+                
+                # Stream updates
+                console.print("\n[bold]Execution progress:[/bold]")
+                import json as json_lib
+                
+                for line in client.stream_execution(result['execution_id'], use_db=True):
+                    if line.startswith("data:"):
+                        data = json_lib.loads(line[5:])
+                        if data.get("status") == "completed":
+                            console.print("\n[bold green]✓ Workflow completed successfully![/bold green]")
+                            if data.get("outputs"):
+                                console.print("\n[bold]Outputs:[/bold]")
+                                console.print(json_lib.dumps(data["outputs"], indent=2))
+                        elif data.get("status") == "failed":
+                            console.print("\n[bold red]✗ Workflow failed![/bold red]")
+                            if data.get("errors"):
+                                console.print("\n[bold]Errors:[/bold]")
+                                console.print(json_lib.dumps(data["errors"], indent=2))
+                        else:
+                            console.print(f"Status: {data.get('status')}")
+                            
+            except httpx.HTTPStatusError as e:
+                console.print(f"[red]✗ API error: {e.response.text}[/red]")
+                raise typer.Exit(1) from e
+    else:
+        # Run locally
+        console.print(f"[bold]Running workflow locally:[/bold] {workflow}")
+        
+        try:
+            # Parse the workflow
+            wf = parse_workflow_yaml(Path(workflow))
+            console.print(f"✓ Loaded workflow: [green]{wf.name} v{wf.version}[/green]")
 
-        # Parse inputs
-        parsed_inputs = parse_input_args(inputs)
-        if parsed_inputs:
-            console.print(f"✓ Parsed inputs: {list(parsed_inputs.keys())}")
+            if parsed_inputs:
+                console.print(f"✓ Parsed inputs: {list(parsed_inputs.keys())}")
 
-        # Run the workflow
-        console.print("\n[bold]Executing workflow...[/bold]")
-        results = asyncio.run(
-            run_workflow(
-                wf,
-                parsed_inputs,
-                save_outputs=not no_save,
-                output_dir=output_dir,
-            )
-        )
-
-        # Display results
-        if results["success"]:
-            console.print(
-                "\n[bold green]✓ Workflow completed successfully![/bold green]"
-            )
-
-            if results["outputs"]:
-                console.print("\n[bold]Outputs:[/bold]")
-                for key, value in results["outputs"].items():
-                    # Pretty print JSON outputs
-                    if isinstance(value, dict | list):
-                        value_str = json.dumps(value, indent=2)
-                    else:
-                        value_str = str(value)
-                    console.print(f"  [cyan]{key}:[/cyan] {value_str}")
-
-            if not no_save:
-                console.print(
-                    "\n[dim]Results saved to: "
-                    f"{output_dir or 'outputs'}/{results['execution_id']}/[/dim]"
+            # Run the workflow
+            console.print("\n[bold]Executing workflow...[/bold]")
+            results = asyncio.run(
+                run_workflow(
+                    wf,
+                    parsed_inputs,
+                    save_outputs=not no_save,
+                    output_dir=output_dir,
                 )
-        else:
-            console.print("\n[bold red]✗ Workflow failed![/bold red]")
-            if results["errors"]:
-                console.print("\n[bold]Errors:[/bold]")
-                for node, error in results["errors"].items():
-                    console.print(f"  [red]{node}:[/red] {error}")
-            raise typer.Exit(1)
+            )
 
-    except WorkflowParseError as e:
-        console.print(f"\n[bold red]✗ Workflow parse error:[/bold red] {e}")
-        raise typer.Exit(1) from None
-    except ValueError as e:
-        console.print(f"\n[bold red]✗ Validation error:[/bold red] {e}")
-        raise typer.Exit(1) from None
-    except Exception as e:
-        console.print(f"\n[bold red]✗ Unexpected error:[/bold red] {e}")
-        raise typer.Exit(1) from None
+            # Display results
+            if results["success"]:
+                console.print(
+                    "\n[bold green]✓ Workflow completed successfully![/bold green]"
+                )
+
+                if results["outputs"]:
+                    console.print("\n[bold]Outputs:[/bold]")
+                    for key, value in results["outputs"].items():
+                        # Pretty print JSON outputs
+                        if isinstance(value, dict | list):
+                            value_str = json.dumps(value, indent=2)
+                        else:
+                            value_str = str(value)
+                        console.print(f"  [cyan]{key}:[/cyan] {value_str}")
+
+                if not no_save:
+                    console.print(
+                        "\n[dim]Results saved to: "
+                        f"{output_dir or 'outputs'}/{results['execution_id']}/[/dim]"
+                    )
+            else:
+                console.print("\n[bold red]✗ Workflow failed![/bold red]")
+                if results["errors"]:
+                    console.print("\n[bold]Errors:[/bold]")
+                    for node, error in results["errors"].items():
+                        console.print(f"  [red]{node}:[/red] {error}")
+                raise typer.Exit(1)
+
+        except WorkflowParseError as e:
+            console.print(f"\n[bold red]✗ Workflow parse error:[/bold red] {e}")
+            raise typer.Exit(1) from None
+        except ValueError as e:
+            console.print(f"\n[bold red]✗ Validation error:[/bold red] {e}")
+            raise typer.Exit(1) from None
+        except Exception as e:
+            console.print(f"\n[bold red]✗ Unexpected error:[/bold red] {e}")
+            raise typer.Exit(1) from None
 
 
 @app.command()
@@ -204,14 +311,55 @@ def list_workflows(
             "--exclude", "-e", help="Patterns to exclude (e.g., '.*', 'test/*')"
         ),
     ] = None,
+    api: Annotated[bool, typer.Option("--api", help="List workflows from API")] = False,
 ) -> None:
-    """List available workflows in the current directory
+    """List available workflows in the current directory or from API
 
     Examples:
         s10s list
         s10s list -d ./workflows
         s10s list -e ".*" -e "test/*"  # Exclude hidden files and test directory
+        s10s list --api  # List from API/database
     """
+    if api:
+        # List from API
+        console.print("[bold]Listing workflows from API:[/bold]")
+        
+        with APIClient() as client:
+            try:
+                workflows = client.list_workflows(use_db=True)
+                
+                if not workflows:
+                    console.print("\n[yellow]No workflows found in database[/yellow]")
+                    console.print("Upload workflows using 's10s workflow upload'")
+                    return
+                
+                # Create table
+                table = Table(show_header=True, header_style="bold magenta")
+                table.add_column("Name", style="cyan")
+                table.add_column("Version", style="green")
+                table.add_column("Owner", style="yellow")
+                table.add_column("Public", style="blue")
+                table.add_column("Description", style="dim")
+                
+                for wf in workflows:
+                    table.add_row(
+                        wf["name"],
+                        wf["version"],
+                        wf["username"],
+                        "✓" if wf["is_public"] else "✗",
+                        (wf.get("description") or "")[:50] + "..." if len(wf.get("description", "")) > 50 else wf.get("description", ""),
+                    )
+                
+                console.print(table)
+                console.print(f"\n[dim]Total workflows: {len(workflows)}[/dim]")
+                
+            except httpx.HTTPStatusError as e:
+                console.print(f"[red]✗ API error: {e.response.text}[/red]")
+                raise typer.Exit(1) from e
+        return
+    
+    # List from filesystem
     console.print(f"[bold]Searching for workflows in:[/bold] {directory}")
 
     # Find all YAML files
@@ -385,6 +533,133 @@ def test(
     except Exception as e:
         console.print(f"\n[bold red]✗ Test failed:[/bold red] {e}")
         raise typer.Exit(1) from None
+
+
+# Create workflow subcommand group
+workflow_app = typer.Typer(
+    name="workflow",
+    help="Manage workflows in the database",
+    no_args_is_help=True,
+)
+app.add_typer(workflow_app, name="workflow")
+
+
+@workflow_app.command()
+def upload(
+    path: Annotated[Path, typer.Argument(help="Path to workflow package (ZIP file)")],
+) -> None:
+    """Upload a workflow package (ZIP file)
+
+    Example:
+        s10s workflow upload my-workflow.zip
+    """
+    if not path.exists():
+        console.print(f"[red]✗ File not found: {path}[/red]")
+        raise typer.Exit(1)
+    
+    if not path.suffix == ".zip":
+        console.print("[red]✗ File must be a ZIP archive[/red]")
+        raise typer.Exit(1)
+    
+    console.print(f"[bold]Uploading workflow package:[/bold] {path}")
+    
+    with APIClient() as client:
+        try:
+            result = client.upload_workflow_package(path)
+            console.print(f"[green]✓ Uploaded workflow: {result['name']} v{result['version']}[/green]")
+            console.print(f"  ID: {result['id']}")
+            console.print(f"  Owner: {result['username']}")
+        except httpx.HTTPStatusError as e:
+            console.print(f"[red]✗ Upload failed: {e.response.text}[/red]")
+            raise typer.Exit(1) from e
+
+
+@workflow_app.command()
+def create(
+    path: Annotated[Path, typer.Argument(help="Path to workflow YAML file")],
+    name: Annotated[str | None, typer.Option("--name", "-n")] = None,
+    version: Annotated[str | None, typer.Option("--version", "-v")] = None,
+    description: Annotated[str | None, typer.Option("--description", "-d")] = None,
+) -> None:
+    """Create a workflow from a YAML file
+
+    Example:
+        s10s workflow create workflow.yaml
+        s10s workflow create workflow.yaml --name "My Workflow" --version "2.0.0"
+    """
+    if not path.exists():
+        console.print(f"[red]✗ File not found: {path}[/red]")
+        raise typer.Exit(1)
+    
+    console.print(f"[bold]Creating workflow from:[/bold] {path}")
+    
+    with APIClient() as client:
+        try:
+            # Read and parse workflow
+            yaml_content = path.read_text()
+            wf = parse_workflow_yaml(path)
+            
+            # Use workflow metadata or provided values
+            name = name or wf.name
+            version = version or wf.version
+            description = description or wf.description
+            
+            result = client.create_workflow(name, version, yaml_content, description)
+            console.print(f"[green]✓ Created workflow: {result['name']} v{result['version']}[/green]")
+            console.print(f"  ID: {result['id']}")
+            console.print(f"  Owner: {result['username']}")
+        except httpx.HTTPStatusError as e:
+            console.print(f"[red]✗ Creation failed: {e.response.text}[/red]")
+            raise typer.Exit(1) from e
+
+
+@workflow_app.command()
+def package(
+    path: Annotated[Path, typer.Argument(help="Path to workflow directory")],
+    output: Annotated[Path | None, typer.Option("--output", "-o")] = None,
+    name: Annotated[str | None, typer.Option("--name", "-n")] = None,
+    version: Annotated[str | None, typer.Option("--version", "-v")] = None,
+) -> None:
+    """Package a workflow directory into a ZIP file
+
+    Example:
+        s10s workflow package ./my-workflow
+        s10s workflow package ./my-workflow -o package.zip
+        s10s workflow package ./my-workflow -n "My Workflow" -v "1.0.0"
+    """
+    if not path.exists():
+        console.print(f"[red]✗ Directory not found: {path}[/red]")
+        raise typer.Exit(1)
+    
+    workflow_file = path / "workflow.yaml"
+    if not workflow_file.exists():
+        console.print(f"[red]✗ No workflow.yaml found in {path}[/red]")
+        raise typer.Exit(1)
+    
+    # Parse workflow to get metadata
+    wf = parse_workflow_yaml(workflow_file)
+    name = name or wf.name
+    version = version or wf.version
+    
+    # Determine output path
+    if not output:
+        output = Path(f"{name}_{version}.zip")
+    
+    console.print(f"[bold]Creating workflow package:[/bold] {output}")
+    
+    with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as zf:
+        # Add all files from the directory
+        file_count = 0
+        for file in path.rglob("*"):
+            if file.is_file() and not file.name.startswith("."):
+                arcname = file.relative_to(path)
+                zf.write(file, arcname)
+                console.print(f"  Added: {arcname}")
+                file_count += 1
+    
+    console.print(f"[green]✓ Created package: {output}[/green]")
+    console.print(f"  Files: {file_count}")
+    console.print(f"  Size: {output.stat().st_size / 1024:.1f} KB")
 
 
 @app.command()
