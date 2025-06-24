@@ -387,5 +387,97 @@ def test(
         raise typer.Exit(1) from None
 
 
+@app.command()
+def docs(
+    subcommand: Annotated[
+        str, typer.Argument(help="Subcommand: generate, serve")
+    ] = "generate",
+    *,
+    output: Annotated[
+        Path | None, typer.Option("--output", "-o", help="Output directory")
+    ] = None,
+    port: Annotated[
+        int, typer.Option("--port", "-p", help="Port for serving docs")
+    ] = 8000,
+) -> None:
+    """Generate or serve workflow documentation
+    
+    Commands:
+        generate - Generate documentation from schema
+        serve    - Serve documentation locally (requires generated docs)
+    
+    Examples:
+        s10s docs generate
+        s10s docs serve --port 8080
+    """
+    if subcommand == "generate":
+        console.print("[bold]Generating documentation from schema...[/bold]")
+        
+        try:
+            # Run the documentation generator
+            from pathlib import Path
+            import subprocess
+            import sys
+            
+            script_path = Path(__file__).parent.parent.parent / "scripts" / "generate_docs.py"
+            
+            if not script_path.exists():
+                console.print(f"[red]Error: Documentation generator script not found at {script_path}[/red]")
+                raise typer.Exit(1)
+            
+            # Run the script
+            result = subprocess.run(
+                [sys.executable, str(script_path)],
+                capture_output=True,
+                text=True
+            )
+            
+            if result.returncode == 0:
+                console.print(result.stdout)
+                console.print("\n[bold green]✓ Documentation generated successfully![/bold green]")
+                console.print("\nDocumentation files created in:")
+                console.print("  • docs/reference/nodes/ - Node type reference")
+                console.print("  • docs/guides/ - Workflow guides")
+                console.print("  • .vscode/ - VS Code snippets")
+            else:
+                console.print(f"[red]Error generating documentation:[/red]\n{result.stderr}")
+                raise typer.Exit(1)
+                
+        except Exception as e:
+            console.print(f"[red]Failed to generate documentation:[/red] {e}")
+            raise typer.Exit(1)
+            
+    elif subcommand == "serve":
+        console.print(f"[bold]Serving documentation on port {port}...[/bold]")
+        
+        docs_dir = Path("docs")
+        if not docs_dir.exists():
+            console.print("[red]Error: Documentation not found. Run 's10s docs generate' first.[/red]")
+            raise typer.Exit(1)
+        
+        try:
+            import http.server
+            import socketserver
+            import os
+            
+            os.chdir(docs_dir)
+            
+            Handler = http.server.SimpleHTTPRequestHandler
+            with socketserver.TCPServer(("", port), Handler) as httpd:
+                console.print(f"\n[green]Documentation server running at http://localhost:{port}[/green]")
+                console.print("[dim]Press Ctrl+C to stop[/dim]\n")
+                httpd.serve_forever()
+                
+        except KeyboardInterrupt:
+            console.print("\n[yellow]Server stopped[/yellow]")
+        except Exception as e:
+            console.print(f"[red]Failed to start server:[/red] {e}")
+            raise typer.Exit(1)
+    else:
+        console.print(f"[red]Unknown subcommand: {subcommand}[/red]")
+        console.print("Available subcommands: generate, serve")
+        raise typer.Exit(1)
+
+
 if __name__ == "__main__":
     app()
