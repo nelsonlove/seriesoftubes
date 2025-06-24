@@ -14,6 +14,10 @@ from seriesoftubes.nodes import NodeResult
 class SlowHTTPNodeExecutor:
     """Mock HTTP executor that simulates slow API calls"""
 
+    # Required schema attributes
+    input_schema_class = None
+    output_schema_class = None
+
     def __init__(self, delay: float = 1.0):
         self.delay = delay
         self.call_times = {}

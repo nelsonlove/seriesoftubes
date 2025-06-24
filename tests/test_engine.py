@@ -155,7 +155,13 @@ async def test_run_workflow(simple_workflow, tmp_path):
     mock_context.execution_id = "test-id"
     mock_context.start_time = MagicMock(isoformat=lambda: "2023-01-01T00:00:00")
     mock_context.errors = {}
-    mock_context.outputs = {"route_node": "hello_path"}
+    mock_context.validation_errors = {}
+    mock_context.outputs = {
+        "route_node": {
+            "selected_route": "hello_path",
+            "condition_met": "inputs.text == 'hello'",
+        }
+    }
 
     with patch(
         "seriesoftubes.engine.WorkflowEngine.execute", return_value=mock_context
@@ -167,7 +173,10 @@ async def test_run_workflow(simple_workflow, tmp_path):
 
         # Check results
         assert results["success"] is True
-        assert results["outputs"]["result"] == "hello_path"
+        assert results["outputs"]["result"] == {
+            "selected_route": "hello_path",
+            "condition_met": "inputs.text == 'hello'",
+        }
         assert results["execution_id"] == "test-id"
 
         # Check files were saved
@@ -180,7 +189,10 @@ async def test_run_workflow(simple_workflow, tmp_path):
         with open(output_dir / "execution.json") as f:
             saved_results = json.load(f)
             assert saved_results["success"] is True
-            assert saved_results["outputs"]["result"] == "hello_path"
+            assert saved_results["outputs"]["result"] == {
+                "selected_route": "hello_path",
+                "condition_met": "inputs.text == 'hello'",
+            }
 
 
 @pytest.mark.asyncio
@@ -190,7 +202,13 @@ async def test_run_workflow_no_save(simple_workflow, tmp_path):
     mock_context.execution_id = "test-id"
     mock_context.start_time = MagicMock(isoformat=lambda: "2023-01-01T00:00:00")
     mock_context.errors = {}
-    mock_context.outputs = {"route_node": "hello_path"}
+    mock_context.validation_errors = {}
+    mock_context.outputs = {
+        "route_node": {
+            "selected_route": "hello_path",
+            "condition_met": "inputs.text == 'hello'",
+        }
+    }
 
     with patch(
         "seriesoftubes.engine.WorkflowEngine.execute", return_value=mock_context
@@ -205,7 +223,10 @@ async def test_run_workflow_no_save(simple_workflow, tmp_path):
 
         # Check results
         assert results["success"] is True
-        assert results["outputs"]["result"] == "hello_path"
+        assert results["outputs"]["result"] == {
+            "selected_route": "hello_path",
+            "condition_met": "inputs.text == 'hello'",
+        }
 
         # Ensure no files were created for this execution
         assert not (tmp_path / "outputs" / "test-id").exists()

@@ -58,7 +58,7 @@ return result
 
         result = await executor.execute(node, basic_context)
         assert result.success
-        assert result.output == 2034
+        assert result.output["result"] == 2034
 
     async def test_complex_data_processing(self, executor, basic_context):
         """Test complex data processing with context"""
@@ -88,10 +88,10 @@ return {
 
         result = await executor.execute(node, basic_context)
         assert result.success
-        assert result.output["company"] == "Acme Corp"
-        assert result.output["high_value"] is True
-        assert result.output["size"] == "small"
-        assert result.output["score"] == 20000
+        assert result.output["result"]["company"] == "Acme Corp"
+        assert result.output["result"]["high_value"] is True
+        assert result.output["result"]["size"] == "small"
+        assert result.output["result"]["score"] == 20000
 
     async def test_list_comprehension(self, executor):
         """Test Python list comprehensions"""
@@ -125,8 +125,8 @@ return {
 
         result = await executor.execute(node, context)
         assert result.success
-        assert result.output["count"] == 2
-        assert result.output["total"] == 300
+        assert result.output["result"]["count"] == 2
+        assert result.output["result"]["total"] == 300
 
     async def test_file_based_code(self, executor, basic_context):
         """Test executing code from a file"""
@@ -155,8 +155,10 @@ def analyze_company():
 
             result = await executor.execute(node, basic_context)
             assert result.success
-            assert result.output["message"] == "Analysis for Acme Corp in 2024"
-            assert result.output["next_year"] == 2025
+            assert (
+                result.output["result"]["message"] == "Analysis for Acme Corp in 2024"
+            )
+            assert result.output["result"]["next_year"] == 2025
         finally:
             Path(temp_file).unlink()
 
@@ -179,8 +181,8 @@ result = {
         result = await executor.execute(node, basic_context)
         assert result.success
         # Should return the modified context
-        assert result.output["processed"] is True
-        assert result.output["company"] == "ACME CORP"
+        assert result.output["result"]["processed"] is True
+        assert result.output["result"]["company"] == "ACME CORP"
 
 
 @pytest.mark.asyncio
@@ -244,8 +246,8 @@ return result
 
         result = await executor.execute(node, basic_context)
         assert result.success
-        assert result.output["pi"] == pytest.approx(3.14159, rel=1e-5)
-        assert result.output["sqrt"] == 4.0
+        assert result.output["result"]["pi"] == pytest.approx(3.14159, rel=1e-5)
+        assert result.output["result"]["sqrt"] == 4.0
 
     async def test_timeout(self, executor, basic_context):
         """Test execution timeout"""
@@ -390,11 +392,11 @@ return {
 
         result = await executor.execute(node, context)
         assert result.success
-        assert result.output["filtered_count"] == 2
-        assert set(result.output["categories"]) == {"A"}
-        assert result.output["statistics"]["A"]["count"] == 2
-        assert result.output["statistics"]["A"]["average"] == 175
-        assert result.output["top_item"]["id"] == 3
+        assert result.output["result"]["filtered_count"] == 2
+        assert set(result.output["result"]["categories"]) == {"A"}
+        assert result.output["result"]["statistics"]["A"]["count"] == 2
+        assert result.output["result"]["statistics"]["A"]["average"] == 175
+        assert result.output["result"]["top_item"]["id"] == 3
 
     async def test_json_manipulation(self, executor, basic_context):
         """Test JSON serialization capabilities"""
@@ -426,4 +428,4 @@ return {
 
         result = await executor.execute(node, basic_context)
         assert result.success
-        assert result.output["roundtrip_success"] is True
+        assert result.output["result"]["roundtrip_success"] is True

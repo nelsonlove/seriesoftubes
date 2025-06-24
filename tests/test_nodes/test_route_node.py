@@ -54,7 +54,8 @@ async def test_route_node_executor():
     result = await executor.execute(node, context)
 
     assert result.success
-    assert result.output == "high_score_path"
+    assert result.output["selected_route"] == "high_score_path"
+    assert result.output["condition_met"] == "data.score > 0.5"
     assert result.metadata["condition"] == "data.score > 0.5"
 
     # Test low score path
@@ -62,7 +63,8 @@ async def test_route_node_executor():
     result = await executor.execute(node, context)
 
     assert result.success
-    assert result.output == "low_score_path"
+    assert result.output["selected_route"] == "low_score_path"
+    assert result.output["condition_met"] == "data.score <= 0.5"
     assert result.metadata["condition"] == "data.score <= 0.5"
 
 
@@ -87,5 +89,6 @@ async def test_route_node_default():
     result = await executor.execute(node, context)
 
     assert result.success
-    assert result.output == "default_path"
+    assert result.output["selected_route"] == "default_path"
+    assert result.output["condition_met"] is None
     assert result.metadata["condition"] == "default"

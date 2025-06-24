@@ -61,7 +61,9 @@ async def test_llm_node_with_openai():
             result = await executor.execute(node, context)
 
             assert result.success
-            assert result.output == {"extracted": "information"}
+            assert result.output["response"] == '{"extracted": "information"}'
+            assert result.output["structured_output"] == {"extracted": "information"}
+            assert result.output["model_used"] == "gpt-4o-mini"
             # Check that the prompt contains the expected data
             # (It will be formatted as DotDict in the actual call)
             call_args = mock_call.call_args[0]
@@ -101,7 +103,9 @@ async def test_llm_node_with_anthropic():
             result = await executor.execute(node, context)
 
             assert result.success
-            assert result.output == {"summary": "text summary"}
+            assert result.output["response"] == '{"summary": "text summary"}'
+            assert result.output["structured_output"] == {"summary": "text summary"}
+            assert result.output["model_used"] == "claude-3-sonnet"
             mock_call.assert_called_once_with(
                 "Summarize this text",
                 "claude-3-sonnet",
@@ -149,7 +153,9 @@ async def test_llm_node_with_schema():
             result = await executor.execute(node, context)
 
             assert result.success
-            assert result.output == {"name": "John", "age": 30}
+            assert result.output["response"] == '{"name": "John", "age": 30}'
+            assert result.output["structured_output"] == {"name": "John", "age": 30}
+            assert result.output["model_used"] == "gpt-4"
             # Check call was made with correct schema
             call_args = mock_call.call_args[0]
             assert call_args[0] == "Extract person information"
@@ -193,7 +199,9 @@ async def test_llm_node_with_prompt_file(tmp_path):
             result = await executor.execute(node, context)
 
             assert result.success
-            assert result.output == {"analysis": "results"}
+            assert result.output["response"] == '{"analysis": "results"}'
+            assert result.output["structured_output"] == {"analysis": "results"}
+            assert result.output["model_used"] == "gpt-4"
             # Should use the template with context data
             mock_call.assert_called_once()
             assert "Analyze this: test data" in mock_call.call_args[0][0]
@@ -235,7 +243,7 @@ async def test_llm_node_invalid_config():
 
     # Node creation should fail with invalid config
     with pytest.raises(ValidationError) as exc_info:
-        node = Node(
+        Node(
             name="bad_config",
             type=NodeType.LLM,
             depends_on=[],

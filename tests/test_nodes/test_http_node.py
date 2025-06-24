@@ -55,13 +55,16 @@ async def test_http_get_request():
         mock_response.status_code = 200
         mock_response.json.return_value = {"result": "success"}
         mock_response.headers = {}
+        mock_response.url = "https://api.example.com/data"
         mock_client.request.return_value = mock_response
         mock_client_class.return_value.__aenter__.return_value = mock_client
 
         result = await executor.execute(node, context)
 
         assert result.success
-        assert result.output == {"result": "success"}
+        assert result.output["body"] == {"result": "success"}
+        assert result.output["status_code"] == 200
+        assert result.output["url"] == "https://api.example.com/data"
         assert result.metadata["status_code"] == 200
 
         mock_client.request.assert_called_once_with(
@@ -98,13 +101,15 @@ async def test_http_post_request_with_body():
         mock_response.status_code = 201
         mock_response.json.return_value = {"id": 123}
         mock_response.headers = {}
+        mock_response.url = "https://api.example.com/submit"
         mock_client.request.return_value = mock_response
         mock_client_class.return_value.__aenter__.return_value = mock_client
 
         result = await executor.execute(node, context)
 
         assert result.success
-        assert result.output == {"id": 123}
+        assert result.output["body"] == {"id": 123}
+        assert result.output["status_code"] == 201
         assert result.metadata["status_code"] == 201
 
         # The template {{ previous_data }} renders to string representation of dict
@@ -141,13 +146,14 @@ async def test_http_with_auth():
         mock_response.status_code = 200
         mock_response.json.return_value = {"secure": "data"}
         mock_response.headers = {}
+        mock_response.url = "https://api.example.com/secure"
         mock_client.request.return_value = mock_response
         mock_client_class.return_value.__aenter__.return_value = mock_client
 
         result = await executor.execute(node, context)
 
         assert result.success
-        assert result.output == {"secure": "data"}
+        assert result.output["body"] == {"secure": "data"}
 
         # Check that Authorization header was added
         call_args = mock_client.request.call_args
@@ -178,13 +184,14 @@ async def test_http_with_query_params():
         mock_response.status_code = 200
         mock_response.json.return_value = {"results": []}
         mock_response.headers = {}
+        mock_response.url = "https://api.example.com/search"
         mock_client.request.return_value = mock_response
         mock_client_class.return_value.__aenter__.return_value = mock_client
 
         result = await executor.execute(node, context)
 
         assert result.success
-        assert result.output == {"results": []}
+        assert result.output["body"] == {"results": []}
 
         mock_client.request.assert_called_once_with(
             method="GET",
@@ -297,13 +304,14 @@ async def test_http_with_custom_timeout():
         mock_response.status_code = 200
         mock_response.json.return_value = {"slow": "response"}
         mock_response.headers = {}
+        mock_response.url = "https://api.example.com/slow"
         mock_client.request.return_value = mock_response
         mock_client_class.return_value.__aenter__.return_value = mock_client
 
         result = await executor.execute(node, context)
 
         assert result.success
-        assert result.output == {"slow": "response"}
+        assert result.output["body"] == {"slow": "response"}
 
         # Check that AsyncClient was created with the correct timeout
         mock_client_class.assert_called_once_with(timeout=60.0)

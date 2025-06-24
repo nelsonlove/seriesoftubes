@@ -73,7 +73,8 @@ class TestFileNodeExecutor:
         result = await executor.execute(node, context)
 
         assert result.success
-        assert result.output == {"key": "value", "number": 42}
+        assert result.output["data"] == {"key": "value", "number": 42}
+        assert result.output["metadata"]["files_read"] == 1
         assert result.metadata["files_read"] == 1
 
     @pytest.mark.asyncio
@@ -90,9 +91,9 @@ class TestFileNodeExecutor:
         result = await executor.execute(node, context)
 
         assert result.success
-        assert isinstance(result.output, list)
-        assert len(result.output) == 2
-        assert result.output[0] == {"name": "Alice", "age": "30", "city": "NYC"}
+        assert isinstance(result.output["data"], list)
+        assert len(result.output["data"]) == 2
+        assert result.output["data"][0] == {"name": "Alice", "age": "30", "city": "NYC"}
 
     @pytest.mark.asyncio
     async def test_read_yaml_file(self, temp_files):
@@ -108,7 +109,7 @@ class TestFileNodeExecutor:
         result = await executor.execute(node, context)
 
         assert result.success
-        assert result.output == {"config": {"enabled": True}}
+        assert result.output["data"] == {"config": {"enabled": True}}
 
     @pytest.mark.asyncio
     async def test_read_text_file(self, temp_files):
@@ -124,7 +125,7 @@ class TestFileNodeExecutor:
         result = await executor.execute(node, context)
 
         assert result.success
-        assert result.output == "Hello, world!"
+        assert result.output["data"] == "Hello, world!"
 
     @pytest.mark.asyncio
     async def test_read_jsonl_file(self, temp_files):
@@ -140,9 +141,9 @@ class TestFileNodeExecutor:
         result = await executor.execute(node, context)
 
         assert result.success
-        assert isinstance(result.output, list)
-        assert len(result.output) == 2
-        assert result.output[0] == {"id": 1, "name": "Alice"}
+        assert isinstance(result.output["data"], list)
+        assert len(result.output["data"]) == 2
+        assert result.output["data"][0] == {"id": 1, "name": "Alice"}
 
     @pytest.mark.asyncio
     async def test_glob_pattern(self, temp_files):
@@ -159,7 +160,7 @@ class TestFileNodeExecutor:
 
         assert result.success
         # With single file match, returns content directly
-        assert result.output == {"key": "value", "number": 42}
+        assert result.output["data"] == {"key": "value", "number": 42}
 
     @pytest.mark.asyncio
     async def test_merge_multiple_files(self, temp_files):
@@ -182,8 +183,8 @@ class TestFileNodeExecutor:
         result = await executor.execute(node, context)
 
         assert result.success
-        assert isinstance(result.output, list)
-        assert len(result.output) == 3  # 2 from first file + 1 from second
+        assert isinstance(result.output["data"], list)
+        assert len(result.output["data"]) == 3  # 2 from first file + 1 from second
 
     @pytest.mark.asyncio
     async def test_sample_and_limit(self, temp_files):
@@ -203,8 +204,8 @@ class TestFileNodeExecutor:
         result = await executor.execute(node, context)
 
         assert result.success
-        assert isinstance(result.output, list)
-        assert len(result.output) == 1
+        assert isinstance(result.output["data"], list)
+        assert len(result.output["data"]) == 1
 
     @pytest.mark.asyncio
     async def test_file_not_found(self):
@@ -255,7 +256,7 @@ class TestFileNodeExecutor:
         result = await executor.execute(node, context)
 
         assert result.success
-        assert result.output == {"key": "value", "number": 42}
+        assert result.output["data"] == {"key": "value", "number": 42}
 
     @pytest.mark.asyncio
     async def test_csv_without_header(self, temp_files):
@@ -277,8 +278,12 @@ class TestFileNodeExecutor:
         result = await executor.execute(node, context)
 
         assert result.success
-        assert isinstance(result.output, list)
-        assert result.output[0] == {"col_0": "Alice", "col_1": "30", "col_2": "NYC"}
+        assert isinstance(result.output["data"], list)
+        assert result.output["data"][0] == {
+            "col_0": "Alice",
+            "col_1": "30",
+            "col_2": "NYC",
+        }
 
     @pytest.mark.asyncio
     async def test_output_modes(self, temp_files):
@@ -299,8 +304,8 @@ class TestFileNodeExecutor:
         result = await executor.execute(node, context)
 
         assert result.success
-        assert isinstance(result.output, list)
-        assert result.output == [{"key": "value", "number": 42}]
+        assert isinstance(result.output["data"], list)
+        assert result.output["data"] == [{"key": "value", "number": 42}]
 
     @pytest.mark.asyncio
     async def test_auto_format_detection(self, temp_files):
@@ -321,4 +326,4 @@ class TestFileNodeExecutor:
         result = await executor.execute(node, context)
 
         assert result.success
-        assert isinstance(result.output, dict)
+        assert isinstance(result.output["data"], dict)
