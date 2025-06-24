@@ -12,8 +12,8 @@ from sse_starlette.sse import EventSourceResponse
 from seriesoftubes.api.execution import execution_manager
 from seriesoftubes.api.models import (
     ExecutionStatus,
-    WorkflowInfo,
     WorkflowDetail,
+    WorkflowInfo,
     WorkflowRunRequest,
     WorkflowRunResponse,
 )
@@ -109,12 +109,12 @@ async def get_workflow(workflow_path: str) -> WorkflowDetail:
                     name: {
                         "type": node.node_type.value,
                         "depends_on": node.depends_on,
-                        "config": node.config.model_dump() if node.config else {}
+                        "config": node.config.model_dump() if node.config else {},
                     }
                     for name, node in workflow.nodes.items()
                 },
-                "outputs": workflow.outputs
-            }
+                "outputs": workflow.outputs,
+            },
         )
     except WorkflowParseError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e

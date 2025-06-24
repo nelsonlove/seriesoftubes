@@ -80,10 +80,15 @@ class TestAPIEndpoints:
         """Test getting a specific workflow"""
         response = client.get(f"/workflows/{sample_workflow}")
         assert response.status_code == 200
-        workflow = response.json()
+        data = response.json()
+        assert "path" in data
+        assert "workflow" in data
+        workflow = data["workflow"]
         assert workflow["name"] == "test-api-workflow"
         assert workflow["version"] == "1.0"
         assert "message" in workflow["inputs"]
+        assert "nodes" in workflow
+        assert "outputs" in workflow
 
     def test_get_workflow_not_found(self, client):
         """Test getting non-existent workflow"""
