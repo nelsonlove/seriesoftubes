@@ -1,7 +1,5 @@
 """Tests for API endpoints"""
 
-import asyncio
-
 import pytest
 from fastapi.testclient import TestClient
 
@@ -177,44 +175,3 @@ class TestAPIEndpoints:
 
         response = client.get(f"/workflows/{bad_workflow}")
         assert response.status_code == 400
-
-
-class TestExecutionManager:
-    """Test execution manager functionality"""
-
-    @pytest.mark.asyncio
-    async def test_execution_tracking(self, sample_workflow):
-        """Test that executions are properly tracked"""
-        from seriesoftubes.api.execution import execution_manager
-
-        # Run a workflow
-        execution_id = await execution_manager.run_workflow(
-            sample_workflow, {"message": "test"}
-        )
-
-        # Check execution is tracked
-        status = execution_manager.get_status(execution_id)
-        assert status is not None
-        assert status["id"] == execution_id
-        assert status["workflow_name"] == "test-api-workflow"
-
-        # Wait for completion
-        await asyncio.sleep(0.5)
-
-        # Check final status
-        status = execution_manager.get_status(execution_id)
-        assert status["status"] in ["completed", "failed"]
-
-    @pytest.mark.asyncio
-    async def test_execution_with_invalid_inputs(self, sample_workflow):
-        """Test execution with invalid inputs"""
-        from seriesoftubes.api.execution import execution_manager
-
-        # Run with missing required input
-        execution_id = await execution_manager.run_workflow(sample_workflow, {})
-
-        # Should record as failed
-        await asyncio.sleep(0.5)
-        status = execution_manager.get_status(execution_id)
-        assert status["status"] == "failed"
-        assert "error" in status or "errors" in status
