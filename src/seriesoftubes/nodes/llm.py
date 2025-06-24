@@ -15,7 +15,7 @@ from seriesoftubes.schemas import LLMNodeInput, LLMNodeOutput
 
 class LLMNodeExecutor(NodeExecutor):
     """Executor for LLM nodes"""
-    
+
     input_schema_class = LLMNodeInput
     output_schema_class = LLMNodeOutput
 
@@ -34,11 +34,11 @@ class LLMNodeExecutor(NodeExecutor):
         try:
             # Prepare prompt
             prompt = self._prepare_prompt(config, context, node)
-            
+
             # Validate input if schema is defined
             context_data = self.prepare_context_data(node, context)
             input_data = {"prompt": prompt, "context_data": context_data}
-            
+
             # Apply input validation if configured
             if node.config.input_schema:
                 validated_input = self.validate_input(input_data)
@@ -74,12 +74,14 @@ class LLMNodeExecutor(NodeExecutor):
 
             # Structure the output
             output = {
-                "response": content if isinstance(content, str) else json.dumps(content),
+                "response": content
+                if isinstance(content, str)
+                else json.dumps(content),
                 "structured_output": content if isinstance(content, dict) else None,
                 "model_used": model,
                 "token_usage": None,  # TODO: Extract from API responses
             }
-            
+
             # Apply output validation if configured
             if node.config.output_schema:
                 output = self.validate_output(output)

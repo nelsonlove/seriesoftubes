@@ -46,7 +46,7 @@ except ImportError:
 
 class FileNodeExecutor(NodeExecutor):
     """Executor for file ingestion nodes"""
-    
+
     input_schema_class = FileNodeInput
     output_schema_class = FileNodeOutput
 
@@ -64,24 +64,26 @@ class FileNodeExecutor(NodeExecutor):
         try:
             # Prepare context for template rendering
             context_data = self.prepare_context_data(node, context)
-            
+
             # Validate input if schema is defined
             if node.config.input_schema:
                 # Extract the rendered path/pattern for validation
                 rendered_path = None
                 rendered_pattern = None
-                
+
                 if config.path:
                     rendered_path = self._render_template(config.path, context_data)
                 elif config.pattern:
-                    rendered_pattern = self._render_template(config.pattern, context_data)
-                
+                    rendered_pattern = self._render_template(
+                        config.pattern, context_data
+                    )
+
                 input_data = {
                     "path": rendered_path,
                     "pattern": rendered_pattern,
                 }
                 validated_input = self.validate_input(input_data)
-                
+
                 # Update config with validated values
                 if validated_input.get("path"):
                     config.path = validated_input["path"]
@@ -115,7 +117,7 @@ class FileNodeExecutor(NodeExecutor):
                     "format": config.format_type,
                 },
             }
-            
+
             # Apply output validation if configured
             if node.config.output_schema:
                 output = self.validate_output(output)

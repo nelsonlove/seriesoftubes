@@ -34,7 +34,7 @@ class BaseNodeConfig(BaseModel):
     context: dict[str, str] | None = Field(
         None, description="Map of variable names to node names for context"
     )
-    
+
     # Schema definitions for validation
     input_schema: dict[str, Any] | None = Field(
         None, description="Expected input schema for validation"

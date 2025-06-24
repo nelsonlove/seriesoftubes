@@ -6,8 +6,6 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from pydantic import ValidationError
-
 from seriesoftubes.models import Node, NodeType, Workflow
 from seriesoftubes.nodes import (
     FileNodeExecutor,
@@ -161,7 +159,7 @@ class WorkflowEngine:
 
         # Execute the node
         result = await executor.execute(node, context)
-        
+
         # If execution was successful, validate output against downstream requirements
         if result.success:
             validation_errors = self._validate_node_output(node, result.output, context)
@@ -170,7 +168,7 @@ class WorkflowEngine:
                     context.add_validation_error(node.name, error)
                 # Note: We don't fail the node here, just record validation errors
                 # This allows the workflow to continue and collect all validation issues
-        
+
         return result
 
     async def _execute_node_async(
@@ -227,27 +225,28 @@ class WorkflowEngine:
         self, node: Node, output: Any, context: ExecutionContext
     ) -> list[str]:
         """Validate node output against downstream node requirements
-        
+
         Returns list of validation error messages
         """
         errors = []
-        
+
         # Find all nodes that depend on this one
         downstream_nodes = [
-            n for n in context.workflow.nodes.values() 
-            if node.name in n.depends_on
+            n for n in context.workflow.nodes.values() if node.name in n.depends_on
         ]
-        
+
         for downstream_node in downstream_nodes:
             # Get the executor for the downstream node to check its input schema
             downstream_executor = self.executors.get(downstream_node.node_type)
             if not downstream_executor or not downstream_executor.input_schema_class:
                 continue
-                
+
             # Check if the downstream node expects this node's output
-            if downstream_node.config and hasattr(downstream_node.config, 'context'):
+            if downstream_node.config and hasattr(downstream_node.config, "context"):
                 context_mapping = downstream_node.config.context
-                
+                if context_mapping is None:
+                    continue
+
                 # Find which context keys map to this node's output
                 for context_key, source in context_mapping.items():
                     if source == node.name:
@@ -257,9 +256,10 @@ class WorkflowEngine:
                         # This is a simplified check
                         if output is None:
                             errors.append(
-                                f"Output is None but required by {downstream_node.name}.{context_key}"
+                                f"Output is None but required by "
+                                f"{downstream_node.name}.{context_key}"
                             )
-        
+
         return errors
 
 

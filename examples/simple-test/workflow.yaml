@@ -74,7 +74,7 @@ nodes:
         Company classification: {{ company }}
 
         Top repositories found:
-        {{ data['items']|length }} repositories total.
+        {% if data.body and data.body['items'] %}{{ data.body['items']|length }}{% else %}0{% endif %} repositories total.
 
         Just provide a 2-3 sentence summary.
 
@@ -86,7 +86,7 @@ nodes:
       context:
         data: fetch_data
       prompt: |
-        Quick summary: Found {{ data.total_count }} repositories for {{ inputs.company_name }} on GitHub.
+        Quick summary: Found {% if data.body and data.body.total_count %}{{ data.body.total_count }}{% else %}0{% endif %} repositories for {{ inputs.company_name }} on GitHub.
 
   standard_analysis:
     type: llm
@@ -99,7 +99,7 @@ nodes:
       prompt: |
         GitHub analysis for {{ inputs.company_name }}:
         - Company type: {{ company.size }}
-        - Total repositories found: {{ data.total_count }}
+        - Total repositories found: {% if data.body and data.body.total_count %}{{ data.body.total_count }}{% else %}0{% endif %}
 
         Provide a brief summary.
 

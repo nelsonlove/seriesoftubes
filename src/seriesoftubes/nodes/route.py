@@ -11,7 +11,7 @@ from seriesoftubes.schemas import RouteNodeInput, RouteNodeOutput
 
 class RouteNodeExecutor(NodeExecutor):
     """Executor for route/conditional nodes"""
-    
+
     input_schema_class = RouteNodeInput
     output_schema_class = RouteNodeOutput
 
@@ -29,7 +29,7 @@ class RouteNodeExecutor(NodeExecutor):
         try:
             # Prepare context for condition evaluation
             context_data = self.prepare_context_data(node, context)
-            
+
             # Validate input if schema is defined
             if node.config.input_schema:
                 input_data = {"context_data": context_data}
@@ -37,6 +37,7 @@ class RouteNodeExecutor(NodeExecutor):
                 context_data = validated_input["context_data"]
 
             # Evaluate each route condition
+            selected_route = None
             for route in config.routes:
                 if route.default:
                     # This is the default route, select it if no other matches
@@ -48,11 +49,11 @@ class RouteNodeExecutor(NodeExecutor):
                             "selected_route": route.to,
                             "condition_met": route.when,
                         }
-                        
+
                         # Apply output validation if configured
                         if node.config.output_schema:
                             output = self.validate_output(output)
-                        
+
                         return NodeResult(
                             output=output,
                             success=True,
@@ -63,15 +64,22 @@ class RouteNodeExecutor(NodeExecutor):
                         )
 
             # If we get here, use the default route
+            if selected_route is None:
+                return NodeResult(
+                    output=None,
+                    success=False,
+                    error="No route matched and no default route defined",
+                )
+
             output = {
                 "selected_route": selected_route,
                 "condition_met": None,  # Default route has no condition
             }
-            
+
             # Apply output validation if configured
             if node.config.output_schema:
                 output = self.validate_output(output)
-            
+
             return NodeResult(
                 output=output,
                 success=True,

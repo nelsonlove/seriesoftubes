@@ -16,7 +16,7 @@ HTTP_ERROR_THRESHOLD = 400
 
 class HTTPNodeExecutor(NodeExecutor):
     """Executor for HTTP nodes"""
-    
+
     input_schema_class = HTTPNodeInput
     output_schema_class = HTTPNodeOutput
 
@@ -59,7 +59,7 @@ class HTTPNodeExecutor(NodeExecutor):
                 body = {}
                 for key, value in config.body.items():
                     body[key] = self._render_template_value(value, context_data)
-            
+
             # Validate input if schema is defined
             if node.config.input_schema:
                 input_data = {
@@ -72,8 +72,8 @@ class HTTPNodeExecutor(NodeExecutor):
                 validated_input = self.validate_input(input_data)
                 url = validated_input["url"]
                 headers = validated_input["headers"]
-                params = validated_input.get("params")
-                body = validated_input.get("body")
+                params = validated_input.get("params") or None
+                body = validated_input.get("body") or None
 
             # Set timeout
             timeout = config.timeout or app_config.http.timeout
@@ -110,7 +110,7 @@ class HTTPNodeExecutor(NodeExecutor):
                     "body": response_body,
                     "url": str(response.url),
                 }
-                
+
                 # Apply output validation if configured
                 if node.config.output_schema:
                     output = self.validate_output(output)

@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
 
-from seriesoftubes.engine import ExecutionContext, WorkflowEngine
+from seriesoftubes.engine import WorkflowEngine
 from seriesoftubes.models import (
     HTTPNodeConfig,
     LLMNodeConfig,
@@ -16,10 +16,8 @@ from seriesoftubes.models import (
 )
 from seriesoftubes.nodes import NodeResult
 from seriesoftubes.schemas import (
-    HTTPNodeInput,
     HTTPNodeOutput,
     LLMNodeInput,
-    LLMNodeOutput,
 )
 
 
@@ -66,10 +64,10 @@ class TestSchemaValidation:
             "model": "gpt-4",
             "temperature": 0.7,
         }
-        
+
         # Should not raise
         LLMNodeInput(**valid_input)
-        
+
         # Test invalid input
         with pytest.raises(ValidationError) as exc_info:
             LLMNodeInput(
@@ -87,10 +85,10 @@ class TestSchemaValidation:
             "body": {"results": []},
             "url": "https://api.example.com/search",
         }
-        
+
         # Should not raise
         HTTPNodeOutput(**valid_output)
-        
+
         # Test invalid output - Pydantic will coerce string to int
         # So let's test with an actually invalid type
         with pytest.raises(ValidationError) as exc_info:
@@ -105,36 +103,44 @@ class TestSchemaValidation:
     async def test_runtime_validation_between_nodes(self, workflow_with_schemas):
         """Test that outputs are validated against downstream inputs"""
         engine = WorkflowEngine()
-        
+
         # Mock the node executors to return specific outputs
-        with patch.object(engine.executors[NodeType.HTTP], "execute") as mock_http, \
-             patch.object(engine.executors[NodeType.LLM], "execute") as mock_llm:
+        with patch.object(
+            engine.executors[NodeType.HTTP], "execute"
+        ) as mock_http, patch.object(
+            engine.executors[NodeType.LLM], "execute"
+        ) as mock_llm:
             # Return None output which should trigger validation error
             mock_http.return_value = NodeResult(
                 output=None,
                 success=True,
             )
-            
+
             # Mock LLM to avoid it failing due to None input
             mock_llm.return_value = NodeResult(
                 output={"response": "dummy"},
                 success=True,
             )
-            
+
             context = await engine.execute(workflow_with_schemas, {"company": "Acme"})
-            
+
             # Should have validation errors recorded
             assert "search_api" in context.validation_errors
-            assert any("Output is None" in err for err in context.validation_errors["search_api"])
+            assert any(
+                "Output is None" in err
+                for err in context.validation_errors["search_api"]
+            )
 
     @pytest.mark.asyncio
     async def test_valid_schema_flow(self, workflow_with_schemas):
         """Test that valid outputs pass validation"""
         engine = WorkflowEngine()
-        
-        with patch.object(engine.executors[NodeType.HTTP], "execute") as mock_http, \
-             patch.object(engine.executors[NodeType.LLM], "execute") as mock_llm:
-            
+
+        with patch.object(
+            engine.executors[NodeType.HTTP], "execute"
+        ) as mock_http, patch.object(
+            engine.executors[NodeType.LLM], "execute"
+        ) as mock_llm:
             # Return valid output that matches schema
             mock_http.return_value = NodeResult(
                 output={
@@ -145,7 +151,7 @@ class TestSchemaValidation:
                 },
                 success=True,
             )
-            
+
             mock_llm.return_value = NodeResult(
                 output={
                     "response": "Analysis complete",
@@ -155,9 +161,9 @@ class TestSchemaValidation:
                 },
                 success=True,
             )
-            
+
             context = await engine.execute(workflow_with_schemas, {"company": "Acme"})
-            
+
             # Should have no validation errors
             assert len(context.validation_errors) == 0
             assert context.errors == {}
@@ -173,19 +179,19 @@ class TestSchemaValidation:
             PythonNodeExecutor,
             RouteNodeExecutor,
         )
-        
+
         # Check that each executor has schema classes assigned
         assert LLMNodeExecutor.input_schema_class is not None
         assert LLMNodeExecutor.output_schema_class is not None
-        
+
         assert HTTPNodeExecutor.input_schema_class is not None
         assert HTTPNodeExecutor.output_schema_class is not None
-        
+
         assert RouteNodeExecutor.input_schema_class is not None
         assert RouteNodeExecutor.output_schema_class is not None
-        
+
         assert FileNodeExecutor.input_schema_class is not None
         assert FileNodeExecutor.output_schema_class is not None
-        
+
         assert PythonNodeExecutor.input_schema_class is not None
         assert PythonNodeExecutor.output_schema_class is not None

@@ -2,7 +2,7 @@
 
 import os
 from abc import ABC, abstractmethod
-from typing import Any, Protocol, Type
+from typing import Any, Protocol
 
 from pydantic import BaseModel, ValidationError
 
@@ -32,10 +32,10 @@ class NodeContext(Protocol):
 
 class NodeExecutor(ABC):
     """Base class for node executors"""
-    
+
     # Override these in subclasses to define schemas
-    input_schema_class: Type[BaseModel] | None = None
-    output_schema_class: Type[BaseModel] | None = None
+    input_schema_class: type[BaseModel] | None = None
+    output_schema_class: type[BaseModel] | None = None
 
     @abstractmethod
     async def execute(self, node: Node, context: NodeContext) -> NodeResult:
@@ -81,13 +81,13 @@ class NodeExecutor(ABC):
 
     def validate_input(self, data: dict[str, Any]) -> dict[str, Any]:
         """Validate input data against the input schema
-        
+
         Args:
             data: Input data to validate
-            
+
         Returns:
             Validated data
-            
+
         Raises:
             ValidationError: If validation fails
         """
@@ -96,20 +96,19 @@ class NodeExecutor(ABC):
                 validated = self.input_schema_class(**data)
                 return validated.model_dump()
             except ValidationError as e:
-                raise ValidationError(
-                    f"Input validation failed: {e}"
-                ) from e
+                msg = f"Input validation failed: {e}"
+                raise ValidationError(msg) from e
         return data
-    
+
     def validate_output(self, data: Any) -> Any:
         """Validate output data against the output schema
-        
+
         Args:
             data: Output data to validate
-            
+
         Returns:
             Validated data
-            
+
         Raises:
             ValidationError: If validation fails
         """
@@ -123,7 +122,6 @@ class NodeExecutor(ABC):
                     validated = self.output_schema_class(result=data)
                 return validated.model_dump()
             except ValidationError as e:
-                raise ValidationError(
-                    f"Output validation failed: {e}"
-                ) from e
+                msg = f"Output validation failed: {e}"
+                raise ValidationError(msg) from e
         return data

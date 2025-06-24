@@ -225,7 +225,7 @@ async def _execute_in_process(
 
 class PythonNodeExecutor(NodeExecutor):
     """Executor for Python code nodes with sandboxing"""
-    
+
     input_schema_class = PythonNodeInput
     output_schema_class = PythonNodeOutput
 
@@ -244,7 +244,7 @@ class PythonNodeExecutor(NodeExecutor):
         try:
             # Prepare context data
             context_data = self.prepare_context_data(node, context)
-            
+
             # Validate input if schema is defined
             if node.config.input_schema:
                 input_data = {"context": context_data}
@@ -297,7 +297,7 @@ class PythonNodeExecutor(NodeExecutor):
 
             # Structure the output
             output = {"result": result}
-            
+
             # Apply output validation if configured
             if node.config.output_schema:
                 output = self.validate_output(output)

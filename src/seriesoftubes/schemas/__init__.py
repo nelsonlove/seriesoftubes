@@ -1,15 +1,13 @@
 """Schema definitions for SeriesOfTubes workflows."""
 
+from abc import ABC
 from pathlib import Path
+from typing import Any, TypeVar
+
+from pydantic import BaseModel, Field, ValidationError
 
 SCHEMA_DIR = Path(__file__).parent
 WORKFLOW_SCHEMA_PATH = SCHEMA_DIR / "workflow-schema.yaml"
-
-# Import all schema definitions from the schemas.py file
-from abc import ABC, abstractmethod
-from typing import Any, Type, TypeVar
-
-from pydantic import BaseModel, Field, ValidationError
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -82,15 +80,9 @@ class HTTPNodeInput(NodeInputSchema):
 
     url: str = Field(..., description="The URL to request")
     method: str = Field("GET", description="HTTP method")
-    headers: dict[str, str] = Field(
-        default_factory=dict, description="HTTP headers"
-    )
-    params: dict[str, Any] = Field(
-        default_factory=dict, description="Query parameters"
-    )
-    body: dict[str, Any] | str | None = Field(
-        None, description="Request body"
-    )
+    headers: dict[str, str] = Field(default_factory=dict, description="HTTP headers")
+    params: dict[str, Any] = Field(default_factory=dict, description="Query parameters")
+    body: dict[str, Any] | str | None = Field(None, description="Request body")
 
 
 class HTTPNodeOutput(NodeOutputSchema):
@@ -115,9 +107,7 @@ class RouteNodeOutput(NodeOutputSchema):
     """Output schema for route nodes"""
 
     selected_route: str = Field(..., description="The node that was routed to")
-    condition_met: str | None = Field(
-        None, description="The condition that was met"
-    )
+    condition_met: str | None = Field(None, description="The condition that was met")
 
 
 # File Node Schemas
@@ -163,18 +153,17 @@ class SchemaValidator:
     """Validates data against schemas"""
 
     @staticmethod
-    def validate_input(data: dict[str, Any], schema_class: Type[T]) -> T:
+    def validate_input(data: dict[str, Any], schema_class: type[T]) -> T:
         """Validate input data against a schema"""
         try:
             return schema_class(**data)
         except ValidationError as e:
             # Re-raise with more context
-            raise ValidationError(
-                f"Input validation failed for {schema_class.__name__}: {e}"
-            ) from e
+            msg = f"Input validation failed for {schema_class.__name__}: {e}"
+            raise ValidationError(msg) from e
 
     @staticmethod
-    def validate_output(data: Any, schema_class: Type[T]) -> T:
+    def validate_output(data: Any, schema_class: type[T]) -> T:
         """Validate output data against a schema"""
         try:
             if isinstance(data, dict):
@@ -184,37 +173,34 @@ class SchemaValidator:
                 return schema_class(result=data)
         except ValidationError as e:
             # Re-raise with more context
-            raise ValidationError(
-                f"Output validation failed for {schema_class.__name__}: {e}"
-            ) from e
+            msg = f"Output validation failed for {schema_class.__name__}: {e}"
+            raise ValidationError(msg) from e
 
     @staticmethod
     def validate_connection(
-        output_schema: Type[NodeOutputSchema],
-        input_schema: Type[NodeInputSchema],
+        output_schema: type[NodeOutputSchema],
+        input_schema: type[NodeInputSchema],
         mapping: dict[str, str] | None = None,
     ) -> list[str]:
         """Validate that output from one node can feed into another
-        
+
         Returns a list of validation errors, empty if valid
         """
         errors = []
-        
+
         # Get required fields from input schema
         input_fields = input_schema.model_fields
         required_fields = {
-            name: field
-            for name, field in input_fields.items()
-            if field.is_required()
+            name: field for name, field in input_fields.items() if field.is_required()
         }
-        
+
         # Get available fields from output schema
         output_fields = output_schema.model_fields
-        
+
         # Check if required fields can be satisfied
-        for field_name, field_info in required_fields.items():
+        for field_name, _ in required_fields.items():
             mapped_name = mapping.get(field_name, field_name) if mapping else field_name
-            
+
             if mapped_name not in output_fields:
                 errors.append(
                     f"Required input field '{field_name}' cannot be satisfied by output"
@@ -222,7 +208,7 @@ class SchemaValidator:
             else:
                 # TODO: Check type compatibility
                 pass
-        
+
         return errors
 
 
