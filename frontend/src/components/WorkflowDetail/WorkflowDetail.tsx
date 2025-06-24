@@ -96,11 +96,18 @@ export const WorkflowDetail: React.FC<WorkflowDetailProps> = ({ path }) => {
         <Space direction="vertical" style={{ width: '100%' }}>
           {Object.entries(workflow.nodes).map(([name, node]) => (
             <Card key={name} size="small">
-              <Space>
-                <Text strong>{name}</Text>
-                <Tag color="purple">{node.type}</Tag>
-                {node.depends_on && node.depends_on.length > 0 && (
-                  <Text type="secondary">Depends on: {node.depends_on.join(', ')}</Text>
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <Space>
+                  <Text strong>{name}</Text>
+                  <Tag color="purple">{node.type}</Tag>
+                  {node.depends_on && node.depends_on.length > 0 && (
+                    <Text type="secondary">Depends on: {node.depends_on.join(', ')}</Text>
+                  )}
+                </Space>
+                {node.description && (
+                  <Text type="secondary" style={{ marginTop: 4 }}>
+                    {node.description}
+                  </Text>
                 )}
               </Space>
             </Card>

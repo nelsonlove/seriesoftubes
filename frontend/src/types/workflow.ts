@@ -10,9 +10,13 @@ export interface WorkflowNode {
   type: 'llm' | 'http' | 'route' | 'file' | 'python';
   depends_on?: string[];
   config: Record<string, any>;
+  description?: string;
 }
 
 export interface Workflow {
+  name: string;
+  version: string;
+  description?: string;
   inputs: Record<string, WorkflowInput>;
   nodes: Record<string, WorkflowNode>;
   outputs: Record<string, string>;
