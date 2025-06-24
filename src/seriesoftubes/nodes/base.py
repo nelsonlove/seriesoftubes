@@ -1,5 +1,6 @@
 """Base node executor interface"""
 
+import os
 from abc import ABC, abstractmethod
 from typing import Any, Protocol
 
@@ -67,6 +68,9 @@ class NodeExecutor(ABC):
         data["inputs"] = {}
         if hasattr(context, "inputs"):
             data["inputs"] = context.inputs
+
+        # Add environment variables
+        data["env"] = dict(os.environ)
 
         # Wrap the data to make dot notation safe in templates
         return wrap_context_data(data)

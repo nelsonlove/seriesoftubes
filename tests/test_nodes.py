@@ -5,7 +5,7 @@ import pytest
 from seriesoftubes.models import (
     Node,
     NodeType,
-    RouteCondition,
+    RouteConfig,
     RouteNodeConfig,
 )
 from seriesoftubes.nodes import (
@@ -45,9 +45,9 @@ async def test_route_node_executor():
         config=RouteNodeConfig(
             context={"data": "previous_node"},
             routes=[
-                RouteCondition(when="data.score > 0.5", to="high_score_path"),
-                RouteCondition(when="data.score <= 0.5", to="low_score_path"),
-                RouteCondition(default=True, to="default_path"),
+                RouteConfig(when="data.score > 0.5", to="high_score_path"),
+                RouteConfig(when="data.score <= 0.5", to="low_score_path"),
+                RouteConfig(default=True, to="default_path"),
             ],
         ),
     )
@@ -80,8 +80,8 @@ async def test_route_node_default():
         depends_on=[],
         config=RouteNodeConfig(
             routes=[
-                RouteCondition(when="false", to="never_selected"),
-                RouteCondition(default=True, to="default_path"),
+                RouteConfig(when="false", to="never_selected"),
+                RouteConfig(default=True, to="default_path"),
             ],
         ),
     )

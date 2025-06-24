@@ -1,0 +1,61 @@
+name: document-analysis
+version: "1.0.0"
+description: Analyze documents from various sources
+
+inputs:
+  document_path:
+    type: string
+    required: false
+    default: "examples/document-analysis/sample.pdf"
+
+nodes:
+  # Load single document
+  load_document:
+    type: file
+    config:
+      path: "{{ inputs.document_path }}"
+      format: auto
+      extract_text: true
+
+  # Load multiple CSV files and merge
+  load_data:
+    type: file
+    config:
+      pattern: "data/*.csv"
+      merge: true
+      sample: 0.1  # Sample 10% for quick analysis
+
+  # Analyze the document
+  analyze_document:
+    type: llm
+    depends_on: [load_document]
+    config:
+      context:
+        document: load_document
+      prompt: |
+        Analyze this document and provide:
+        1. A brief summary (2-3 sentences)
+        2. Key topics covered
+        3. Overall sentiment/tone
+
+        Document content:
+        {{ document[:2000] }}  # First 2000 chars
+
+  # Analyze the data
+  analyze_data:
+    type: llm
+    depends_on: [load_data]
+    config:
+      context:
+        data: load_data
+      prompt: |
+        You have {{ data|length }} records from CSV files.
+
+        First 5 records:
+        {{ data[:5] }}
+
+        Provide a brief analysis of the data structure and content.
+
+outputs:
+  document_analysis: analyze_document
+  data_analysis: analyze_data

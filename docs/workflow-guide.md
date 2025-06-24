@@ -105,7 +105,7 @@ nodes:
     type: http
     config:
       url: https://api.example.com/company/{{ inputs.company_name }}
-  
+
   analyze:
     type: llm
     depends_on: [fetch_data]
@@ -148,22 +148,22 @@ analyze_company:
     model: gpt-4
     temperature: 0.7
     max_tokens: 1000
-    
+
     # Context from other nodes
     context:
       company_data: fetch_data
       classification: classify_company
-    
+
     # Prompt (inline or external)
     prompt: |
       Analyze this company:
       Name: {{ inputs.company_name }}
       Data: {{ company_data }}
       Classification: {{ classification }}
-    
+
     # OR use external template
     # prompt_template: prompts/analysis.j2
-    
+
     # Optional: structured extraction
     schema:
       summary: string
@@ -201,7 +201,7 @@ fetch_github:
       q: "org:{{ inputs.company_name }}"
       sort: stars
       per_page: 10
-    
+
     # Optional authentication
     auth:
       type: bearer
@@ -233,7 +233,7 @@ route_by_size:
       company: classify_company
     routes:
       - condition: company.size == "enterprise"
-        output: 
+        output:
           template: enterprise_analysis
           priority: high
       - condition: company.size == "startup"
@@ -263,7 +263,7 @@ load_companies:
   config:
     path: "{{ inputs.data_file }}"
     format: auto  # or json, csv, yaml, txt, pdf, docx, xlsx, html
-    
+
     # CSV-specific options
     csv_options:
       delimiter: ","
@@ -379,7 +379,7 @@ nodes:
     type: http
     config:
       url: https://api.example.com/data
-  
+
   process_data:
     type: llm
     depends_on: [fetch_data]  # Must wait for fetch_data
@@ -441,7 +441,7 @@ nodes:
       url: https://api.crunchbase.com/v4/entities/organizations/{{ inputs.company_name }}
       headers:
         X-API-KEY: "{{ env.CRUNCHBASE_API_KEY }}"
-  
+
   analyze:
     type: llm
     depends_on: [fetch_data]
@@ -488,7 +488,7 @@ nodes:
         industry: string
         size: string
         public: boolean
-  
+
   # Conditional GitHub search
   check_github:
     type: route
@@ -500,7 +500,7 @@ nodes:
         - condition: inputs.include_github and classification.industry == "technology"
           output: true
       default: false
-  
+
   # GitHub search (conditional)
   search_github:
     type: http
@@ -512,7 +512,7 @@ nodes:
       params:
         q: "org:{{ inputs.company_name }}"
         sort: stars
-  
+
   # Final analysis
   analyze:
     type: llm
@@ -527,11 +527,11 @@ nodes:
       prompt: |
         Company: {{ inputs.company_name }}
         Classification: {{ classification }}
-        
+
         {% if should_check_github %}
         GitHub repositories found: {{ github_data.total_count }}
         {% endif %}
-        
+
         Provide a comprehensive analysis.
 
 outputs:
@@ -561,7 +561,7 @@ nodes:
     config:
       path: "{{ inputs.document_path }}"
       format: auto
-  
+
   # Extract key information
   extract_info:
     type: llm
@@ -584,7 +584,7 @@ nodes:
           people: array
           organizations: array
           locations: array
-  
+
   # Categorize document
   categorize:
     type: llm

@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from seriesoftubes.models import Node, NodeType, Workflow
 from seriesoftubes.nodes import (
+    FileNodeExecutor,
     HTTPNodeExecutor,
     LLMNodeExecutor,
     NodeExecutor,
@@ -53,6 +54,7 @@ class WorkflowEngine:
             NodeType.LLM: LLMNodeExecutor(),
             NodeType.HTTP: HTTPNodeExecutor(),
             NodeType.ROUTE: RouteNodeExecutor(),
+            NodeType.FILE: FileNodeExecutor(),
         }
 
     async def execute(

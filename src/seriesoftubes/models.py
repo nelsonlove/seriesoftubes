@@ -1,9 +1,9 @@
-"""Core data models for seriesoftubes workflows"""
+"""Data models for seriesoftubes"""
 
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing_extensions import Self
 
 
@@ -13,13 +13,7 @@ class NodeType(str, Enum):
     LLM = "llm"
     HTTP = "http"
     ROUTE = "route"
-
-
-class LLMProvider(str, Enum):
-    """Supported LLM providers"""
-
-    OPENAI = "openai"
-    ANTHROPIC = "anthropic"
+    FILE = "file"  # New file ingestion node type
 
 
 class HTTPMethod(str, Enum):
@@ -32,123 +26,158 @@ class HTTPMethod(str, Enum):
     PATCH = "PATCH"
 
 
-class RouteCondition(BaseModel):
-    """A routing condition"""
-
-    when: str | None = Field(None, description="Condition expression")
-    to: str = Field(..., description="Target node name")
-    default: bool | None = Field(False, description="Is this the default route")
-
-    @model_validator(mode="after")
-    def validate_condition(self) -> Self:
-        """Ensure either 'when' or 'default' is set, but not both"""
-        if self.default and self.when:
-            msg = "Cannot have both 'when' condition and 'default' flag"
-            raise ValueError(msg)
-        if not self.default and not self.when:
-            msg = "Must have either 'when' condition or 'default' flag"
-            raise ValueError(msg)
-        return self
-
-
 class BaseNodeConfig(BaseModel):
     """Base configuration for all node types"""
 
-    context: dict[str, str] = Field(
-        default_factory=dict,
-        description="Context mapping from dependency outputs",
+    # Common fields for all nodes
+    context: dict[str, str] | None = Field(
+        None, description="Map of variable names to node names for context"
     )
 
 
 class LLMNodeConfig(BaseNodeConfig):
     """Configuration for LLM nodes"""
 
+    # Prompt configuration
     prompt: str | None = Field(None, description="Direct prompt text")
     prompt_template: str | None = Field(
-        None, description="Path to Jinja2 template file"
+        None, description="Path to Jinja2 prompt template"
     )
-    schema_definition: dict[str, Any] | None = Field(
-        None,
-        description="Expected output schema for structured extraction",
-        alias="schema",
-    )
+
+    # LLM settings
     model: str | None = Field(None, description="Override default model")
     temperature: float | None = Field(None, description="Override default temperature")
 
-    @classmethod
-    @field_validator("prompt", "prompt_template")
-    def validate_prompt_source(cls, v: Any, info: ValidationInfo) -> Any:
-        """Ensure exactly one prompt source is provided"""
-        data = info.data
-        prompt = data.get("prompt")
-        template = data.get("prompt_template")
+    # Structured extraction
+    schema_definition: dict[str, Any] | None = Field(
+        None, description="Schema for structured extraction", alias="schema"
+    )
 
-        # Only validate when we have all the data
-        if info.field_name == "prompt_template" or (
-            info.field_name == "prompt" and "prompt_template" in data
-        ):
-            if bool(prompt) == bool(template):
-                msg = "Must provide exactly one of 'prompt' or 'prompt_template'"
-                raise ValueError(msg)
+    @field_validator("schema_definition", mode="before")
+    @classmethod
+    def validate_schema(cls, v: Any) -> dict[str, Any] | None:
+        """Ensure schema is a dict if provided"""
+        if v is None:
+            return None
+        if not isinstance(v, dict):
+            msg = "Schema must be a dictionary"
+            raise ValueError(msg)
         return v
 
 
 class HTTPNodeConfig(BaseNodeConfig):
     """Configuration for HTTP nodes"""
 
-    url: str = Field(..., description="URL to request")
+    url: str = Field(..., description="URL to call (supports Jinja2 templates)")
     method: HTTPMethod = Field(HTTPMethod.GET, description="HTTP method")
-    params: dict[str, Any] | None = Field(None, description="Query parameters")
     headers: dict[str, str] | None = Field(None, description="HTTP headers")
-    body: dict[str, Any] | None = Field(None, description="Request body (JSON)")
+    params: dict[str, Any] | None = Field(None, description="Query parameters")
+    body: dict[str, Any] | None = Field(None, description="Request body (for POST/PUT)")
     timeout: int | None = Field(None, description="Request timeout in seconds")
 
 
+class RouteConfig(BaseModel):
+    """Configuration for a single route"""
+
+    when: str | None = Field(None, description="Condition expression")
+    to: str = Field(..., description="Target node name")
+    default: bool = Field(False, description="Is this the default route")
+
+
 class RouteNodeConfig(BaseNodeConfig):
-    """Configuration for routing nodes"""
+    """Configuration for route/conditional nodes"""
 
-    routes: list[RouteCondition] = Field(..., description="List of routing conditions")
+    routes: list[RouteConfig] = Field(..., description="List of routing rules")
 
-    @classmethod
-    @field_validator("routes")
-    def validate_routes(cls, v: list[RouteCondition]) -> list[RouteCondition]:
-        """Ensure exactly one default route"""
-        defaults = [r for r in v if r.default]
-        if len(defaults) > 1:
-            msg = "Can only have one default route"
+
+class FileNodeConfig(BaseNodeConfig):
+    """Configuration for file ingestion nodes"""
+
+    # File selection
+    path: str | None = Field(None, description="Single file path (supports Jinja2)")
+    pattern: str | None = Field(None, description="Glob pattern for multiple files")
+
+    # Format and parsing
+    format_type: str = Field(
+        "auto",
+        description=(
+            "File format: auto, json, jsonl, csv, txt, yaml, pdf, docx, xlsx, html"
+        ),
+        alias="format",
+    )
+    encoding: str = Field("utf-8", description="File encoding")
+    extract_text: bool = Field(
+        True, description="Extract text from documents (PDF, DOCX, HTML)"
+    )
+
+    # Output structure
+    output_mode: str = Field(
+        "content",
+        description="Output mode: content (single), list (records), dict (collection)",
+    )
+    merge: bool = Field(False, description="Merge multiple files into single output")
+
+    # Streaming options for large files
+    stream: bool = Field(False, description="Stream large files in chunks")
+    chunk_size: int = Field(1000, description="Rows per chunk for streaming")
+    sample: float | None = Field(None, description="Sample fraction (0.0-1.0)")
+    limit: int | None = Field(None, description="Limit number of records")
+
+    # CSV specific
+    delimiter: str = Field(",", description="CSV delimiter")
+    has_header: bool = Field(True, description="CSV has header row")
+
+    # Error handling
+    skip_errors: bool = Field(False, description="Skip files/rows with errors")
+
+    @model_validator(mode="after")
+    def validate_paths(self) -> Self:
+        """Ensure either path or pattern is provided"""
+        if not self.path and not self.pattern:
+            msg = "Either 'path' or 'pattern' must be provided"
             raise ValueError(msg)
-        if len(defaults) == 0:
-            msg = "Must have exactly one default route"
+        if self.path and self.pattern:
+            msg = "Cannot specify both 'path' and 'pattern'"
             raise ValueError(msg)
-        return v
+        return self
 
 
 class Node(BaseModel):
-    """A workflow node"""
+    """A node in the workflow DAG"""
 
-    name: str = Field(..., description="Unique node identifier")
-    node_type: NodeType = Field(..., description="Node type", alias="type")
-    depends_on: list[str] = Field(default_factory=list, description="Node dependencies")
-    config: LLMNodeConfig | HTTPNodeConfig | RouteNodeConfig = Field(
-        ..., description="Node-specific configuration"
+    name: str = Field(..., description="Unique node name", pattern=r"^[a-zA-Z0-9_-]+$")
+    node_type: NodeType = Field(..., description="Type of node", alias="type")
+    depends_on: list[str] = Field(
+        default_factory=list, description="List of node dependencies"
     )
+    config: BaseNodeConfig = Field(..., description="Node-specific configuration")
 
+    @field_validator("config", mode="before")
     @classmethod
-    @field_validator("config")
-    def validate_config_type(cls, v: Any, info: ValidationInfo) -> Any:
-        """Ensure config matches node type"""
-        data = info.data
-        node_type = data.get("node_type") or data.get("type")
-        if node_type == NodeType.LLM and not isinstance(v, LLMNodeConfig):
-            msg = "LLM node requires LLMNodeConfig"
+    def validate_config_type(cls, v: Any, info: Any) -> BaseNodeConfig:
+        """Validate and convert config based on node type"""
+        if isinstance(v, BaseNodeConfig):
+            return v
+
+        # Get the node type from the values
+        node_type = info.data.get("node_type") or info.data.get("type")
+
+        if not isinstance(v, dict):
+            msg = "Config must be a dictionary"
             raise ValueError(msg)
-        elif node_type == NodeType.HTTP and not isinstance(v, HTTPNodeConfig):
-            msg = "HTTP node requires HTTPNodeConfig"
+
+        # Convert to appropriate config type
+        if node_type == NodeType.LLM:
+            return LLMNodeConfig(**v)
+        elif node_type == NodeType.HTTP:
+            return HTTPNodeConfig(**v)
+        elif node_type == NodeType.ROUTE:
+            return RouteNodeConfig(**v)
+        elif node_type == NodeType.FILE:
+            return FileNodeConfig(**v)
+        else:
+            msg = f"Unknown node type: {node_type}"
             raise ValueError(msg)
-        elif node_type == NodeType.ROUTE and not isinstance(v, RouteNodeConfig):
-            msg = "Route node requires RouteNodeConfig"
-            raise ValueError(msg)
-        return v
 
 
 class WorkflowInput(BaseModel):
@@ -170,46 +199,32 @@ class Workflow(BaseModel):
     """Complete workflow definition"""
 
     name: str = Field(..., description="Workflow name")
-    version: str = Field("1.0", description="Workflow version")
+    version: str = Field(..., description="Workflow version")
     description: str | None = Field(None, description="Workflow description")
     inputs: dict[str, WorkflowInput] = Field(
         default_factory=dict, description="Input definitions"
     )
-    nodes: dict[str, Node] = Field(..., description="Workflow nodes")
-    outputs: dict[str, str] = Field(
-        default_factory=dict, description="Output mappings from nodes"
-    )
+    nodes: dict[str, Node] = Field(..., description="DAG nodes")
+    outputs: dict[str, str] = Field(default_factory=dict, description="Output mappings")
 
+    @field_validator("nodes", mode="before")
     @classmethod
-    @field_validator("nodes")
-    def validate_node_names(cls, v: dict[str, Node]) -> dict[str, Node]:
-        """Ensure node names in dict match node.name"""
-        for name, node in v.items():
-            if name != node.name:
-                msg = f"Node key '{name}' doesn't match node name '{node.name}'"
+    def set_node_names(cls, v: Any) -> dict[str, Node]:
+        """Set node names from dict keys"""
+        if not isinstance(v, dict):
+            msg = "Nodes must be a dictionary"
+            raise ValueError(msg)
+
+        nodes = {}
+        for name, node_data in v.items():
+            if isinstance(node_data, Node):
+                node_data.name = name
+                nodes[name] = node_data
+            elif isinstance(node_data, dict):
+                node_data["name"] = name
+                nodes[name] = Node(**node_data)
+            else:
+                msg = f"Invalid node data for {name}"
                 raise ValueError(msg)
-        return v
 
-    @classmethod
-    @field_validator("outputs")
-    def validate_outputs(
-        cls, v: dict[str, str], info: ValidationInfo
-    ) -> dict[str, str]:
-        """Ensure output references exist"""
-        data = info.data
-        nodes = data.get("nodes", {})
-        for output_name, node_name in v.items():
-            if node_name not in nodes:
-                msg = (
-                    f"Output '{output_name}' references non-existent node '{node_name}'"
-                )
-                raise ValueError(msg)
-        return v
-
-
-class ExecutionConfig(BaseModel):
-    """Runtime configuration from .tubes.yaml"""
-
-    llm: dict[str, Any] = Field(default_factory=dict)
-    http: dict[str, Any] = Field(default_factory=dict)
-    execution: dict[str, Any] = Field(default_factory=dict)
+        return nodes

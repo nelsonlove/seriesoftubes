@@ -141,14 +141,14 @@ def validate(
         # First, validate against JSON schema
         console.print("• Checking schema compliance...")
         schema_path = Path(__file__).parent / "schemas" / "workflow-schema.yaml"
-        
+
         if schema_path.exists():
             with open(schema_path) as f:
                 schema = yaml.safe_load(f)
-            
+
             with open(workflow) as f:
                 workflow_data = yaml.safe_load(f)
-            
+
             try:
                 jsonschema.validate(workflow_data, schema)
                 console.print("  ✓ [green]Schema validation passed[/green]")
@@ -158,7 +158,9 @@ def validate(
                     console.print(f"    Path: {'.'.join(str(p) for p in e.path)}")
                 raise typer.Exit(1) from None
         else:
-            console.print("  [yellow]⚠ Schema file not found, skipping schema validation[/yellow]")
+            console.print(
+                "  [yellow]⚠ Schema file not found, skipping schema validation[/yellow]"
+            )
 
         # Parse the workflow with Pydantic
         console.print("• Parsing workflow structure...")

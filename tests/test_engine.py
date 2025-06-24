@@ -9,7 +9,7 @@ from seriesoftubes.engine import ExecutionContext, WorkflowEngine, run_workflow
 from seriesoftubes.models import (
     Node,
     NodeType,
-    RouteCondition,
+    RouteConfig,
     RouteNodeConfig,
     Workflow,
     WorkflowInput,
@@ -22,6 +22,7 @@ def simple_workflow():
     """Create a simple test workflow"""
     return Workflow(
         name="test_workflow",
+        version="1.0",
         inputs={
             "text": WorkflowInput(required=True),
             "optional": WorkflowInput(required=False, default="default_value"),
@@ -33,8 +34,8 @@ def simple_workflow():
                 depends_on=[],
                 config=RouteNodeConfig(
                     routes=[
-                        RouteCondition(when="inputs.text == 'hello'", to="hello_path"),
-                        RouteCondition(default=True, to="default_path"),
+                        RouteConfig(when="inputs.text == 'hello'", to="hello_path"),
+                        RouteConfig(default=True, to="default_path"),
                     ]
                 ),
             )
@@ -85,6 +86,7 @@ class TestWorkflowEngine:
         assert NodeType.LLM in engine.executors
         assert NodeType.HTTP in engine.executors
         assert NodeType.ROUTE in engine.executors
+        assert NodeType.FILE in engine.executors
 
     def test_validate_inputs(self, simple_workflow):
         """Test input validation"""

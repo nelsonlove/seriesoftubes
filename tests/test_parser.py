@@ -15,7 +15,7 @@ def test_parse_simple_workflow():
 
     # Check basic properties
     assert workflow.name == "simple-test"
-    assert workflow.version == "1.0"
+    assert workflow.version == "1.0.0"
     assert workflow.description == "A simple test workflow"
 
     # Check inputs

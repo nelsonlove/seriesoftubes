@@ -175,7 +175,7 @@ module = "tests.*"
 disallow_untyped_defs = false
 
 [[tool.mypy.overrides]]
-module = ["typer", "rich.*", "fastapi", "uvicorn"]
+module = ["typer", "rich.*", "fastapi", "uvicorn", "sse_starlette.*", "PyPDF2", "docx", "openpyxl", "bs4"]
 ignore_missing_imports = true
 
 [tool.ruff]

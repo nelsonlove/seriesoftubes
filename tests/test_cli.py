@@ -74,27 +74,31 @@ class TestCLI:
         workflow_file.write_text(
             """
 name: test_workflow
-version: "1.0"
+version: "1.0.0"
 inputs:
   text: string
 nodes:
+  process:
+    type: llm
+    config:
+      prompt: "Echo: {{ text }}"
   echo:
     type: route
+    depends_on: [process]
     config:
       routes:
-        - when: "true"
-          to: "echo"
         - default: true
-          to: "echo"
+          to: "process"
 outputs:
-  result: echo
+  result: process
 """
         )
 
         result = runner.invoke(app, ["validate", str(workflow_file)])
         assert result.exit_code == 0
-        assert "✓ Parsed workflow: test_workflow v1.0" in result.stdout
-        assert "✓ DAG structure is valid" in result.stdout
+        assert "✓ Parsed workflow: test_workflow" in result.stdout
+        assert "✓ No cycles detected" in result.stdout
+        assert "✓ All dependencies exist" in result.stdout
         assert "✓ Workflow is valid!" in result.stdout
 
     def test_validate_invalid_workflow(self, tmp_path):
@@ -104,7 +108,7 @@ outputs:
 
         result = runner.invoke(app, ["validate", str(workflow_file)])
         assert result.exit_code == 1
-        assert "✗ Validation failed:" in result.stdout
+        assert "✗ Unexpected error:" in result.stdout
 
     @patch("seriesoftubes.cli.run_workflow")
     def test_run_command(self, mock_run_workflow, tmp_path):
@@ -114,7 +118,7 @@ outputs:
         workflow_file.write_text(
             """
 name: test_workflow
-version: "1.0"
+version: "1.0.0"
 inputs:
   text:
     type: string
@@ -127,7 +131,7 @@ nodes:
         - default: true
           to: "echo"
 outputs:
-  result: echo
+  result: process
 """
         )
 
@@ -195,7 +199,7 @@ nodes:
         workflow1.write_text(
             """
 name: workflow_one
-version: "1.0"
+version: "1.0.0"
 description: Test workflow 1
 nodes:
   node1:
@@ -295,7 +299,7 @@ nodes:
         workflow_file.write_text(
             """
 name: test_workflow
-version: "1.0"
+version: "1.0.0"
 inputs:
   text:
     type: string
@@ -312,7 +316,7 @@ nodes:
         - default: true
           to: "echo"
 outputs:
-  result: echo
+  result: process
 """
         )
 
@@ -348,7 +352,7 @@ nodes:
         - default: true
           to: "echo"
 outputs:
-  result: echo
+  result: process
 """
         )
 
