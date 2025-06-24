@@ -3,11 +3,12 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConfigProvider, Layout, Menu } from 'antd';
-import { AppstoreOutlined, PlayCircleOutlined, ExperimentOutlined } from '@ant-design/icons';
+import { AppstoreOutlined, PlayCircleOutlined, ExperimentOutlined, BookOutlined } from '@ant-design/icons';
 import { WorkflowsPage } from './pages/Workflows';
 import { ExecutionsPage } from './pages/Executions';
 import { ExecutionDetail } from './pages/Executions/ExecutionDetail';
 import { TestingPage } from './pages/Testing';
+import { DocumentationPage } from './pages/Documentation';
 import './App.css';
 
 const { Header, Content, Sider } = Layout;
@@ -40,6 +41,12 @@ function App() {
       icon: <ExperimentOutlined />,
       label: 'Testing',
       path: '/testing',
+    },
+    {
+      key: 'documentation',
+      icon: <BookOutlined />,
+      label: 'Documentation',
+      path: '/documentation',
     },
   ];
 
@@ -81,6 +88,7 @@ function App() {
                     <Route path="/executions" element={<ExecutionsPage />} />
                     <Route path="/executions/:id" element={<ExecutionDetail />} />
                     <Route path="/testing" element={<TestingPage />} />
+                    <Route path="/documentation" element={<DocumentationPage />} />
                     <Route path="/" element={<Navigate to="/workflows" replace />} />
                   </Routes>
                 </Content>

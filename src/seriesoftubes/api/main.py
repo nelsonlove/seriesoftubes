@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
 from sse_starlette.sse import EventSourceResponse
 
 from seriesoftubes.api.execution import execution_manager
@@ -237,3 +238,12 @@ async def stream_execution(execution_id: str) -> EventSourceResponse:
             await asyncio.sleep(0.5)
 
     return EventSourceResponse(event_generator())
+
+
+# Mount documentation files
+docs_path = Path(__file__).parent.parent.parent.parent / "docs"
+if docs_path.exists():
+    app.mount("/docs", StaticFiles(directory=str(docs_path)), name="docs")
+    logger.info(f"Mounted documentation at /docs from {docs_path}")
+else:
+    logger.warning(f"Documentation directory not found at {docs_path}")
