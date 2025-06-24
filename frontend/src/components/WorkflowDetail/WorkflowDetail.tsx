@@ -49,12 +49,8 @@ export const WorkflowDetail: React.FC<WorkflowDetailProps> = ({ path }) => {
           </div>
 
           <Descriptions column={1}>
-            <Descriptions.Item label="Path">
-              {data.path}
-            </Descriptions.Item>
-            <Descriptions.Item label="Version">
-              {workflow.version}
-            </Descriptions.Item>
+            <Descriptions.Item label="Path">{data.path}</Descriptions.Item>
+            <Descriptions.Item label="Version">{workflow.version}</Descriptions.Item>
             <Descriptions.Item label="Description">
               {workflow.description || 'No description available'}
             </Descriptions.Item>
@@ -98,9 +94,7 @@ export const WorkflowDetail: React.FC<WorkflowDetailProps> = ({ path }) => {
                 <Text strong>{name}</Text>
                 <Tag color="purple">{node.type}</Tag>
                 {node.depends_on && node.depends_on.length > 0 && (
-                  <Text type="secondary">
-                    Depends on: {node.depends_on.join(', ')}
-                  </Text>
+                  <Text type="secondary">Depends on: {node.depends_on.join(', ')}</Text>
                 )}
               </Space>
             </Card>

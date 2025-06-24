@@ -1,12 +1,9 @@
+// Testing pre-commit hooks
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConfigProvider, Layout, Menu } from 'antd';
-import {
-  AppstoreOutlined,
-  PlayCircleOutlined,
-  ExperimentOutlined,
-} from '@ant-design/icons';
+import { AppstoreOutlined, PlayCircleOutlined, ExperimentOutlined } from '@ant-design/icons';
 import { WorkflowsPage } from './pages/Workflows';
 import { ExecutionsPage } from './pages/Executions';
 import { TestingPage } from './pages/Testing';
@@ -61,7 +58,7 @@ function App() {
                   mode="inline"
                   defaultSelectedKeys={['workflows']}
                   style={{ height: '100%', borderRight: 0 }}
-                  items={menuItems.map(item => ({
+                  items={menuItems.map((item) => ({
                     key: item.key,
                     icon: item.icon,
                     label: <a href={item.path}>{item.label}</a>,

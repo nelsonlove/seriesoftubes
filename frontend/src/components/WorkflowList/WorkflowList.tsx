@@ -16,7 +16,11 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({ onSelectWorkflow }) 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTag, setSelectedTag] = useState<string | undefined>();
 
-  const { data: workflows, isLoading, error } = useQuery({
+  const {
+    data: workflows,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ['workflows', searchTerm, selectedTag],
     queryFn: () => workflowAPI.list({ search: searchTerm, tag: selectedTag }),
   });
@@ -30,9 +34,7 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({ onSelectWorkflow }) 
   }
 
   if (error) {
-    return (
-      <Empty description={`Failed to load workflows: ${error.message}`} />
-    );
+    return <Empty description={`Failed to load workflows: ${error.message}`} />;
   }
 
   // Tags feature not implemented in backend yet
@@ -60,7 +62,7 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({ onSelectWorkflow }) 
               >
                 All
               </Tag>
-              {allTags.map(tag => (
+              {allTags.map((tag) => (
                 <Tag
                   key={tag}
                   color={selectedTag === tag ? 'blue' : 'default'}
@@ -90,17 +92,13 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({ onSelectWorkflow }) 
                 <Space direction="vertical" style={{ width: '100%' }}>
                   {workflow.description && <Text>{workflow.description}</Text>}
                   <Space>
-                    <Text type="secondary">
-                      {Object.keys(workflow.inputs).length} inputs
-                    </Text>
+                    <Text type="secondary">{Object.keys(workflow.inputs).length} inputs</Text>
                     <Text type="secondary">•</Text>
-                    <Text type="secondary">
-                      v{workflow.version}
-                    </Text>
+                    <Text type="secondary">v{workflow.version}</Text>
                   </Space>
                   <Space wrap>
                     {Object.entries(workflow.inputs).map(([name, input]) => (
-                      <Tag key={name} color={input.required ? "red" : "blue"}>
+                      <Tag key={name} color={input.required ? 'red' : 'blue'}>
                         {name}: {input.type}
                       </Tag>
                     ))}

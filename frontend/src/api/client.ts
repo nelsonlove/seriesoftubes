@@ -5,7 +5,7 @@ import type {
   ExecutionInput,
   ExecutionResponse,
   ExecutionDetail,
-  ExecutionProgress
+  ExecutionProgress,
 } from '../types/workflow';
 
 const api = axios.create({

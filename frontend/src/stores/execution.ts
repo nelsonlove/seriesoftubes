@@ -51,7 +51,8 @@ export const useExecutionStore = create<ExecutionStore>((set) => ({
 
   clearExecution: (id) =>
     set((state) => {
-      const { [id]: _, ...rest } = state.executions;
+      const { [id]: removed, ...rest } = state.executions;
+      void removed; // Satisfy linter
       return {
         executions: rest,
         activeExecution: state.activeExecution === id ? null : state.activeExecution,
