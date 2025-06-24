@@ -1,0 +1,195 @@
+name: Data Analysis Pipeline
+version: "1.0.0"
+description: >
+  Example workflow demonstrating Python node capabilities for data analysis.
+  This workflow loads sample data, processes it with Python, and generates insights.
+
+inputs:
+  threshold:
+    type: number
+    default: 100
+    description: Revenue threshold for filtering companies
+
+  export_format:
+    type: string
+    default: json
+    description: Export format for results
+
+nodes:
+  # Load sample data
+  load_data:
+    type: file
+    config:
+      path: examples/data-analysis/sample_data.json
+      format: json
+
+  # Process and filter data using Python
+  process_companies:
+    type: python
+    depends_on: [load_data]
+    config:
+      code: |
+        # Access data from previous node and inputs
+        companies = context['companies']
+        threshold = context['inputs']['threshold']
+
+        # Filter companies above threshold
+        high_value_companies = [
+            company for company in companies
+            if company.get('revenue', 0) > threshold
+        ]
+
+        # Group by industry
+        industries = {}
+        for company in high_value_companies:
+            industry = company.get('industry', 'Unknown')
+            if industry not in industries:
+                industries[industry] = []
+            industries[industry].append(company)
+
+        # Calculate statistics
+        stats = {}
+        for industry, industry_companies in industries.items():
+            revenues = [c.get('revenue', 0) for c in industry_companies]
+            employees = [c.get('employees', 0) for c in industry_companies]
+
+            stats[industry] = {
+                'count': len(industry_companies),
+                'total_revenue': sum(revenues),
+                'avg_revenue': sum(revenues) / len(revenues) if revenues else 0,
+                'total_employees': sum(employees),
+                'avg_employees': sum(employees) / len(employees) if employees else 0
+            }
+
+        return {
+            'filtered_companies': high_value_companies,
+            'industry_breakdown': industries,
+            'statistics': stats,
+            'summary': {
+                'total_companies': len(companies),
+                'filtered_count': len(high_value_companies),
+                'industries_count': len(industries),
+                'threshold_used': threshold
+            }
+        }
+      context:
+        companies: load_data
+
+  # Generate insights with mathematical calculations
+  generate_insights:
+    type: python
+    depends_on: [process_companies]
+    config:
+      code: |
+        import math
+        import json
+
+        # Get processed data
+        data = context['analysis']
+        stats = data['statistics']
+        summary = data['summary']
+
+        # Calculate insights
+        insights = []
+
+        # Top performing industry
+        if stats:
+            top_industry = max(stats.items(), key=lambda x: x[1]['avg_revenue'])
+            insights.append({
+                'type': 'top_performer',
+                'message': f"{top_industry[0]} is the highest performing industry with average revenue of ${top_industry[1]['avg_revenue']:,.0f}",
+                'industry': top_industry[0],
+                'avg_revenue': top_industry[1]['avg_revenue']
+            })
+
+        # Diversity analysis
+        industry_count = summary['industries_count']
+        if industry_count > 3:
+            insights.append({
+                'type': 'diversity',
+                'message': f"Good industry diversity with {industry_count} different industries represented",
+                'score': min(industry_count / 10, 1.0)  # Normalize to 0-1
+            })
+
+        # Revenue distribution analysis
+        if stats:
+            revenues = [stat['avg_revenue'] for stat in stats.values()]
+            if len(revenues) > 1:
+                mean_revenue = sum(revenues) / len(revenues)
+                variance = sum((r - mean_revenue) ** 2 for r in revenues) / len(revenues)
+                std_dev = math.sqrt(variance)
+                cv = std_dev / mean_revenue if mean_revenue > 0 else 0
+
+                insights.append({
+                    'type': 'revenue_distribution',
+                    'message': f"Revenue coefficient of variation: {cv:.2f} ({'high' if cv > 0.5 else 'moderate' if cv > 0.3 else 'low'} variability)",
+                    'coefficient_of_variation': cv,
+                    'std_deviation': std_dev,
+                    'mean_revenue': mean_revenue
+                })
+
+        return {
+            'insights': insights,
+            'analysis_metadata': {
+                'timestamp': '2024-01-01T00:00:00Z',
+                'threshold_applied': summary['threshold_used'],
+                'total_insights': len(insights)
+            }
+        }
+      context:
+        analysis: process_companies
+      allowed_imports: [math, json]
+
+  # Export results in specified format
+  export_results:
+    type: python
+    depends_on: [process_companies, generate_insights]
+    config:
+      code: |
+        import json
+
+        # Get all data
+        analysis = context['analysis']
+        insights = context['insights']
+        export_format = context['inputs']['export_format']
+
+        # Combine all results
+        final_results = {
+            'analysis': analysis,
+            'insights': insights['insights'],
+            'metadata': insights['analysis_metadata']
+        }
+
+        # Format based on requested format
+        if export_format == 'json':
+            # Pretty formatted JSON
+            formatted_output = json.dumps(final_results, indent=2)
+        elif export_format == 'summary':
+            # Generate text summary
+            lines = ["=== DATA ANALYSIS SUMMARY ==="]
+            lines.append(f"Total companies analyzed: {analysis['summary']['total_companies']}")
+            lines.append(f"Companies above threshold: {analysis['summary']['filtered_count']}")
+            lines.append(f"Industries represented: {analysis['summary']['industries_count']}")
+            lines.append("")
+            lines.append("Key Insights:")
+            for i, insight in enumerate(insights['insights'], 1):
+                lines.append(f"{i}. {insight['message']}")
+            formatted_output = "\n".join(lines)
+        else:
+            # Default to JSON
+            formatted_output = json.dumps(final_results)
+
+        return {
+            'formatted_results': formatted_output,
+            'export_format': export_format,
+            'data_size': len(str(final_results))
+        }
+      context:
+        analysis: process_companies
+        insights: generate_insights
+      allowed_imports: [json]
+
+outputs:
+  analysis: process_companies
+  insights: generate_insights
+  export: export_results

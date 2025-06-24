@@ -13,6 +13,7 @@ from seriesoftubes.api.execution import execution_manager
 from seriesoftubes.api.models import (
     ExecutionStatus,
     WorkflowInfo,
+    WorkflowDetail,
     WorkflowRunRequest,
     WorkflowRunResponse,
 )
@@ -80,8 +81,8 @@ async def list_workflows(directory: str = ".") -> list[WorkflowInfo]:
     return workflows
 
 
-@app.get("/workflows/{workflow_path:path}", response_model=WorkflowInfo)
-async def get_workflow(workflow_path: str) -> WorkflowInfo:
+@app.get("/workflows/{workflow_path:path}", response_model=WorkflowDetail)
+async def get_workflow(workflow_path: str) -> WorkflowDetail:
     """Get details about a specific workflow"""
     path = Path(workflow_path)
 
@@ -90,19 +91,30 @@ async def get_workflow(workflow_path: str) -> WorkflowInfo:
 
     try:
         workflow = parse_workflow_yaml(path)
-        return WorkflowInfo(
-            name=workflow.name,
-            version=workflow.version,
-            description=workflow.description,
+        return WorkflowDetail(
             path=str(path),
-            inputs={
-                name: {
-                    "type": input_def.input_type,
-                    "required": input_def.required,
-                    "default": input_def.default,
-                }
-                for name, input_def in workflow.inputs.items()
-            },
+            workflow={
+                "name": workflow.name,
+                "version": workflow.version,
+                "description": workflow.description,
+                "inputs": {
+                    name: {
+                        "type": input_def.input_type,
+                        "required": input_def.required,
+                        "default": input_def.default,
+                    }
+                    for name, input_def in workflow.inputs.items()
+                },
+                "nodes": {
+                    name: {
+                        "type": node.node_type.value,
+                        "depends_on": node.depends_on,
+                        "config": node.config.model_dump() if node.config else {}
+                    }
+                    for name, node in workflow.nodes.items()
+                },
+                "outputs": workflow.outputs
+            }
         )
     except WorkflowParseError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e

@@ -14,6 +14,7 @@ class NodeType(str, Enum):
     HTTP = "http"
     ROUTE = "route"
     FILE = "file"  # New file ingestion node type
+    PYTHON = "python"  # Python code execution node type
 
 
 class HTTPMethod(str, Enum):
@@ -142,6 +143,46 @@ class FileNodeConfig(BaseNodeConfig):
         return self
 
 
+class PythonNodeConfig(BaseNodeConfig):
+    """Configuration for Python execution nodes"""
+
+    # Code specification
+    code: str | None = Field(None, description="Inline Python code to execute")
+    file: str | None = Field(None, description="Path to Python file (supports Jinja2)")
+    function: str | None = Field(
+        None, description="Function name to call if using file"
+    )
+
+    # Resource limits
+    timeout: int = Field(30, description="Execution timeout in seconds")
+    memory_limit: str = Field(
+        "100MB", description="Memory limit (e.g., '100MB', '1GB')"
+    )
+
+    # Security settings
+    allowed_imports: list[str] = Field(
+        default_factory=list,
+        description="List of allowed module imports (empty = no imports allowed)",
+    )
+    max_output_size: int = Field(
+        10_000_000, description="Maximum output size in bytes (10MB default)"
+    )
+
+    @model_validator(mode="after")
+    def validate_code_source(self) -> Self:
+        """Ensure either code or file is provided, not both"""
+        if not self.code and not self.file:
+            msg = "Either 'code' or 'file' must be provided"
+            raise ValueError(msg)
+        if self.code and self.file:
+            msg = "Cannot specify both 'code' and 'file'"
+            raise ValueError(msg)
+        if self.file and not self.function:
+            # If file is provided without function, we'll execute the whole file
+            pass
+        return self
+
+
 class Node(BaseModel):
     """A node in the workflow DAG"""
 
@@ -175,6 +216,8 @@ class Node(BaseModel):
             return RouteNodeConfig(**v)
         elif node_type == NodeType.FILE:
             return FileNodeConfig(**v)
+        elif node_type == NodeType.PYTHON:
+            return PythonNodeConfig(**v)
         else:
             msg = f"Unknown node type: {node_type}"
             raise ValueError(msg)

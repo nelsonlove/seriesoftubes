@@ -54,7 +54,7 @@ properties:
       properties:
         type:
           type: string
-          enum: [llm, http, route, file]
+          enum: [llm, http, route, file, python]
           description: Type of node to execute
 
         depends_on:
@@ -72,6 +72,7 @@ properties:
             - $ref: "#/definitions/http_config"
             - $ref: "#/definitions/route_config"
             - $ref: "#/definitions/file_config"
+            - $ref: "#/definitions/python_config"
 
   outputs:
     type: object
@@ -294,3 +295,57 @@ definitions:
     oneOf:
       - required: [path]
       - required: [pattern]
+
+  python_config:
+    type: object
+    properties:
+      code:
+        type: string
+        description: Inline Python code to execute
+
+      file:
+        type: string
+        description: Path to Python file (supports Jinja2 templates)
+
+      function:
+        type: string
+        description: Function name to call if using file
+
+      context:
+        type: object
+        description: Map context variables from other nodes
+        additionalProperties:
+          type: string
+
+      timeout:
+        type: integer
+        minimum: 1
+        maximum: 300
+        default: 30
+        description: Execution timeout in seconds
+
+      memory_limit:
+        type: string
+        pattern: "^\\d+(\\.\\d+)?(KB|MB|GB)?$"
+        default: "100MB"
+        description: Memory limit (e.g., '100MB', '1GB')
+
+      allowed_imports:
+        type: array
+        items:
+          type: string
+        default: []
+        description: List of allowed module imports
+        examples:
+          - [math, statistics, collections]
+          - [pandas, numpy]
+
+      max_output_size:
+        type: integer
+        minimum: 1024
+        maximum: 104857600
+        default: 10485760
+        description: Maximum output size in bytes (10MB default)
+    oneOf:
+      - required: [code]
+      - required: [file]

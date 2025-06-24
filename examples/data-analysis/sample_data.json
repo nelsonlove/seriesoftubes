@@ -1,0 +1,92 @@
+[
+  {
+    "id": 1,
+    "name": "TechCorp Inc",
+    "industry": "Technology",
+    "revenue": 2500000,
+    "employees": 150,
+    "founded": 2015,
+    "location": "San Francisco, CA"
+  },
+  {
+    "id": 2,
+    "name": "Green Energy Solutions",
+    "industry": "Energy",
+    "revenue": 890000,
+    "employees": 45,
+    "founded": 2018,
+    "location": "Austin, TX"
+  },
+  {
+    "id": 3,
+    "name": "MedDevice Pro",
+    "industry": "Healthcare",
+    "revenue": 1750000,
+    "employees": 85,
+    "founded": 2012,
+    "location": "Boston, MA"
+  },
+  {
+    "id": 4,
+    "name": "FinTech Innovations",
+    "industry": "Finance",
+    "revenue": 3200000,
+    "employees": 200,
+    "founded": 2010,
+    "location": "New York, NY"
+  },
+  {
+    "id": 5,
+    "name": "AgriTech Systems",
+    "industry": "Agriculture",
+    "revenue": 650000,
+    "employees": 30,
+    "founded": 2020,
+    "location": "Des Moines, IA"
+  },
+  {
+    "id": 6,
+    "name": "CloudSoft Ltd",
+    "industry": "Technology",
+    "revenue": 4100000,
+    "employees": 280,
+    "founded": 2008,
+    "location": "Seattle, WA"
+  },
+  {
+    "id": 7,
+    "name": "BioPharm Research",
+    "industry": "Healthcare",
+    "revenue": 5600000,
+    "employees": 320,
+    "founded": 2005,
+    "location": "San Diego, CA"
+  },
+  {
+    "id": 8,
+    "name": "RetailTech Solutions",
+    "industry": "Retail",
+    "revenue": 1200000,
+    "employees": 75,
+    "founded": 2017,
+    "location": "Chicago, IL"
+  },
+  {
+    "id": 9,
+    "name": "EduTech Platform",
+    "industry": "Education",
+    "revenue": 800000,
+    "employees": 40,
+    "founded": 2019,
+    "location": "Portland, OR"
+  },
+  {
+    "id": 10,
+    "name": "Manufacturing Plus",
+    "industry": "Manufacturing",
+    "revenue": 3800000,
+    "employees": 450,
+    "founded": 2002,
+    "location": "Detroit, MI"
+  }
+]

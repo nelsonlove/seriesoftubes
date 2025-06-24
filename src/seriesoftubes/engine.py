@@ -13,6 +13,7 @@ from seriesoftubes.nodes import (
     LLMNodeExecutor,
     NodeExecutor,
     NodeResult,
+    PythonNodeExecutor,
     RouteNodeExecutor,
 )
 
@@ -55,6 +56,7 @@ class WorkflowEngine:
             NodeType.HTTP: HTTPNodeExecutor(),
             NodeType.ROUTE: RouteNodeExecutor(),
             NodeType.FILE: FileNodeExecutor(),
+            NodeType.PYTHON: PythonNodeExecutor(),
         }
 
     async def execute(

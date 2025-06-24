@@ -29,6 +29,13 @@ class WorkflowInfo(BaseModel):
     inputs: dict[str, Any] = Field(..., description="Input definitions")
 
 
+class WorkflowDetail(BaseModel):
+    """Complete workflow details including structure"""
+
+    path: str = Field(..., description="Workflow file path")
+    workflow: dict[str, Any] = Field(..., description="Complete workflow definition")
+
+
 class ExecutionStatus(BaseModel):
     """Execution status response"""
 
