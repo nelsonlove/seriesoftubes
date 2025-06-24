@@ -7,10 +7,12 @@ import yaml
 from pydantic import ValidationError
 
 from seriesoftubes.models import (
+    FileNodeConfig,
     HTTPNodeConfig,
     LLMNodeConfig,
     Node,
     NodeType,
+    PythonNodeConfig,
     RouteNodeConfig,
     Workflow,
     WorkflowInput,
@@ -25,7 +27,7 @@ class WorkflowParseError(Exception):
 
 def parse_node_config(
     node_type: NodeType, config_data: dict[str, Any]
-) -> LLMNodeConfig | HTTPNodeConfig | RouteNodeConfig:
+) -> LLMNodeConfig | HTTPNodeConfig | RouteNodeConfig | FileNodeConfig | PythonNodeConfig:
     """Parse node configuration based on the node type"""
     if node_type == NodeType.LLM:
         return LLMNodeConfig(**config_data)
@@ -33,6 +35,10 @@ def parse_node_config(
         return HTTPNodeConfig(**config_data)
     elif node_type == NodeType.ROUTE:
         return RouteNodeConfig(**config_data)
+    elif node_type == NodeType.FILE:
+        return FileNodeConfig(**config_data)
+    elif node_type == NodeType.PYTHON:
+        return PythonNodeConfig(**config_data)
     else:
         msg = f"Unknown node type: {node_type}"
         raise WorkflowParseError(msg)
