@@ -1,5 +1,6 @@
 """Tests for HTTP node executor"""
 
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
@@ -18,16 +19,16 @@ class MockContext:
 
     def __init__(
         self,
-        outputs: dict[str, any] | None = None,
-        inputs: dict[str, any] | None = None,
+        outputs: dict[str, Any] | None = None,
+        inputs: dict[str, Any] | None = None,
     ):
         self.outputs = outputs or {}
         self.inputs = inputs or {}
 
-    def get_output(self, node_name: str) -> any:
+    def get_output(self, node_name: str) -> Any:
         return self.outputs.get(node_name)
 
-    def get_input(self, input_name: str) -> any:
+    def get_input(self, input_name: str) -> Any:
         return self.inputs.get(input_name)
 
 
@@ -266,7 +267,7 @@ async def test_http_network_error():
 @pytest.mark.asyncio
 async def test_http_invalid_config():
     """Test HTTP node with invalid config type"""
-    from pydantic import ValidationError
+    from pydantic import ValidationError  # noqa: PLC0415
 
     # Node creation should fail with invalid config
     with pytest.raises(ValidationError) as exc_info:

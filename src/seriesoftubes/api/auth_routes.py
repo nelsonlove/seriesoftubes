@@ -43,6 +43,8 @@ class Token(BaseModel):
 class UserResponse(BaseModel):
     """User response"""
 
+    model_config = {"from_attributes": True}
+
     id: str
     username: str
     email: str | None
@@ -88,13 +90,7 @@ async def register(
     await db.commit()
     await db.refresh(user)
 
-    return UserResponse(
-        id=user.id,
-        username=user.username,
-        email=user.email,
-        is_active=user.is_active,
-        is_admin=user.is_admin,
-    )
+    return UserResponse.model_validate(user)
 
 
 @router.post("/login", response_model=Token)

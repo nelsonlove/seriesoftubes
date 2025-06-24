@@ -1,74 +1,77 @@
+# Pre-commit config using local hooks - no dependency duplication!
+# Requires: pip install -e ".[dev]" before using
+
 repos:
-  - repo: https://github.com/psf/black
-    rev: 23.9.1
+  # Python tools - use whatever versions are installed locally
+  - repo: local
     hooks:
       - id: black
+        name: black
+        entry: black
+        language: system
+        types: [python]
+        files: ^(src/|tests/)
+        pass_filenames: true
+        require_serial: true
 
-  - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.1.0
-    hooks:
       - id: ruff
-        args: [--fix]
+        name: ruff
+        entry: ruff check --fix
+        language: system
+        types: [python]
+        files: ^(src/|tests/)
+        pass_filenames: true
+        require_serial: true
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.6.1
-    hooks:
       - id: mypy
-        args: [--install-types, --non-interactive]
-        files: ^src/
-        additional_dependencies:
-          - pydantic>=2.0.0
-          - types-PyYAML
-          - typer
-          - rich
-          - fastapi
-          - pytest
-          - click>=8.1.0
-          - pyyaml>=6.0
-          - jinja2>=3.1.0
-          - httpx>=0.25.0
+        name: mypy
+        entry: mypy
+        language: system
+        types: [python]
+        files: ^(src/|tests/)
+        pass_filenames: true
+        require_serial: true
 
+      - id: pytest
+        name: pytest
+        entry: python -m pytest
+        language: system
+        pass_filenames: false
+        always_run: false
+        files: ^(src/|tests/).*\.py$
+        args: ["-v", "--tb=short"]
+
+  # Generic file checks - these don't need project dependencies
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
       - id: check-yaml
       - id: end-of-file-fixer
       - id: trailing-whitespace
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: debug-statements
+        files: ^(src/|tests/)
 
-  - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v3.0.3
-    hooks:
-      - id: prettier
-        files: ^frontend/
-        types_or: [javascript, jsx, ts, tsx, css, json]
-        exclude: ^frontend/(dist|node_modules)/
-
-  - repo: https://github.com/pre-commit/mirrors-eslint
-    rev: v9.13.0
-    hooks:
-      - id: eslint
-        files: ^frontend/.*\.(js|jsx|ts|tsx)$
-        exclude: ^frontend/(dist|node_modules)/
-        args: ['--config', 'frontend/eslint.config.js']
-        additional_dependencies:
-          - eslint@9.13.0
-          - '@eslint/js@9.13.0'
-          - 'typescript-eslint@8.8.1'
-          - 'eslint-plugin-react-hooks@5.0.0'
-          - 'eslint-plugin-react-refresh@0.4.12'
-          - 'eslint-config-prettier@9.1.0'
-          - 'typescript@5.6.3'
-          - 'globals@15.11.0'
-
+  # Frontend tools - use local npm/node
   - repo: local
     hooks:
-      - id: pytest
-        name: pytest
-        entry: pytest
+      - id: prettier
+        name: prettier
+        entry: bash -c 'cd frontend && npx prettier --write'
         language: system
-        pass_filenames: false
-        always_run: true
-        args: ["-v", "--tb=short"]
+        files: ^frontend/.*\.(js|jsx|ts|tsx|css|json)$
+        exclude: ^frontend/(dist|node_modules)/
+        pass_filenames: true
+
+      - id: eslint
+        name: eslint
+        entry: bash -c 'cd frontend && npx eslint --fix'
+        language: system
+        files: ^frontend/.*\.(js|jsx|ts|tsx)$
+        exclude: ^frontend/(dist|node_modules)/
+        pass_filenames: true
 
       - id: frontend-typecheck
         name: frontend typecheck
@@ -77,11 +80,4 @@ repos:
         files: ^frontend/.*\.(ts|tsx)$
         exclude: ^frontend/(dist|node_modules)/
         pass_filenames: false
-
-      - id: frontend-lint
-        name: frontend lint
-        entry: bash -c 'cd frontend && npm run lint'
-        language: system
-        files: ^frontend/.*\.(js|jsx|ts|tsx)$
-        exclude: ^frontend/(dist|node_modules)/
-        pass_filenames: false
+        require_serial: true

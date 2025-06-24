@@ -5,17 +5,15 @@ import shutil
 import tempfile
 import zipfile
 from pathlib import Path
-from typing import Any
 
 import yaml
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from seriesoftubes.api.auth import get_current_active_user
-from seriesoftubes.api.models import WorkflowInfo
 from seriesoftubes.db import User, Workflow, get_db
 from seriesoftubes.parser import parse_workflow_yaml
 
@@ -35,6 +33,8 @@ class WorkflowCreate(BaseModel):
 class WorkflowResponse(BaseModel):
     """Workflow response"""
 
+    model_config = {"from_attributes": True}
+
     id: str
     name: str
     version: str
@@ -50,6 +50,7 @@ class WorkflowResponse(BaseModel):
 async def list_user_workflows(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
+    *,
     include_public: bool = True,
 ) -> list[WorkflowResponse]:
     """List workflows accessible to the current user"""
@@ -59,7 +60,7 @@ async def list_user_workflows(
         result = await db.execute(
             select(Workflow)
             .options(selectinload(Workflow.user))
-            .where((Workflow.user_id == current_user.id) | (Workflow.is_public == True))
+            .where((Workflow.user_id == current_user.id) | (Workflow.is_public))
             .order_by(Workflow.updated_at.desc())
         )
     else:
@@ -74,16 +75,12 @@ async def list_user_workflows(
     workflows = result.scalars().all()
 
     return [
-        WorkflowResponse(
-            id=w.id,
-            name=w.name,
-            version=w.version,
-            description=w.description,
-            user_id=w.user_id,
-            username=w.user.username,
-            is_public=w.is_public,
-            created_at=w.created_at.isoformat(),
-            updated_at=w.updated_at.isoformat(),
+        WorkflowResponse.model_validate(w).model_copy(
+            update={
+                "username": w.user.username,
+                "created_at": w.created_at.isoformat(),
+                "updated_at": w.updated_at.isoformat(),
+            }
         )
         for w in workflows
     ]
@@ -125,7 +122,10 @@ async def create_workflow(
     if result.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Workflow {workflow_data.name} v{workflow_data.version} already exists",
+            detail=(
+                f"Workflow {workflow_data.name} v{workflow_data.version} "
+                "already exists"
+            ),
         )
 
     # Create workflow directory
@@ -153,28 +153,27 @@ async def create_workflow(
     await db.commit()
     await db.refresh(workflow)
 
-    return WorkflowResponse(
-        id=workflow.id,
-        name=workflow.name,
-        version=workflow.version,
-        description=workflow.description,
-        user_id=workflow.user_id,
-        username=current_user.username,
-        is_public=workflow.is_public,
-        created_at=workflow.created_at.isoformat(),
-        updated_at=workflow.updated_at.isoformat(),
+    return WorkflowResponse.model_validate(workflow).model_copy(
+        update={
+            "username": current_user.username,
+            "created_at": workflow.created_at.isoformat(),
+            "updated_at": workflow.updated_at.isoformat(),
+        }
     )
 
 
-@router.post("/upload", response_model=WorkflowResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/upload", response_model=WorkflowResponse, status_code=status.HTTP_201_CREATED
+)
 async def upload_workflow_package(
     file: UploadFile = File(..., description="Workflow package (ZIP file)"),
-    is_public: bool = False,
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
+    *,
+    is_public: bool = False,
 ) -> WorkflowResponse:
     """Upload a workflow package (ZIP file containing workflow.yaml and assets)"""
-    if not file.filename.endswith(".zip"):
+    if not file.filename or not file.filename.endswith(".zip"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="File must be a ZIP archive",
@@ -202,7 +201,9 @@ async def upload_workflow_package(
             description = yaml_data.get("description")
 
             # Validate by parsing
-            with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as tmp:
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".yaml", delete=False
+            ) as tmp:
                 tmp.write(yaml_content)
                 tmp_path = Path(tmp.name)
 
@@ -229,7 +230,9 @@ async def upload_workflow_package(
                 )
 
             # Create workflow directory
-            workflows_dir = Path.home() / ".seriesoftubes" / "workflows" / str(current_user.id)
+            workflows_dir = (
+                Path.home() / ".seriesoftubes" / "workflows" / str(current_user.id)
+            )
             workflows_dir.mkdir(parents=True, exist_ok=True)
 
             workflow_dir = workflows_dir / f"{name}_{version}"
@@ -254,23 +257,19 @@ async def upload_workflow_package(
             await db.commit()
             await db.refresh(workflow)
 
-            return WorkflowResponse(
-                id=workflow.id,
-                name=workflow.name,
-                version=workflow.version,
-                description=workflow.description,
-                user_id=workflow.user_id,
-                username=current_user.username,
-                is_public=workflow.is_public,
-                created_at=workflow.created_at.isoformat(),
-                updated_at=workflow.updated_at.isoformat(),
+            return WorkflowResponse.model_validate(workflow).model_copy(
+                update={
+                    "username": current_user.username,
+                    "created_at": workflow.created_at.isoformat(),
+                    "updated_at": workflow.updated_at.isoformat(),
+                }
             )
 
     except zipfile.BadZipFile:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid ZIP file",
-        )
+        ) from None
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -290,7 +289,7 @@ async def get_workflow(
         .options(selectinload(Workflow.user))
         .where(
             Workflow.id == workflow_id,
-            (Workflow.user_id == current_user.id) | (Workflow.is_public == True),
+            (Workflow.user_id == current_user.id) | (Workflow.is_public),
         )
     )
     workflow = result.scalar_one_or_none()
@@ -301,16 +300,12 @@ async def get_workflow(
             detail="Workflow not found",
         )
 
-    return WorkflowResponse(
-        id=workflow.id,
-        name=workflow.name,
-        version=workflow.version,
-        description=workflow.description,
-        user_id=workflow.user_id,
-        username=workflow.user.username,
-        is_public=workflow.is_public,
-        created_at=workflow.created_at.isoformat(),
-        updated_at=workflow.updated_at.isoformat(),
+    return WorkflowResponse.model_validate(workflow).model_copy(
+        update={
+            "username": workflow.user.username,
+            "created_at": workflow.created_at.isoformat(),
+            "updated_at": workflow.updated_at.isoformat(),
+        }
     )
 
 

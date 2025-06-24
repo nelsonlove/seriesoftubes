@@ -8,7 +8,6 @@ from typing import Any
 from sqlalchemy import (
     JSON,
     Boolean,
-    Column,
     DateTime,
     Enum,
     ForeignKey,
@@ -17,7 +16,7 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import DeclarativeBase, relationship
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 class Base(DeclarativeBase):
@@ -36,29 +35,31 @@ class User(Base):
 
     __tablename__ = "users"
 
-    id = Column(
+    id: Mapped[str] = mapped_column(
         UUID(as_uuid=False),
         primary_key=True,
         default=generate_uuid,
-        nullable=False,
     )
-    username = Column(String(255), unique=True, nullable=False, index=True)
-    email = Column(String(255), unique=True, nullable=True, index=True)
-    password_hash = Column(String(255), nullable=True)  # Nullable for system user
-    is_active = Column(Boolean, default=True, nullable=False)
-    is_admin = Column(Boolean, default=False, nullable=False)
-    is_system = Column(Boolean, default=False, nullable=False)
-    created_at = Column(
+    username: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    email: Mapped[str | None] = mapped_column(
+        String(255), unique=True, nullable=True, index=True
+    )
+    password_hash: Mapped[str | None] = mapped_column(
+        String(255), nullable=True
+    )  # Nullable for system user
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_system: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
-        nullable=False,
     )
 
     # Relationships
-    workflows = relationship(
+    workflows: Mapped[list["Workflow"]] = relationship(
         "Workflow", back_populates="user", cascade="all, delete-orphan"
     )
-    executions = relationship(
+    executions: Mapped[list["Execution"]] = relationship(
         "Execution", back_populates="user", cascade="all, delete-orphan"
     )
 
@@ -71,34 +72,31 @@ class Workflow(Base):
 
     __tablename__ = "workflows"
 
-    id = Column(
+    id: Mapped[str] = mapped_column(
         UUID(as_uuid=False),
         primary_key=True,
         default=generate_uuid,
-        nullable=False,
     )
-    name = Column(String(255), nullable=False, index=True)
-    version = Column(String(50), nullable=False)
-    description = Column(Text, nullable=True)
-    user_id = Column(UUID(as_uuid=False), ForeignKey("users.id"), nullable=False)
-    is_public = Column(Boolean, default=False, nullable=False)
-    package_path = Column(String(500), nullable=False)  # Path to extracted workflow
-    yaml_content = Column(Text, nullable=False)  # Cached workflow.yaml content
-    created_at = Column(
+    name: Mapped[str] = mapped_column(String(255), index=True)
+    version: Mapped[str] = mapped_column(String(50))
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    user_id: Mapped[str] = mapped_column(UUID(as_uuid=False), ForeignKey("users.id"))
+    is_public: Mapped[bool] = mapped_column(Boolean, default=False)
+    package_path: Mapped[str] = mapped_column(String(500))  # Path to extracted workflow
+    yaml_content: Mapped[str] = mapped_column(Text)  # Cached workflow.yaml content
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
-        nullable=False,
     )
-    updated_at = Column(
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
-        nullable=False,
     )
 
     # Relationships
-    user = relationship("User", back_populates="workflows")
-    executions = relationship(
+    user: Mapped["User"] = relationship("User", back_populates="workflows")
+    executions: Mapped[list["Execution"]] = relationship(
         "Execution", back_populates="workflow", cascade="all, delete-orphan"
     )
 
@@ -130,35 +128,34 @@ class Execution(Base):
 
     __tablename__ = "executions"
 
-    id = Column(
+    id: Mapped[str] = mapped_column(
         UUID(as_uuid=False),
         primary_key=True,
         default=generate_uuid,
-        nullable=False,
     )
-    workflow_id = Column(
-        UUID(as_uuid=False), ForeignKey("workflows.id"), nullable=False
+    workflow_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("workflows.id")
     )
-    user_id = Column(UUID(as_uuid=False), ForeignKey("users.id"), nullable=False)
-    status = Column(
+    user_id: Mapped[str] = mapped_column(UUID(as_uuid=False), ForeignKey("users.id"))
+    status: Mapped[str] = mapped_column(
         Enum(ExecutionStatus, values_callable=lambda x: [e.value for e in x]),
         default=ExecutionStatus.PENDING.value,
-        nullable=False,
         index=True,
     )
-    inputs = Column(JSON, nullable=False, default=dict)
-    outputs = Column(JSON, nullable=True)
-    errors = Column(JSON, nullable=True)
-    started_at = Column(
+    inputs: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    outputs: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    errors: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
-        nullable=False,
     )
-    completed_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     # Relationships
-    workflow = relationship("Workflow", back_populates="executions")
-    user = relationship("User", back_populates="executions")
+    workflow: Mapped["Workflow"] = relationship("Workflow", back_populates="executions")
+    user: Mapped["User"] = relationship("User", back_populates="executions")
 
     def __repr__(self) -> str:
         return (
@@ -173,16 +170,16 @@ class Execution(Base):
             "workflow_id": self.workflow_id,
             "workflow_name": self.workflow.name if self.workflow else None,
             "user_id": self.user_id,
-            "status": self.status
-            if isinstance(self.status, str)
-            else self.status.value
-            if self.status
-            else None,
+            "status": (
+                self.status
+                if isinstance(self.status, str)
+                else self.status.value if self.status else None
+            ),
             "inputs": self.inputs,
             "outputs": self.outputs,
             "errors": self.errors,
             "started_at": self.started_at.isoformat() if self.started_at else None,
-            "completed_at": self.completed_at.isoformat()
-            if self.completed_at
-            else None,
+            "completed_at": (
+                self.completed_at.isoformat() if self.completed_at else None
+            ),
         }

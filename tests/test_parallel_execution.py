@@ -20,9 +20,9 @@ class SlowHTTPNodeExecutor:
 
     def __init__(self, delay: float = 1.0):
         self.delay = delay
-        self.call_times = {}
+        self.call_times: dict[str, dict[str, float]] = {}
 
-    async def execute(self, node: Node, context) -> NodeResult:  # noqa: ARG002
+    async def execute(self, node: Node, context) -> NodeResult:
         """Execute with a delay to simulate network latency"""
         start_time = time.time()
         await asyncio.sleep(self.delay)
@@ -196,7 +196,7 @@ async def test_parallel_execution_with_error():
     # Create engine with mock executor that fails for node2
     engine = WorkflowEngine()
 
-    async def mock_execute(node: Node, context) -> NodeResult:  # noqa: ARG001
+    async def mock_execute(node: Node, context) -> NodeResult:
         if node.name == "node2":
             return NodeResult(
                 output=None,

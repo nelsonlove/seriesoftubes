@@ -1,8 +1,9 @@
 """CLI client for interacting with the SeriesOfTubes API"""
 
+import json
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import httpx
 from pydantic import BaseModel
@@ -20,7 +21,6 @@ def get_cli_config() -> CLIConfig:
     config_path = Path.home() / ".seriesoftubes" / "cli_config.json"
 
     if config_path.exists():
-        import json
         with open(config_path) as f:
             data = json.load(f)
         return CLIConfig(**data)
@@ -36,7 +36,6 @@ def save_cli_config(config: CLIConfig) -> None:
     config_path = Path.home() / ".seriesoftubes" / "cli_config.json"
     config_path.parent.mkdir(parents=True, exist_ok=True)
 
-    import json
     with open(config_path, "w") as f:
         json.dump(config.model_dump(), f, indent=2)
 
@@ -93,7 +92,7 @@ class APIClient:
             json={"username": username, "email": email, "password": password},
         )
         response.raise_for_status()
-        return response.json()
+        return cast(dict[str, Any], response.json())
 
     def login(self, username: str, password: str) -> dict[str, Any]:
         """Login and get token"""
@@ -108,10 +107,12 @@ class APIClient:
         if "access_token" in data:
             self.set_token(data["access_token"])
 
-        return data
+        return cast(dict[str, Any], data)
 
     # Workflow methods
-    def list_workflows(self, directory: str = ".", use_db: bool = False) -> list[dict[str, Any]]:
+    def list_workflows(
+        self, directory: str = ".", *, use_db: bool = False
+    ) -> list[dict[str, Any]]:
         """List workflows"""
         if use_db:
             # List from database
@@ -121,13 +122,13 @@ class APIClient:
             response = self.client.get("/workflows", params={"directory": directory})
 
         response.raise_for_status()
-        return response.json()
+        return cast(list[dict[str, Any]], response.json())
 
     def get_workflow(self, workflow_path: str) -> dict[str, Any]:
         """Get workflow details"""
         response = self.client.get(f"/workflows/{workflow_path}")
         response.raise_for_status()
-        return response.json()
+        return cast(dict[str, Any], response.json())
 
     def create_workflow(
         self, name: str, version: str, yaml_content: str, description: str | None = None
@@ -144,7 +145,7 @@ class APIClient:
             },
         )
         response.raise_for_status()
-        return response.json()
+        return cast(dict[str, Any], response.json())
 
     def upload_workflow_package(self, zip_path: Path) -> dict[str, Any]:
         """Upload a workflow package"""
@@ -153,10 +154,10 @@ class APIClient:
             response = self.client.post("/api/workflows/upload", files=files)
 
         response.raise_for_status()
-        return response.json()
+        return cast(dict[str, Any], response.json())
 
     def run_workflow(
-        self, workflow_path: str, inputs: dict[str, Any], use_db: bool = False
+        self, workflow_path: str, inputs: dict[str, Any], *, use_db: bool = False
     ) -> dict[str, Any]:
         """Run a workflow"""
         if use_db:
@@ -173,15 +174,17 @@ class APIClient:
             )
 
         response.raise_for_status()
-        return response.json()
+        return cast(dict[str, Any], response.json())
 
     def list_executions(self) -> list[dict[str, Any]]:
         """List executions"""
         response = self.client.get("/api/executions")
         response.raise_for_status()
-        return response.json()
+        return cast(list[dict[str, Any]], response.json())
 
-    def get_execution(self, execution_id: str, use_db: bool = False) -> dict[str, Any]:
+    def get_execution(
+        self, execution_id: str, *, use_db: bool = False
+    ) -> dict[str, Any]:
         """Get execution details"""
         if use_db:
             response = self.client.get(f"/api/executions/{execution_id}")
@@ -189,9 +192,9 @@ class APIClient:
             response = self.client.get(f"/executions/{execution_id}")
 
         response.raise_for_status()
-        return response.json()
+        return cast(dict[str, Any], response.json())
 
-    def stream_execution(self, execution_id: str, use_db: bool = False) -> Any:
+    def stream_execution(self, execution_id: str, *, use_db: bool = False) -> Any:
         """Stream execution updates"""
         if use_db:
             url = f"/api/executions/{execution_id}/stream"

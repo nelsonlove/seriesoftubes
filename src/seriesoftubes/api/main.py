@@ -5,6 +5,7 @@ import json
 import logging
 import shutil
 import tempfile
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -34,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:  # noqa: ARG001
     """Initialize app on startup"""
     # Initialize database
     await init_db()
@@ -155,7 +156,11 @@ async def get_workflow(workflow_path: str) -> WorkflowDetail:
 @app.get("/workflows/{workflow_path:path}/raw", response_model=RawWorkflowResponse)
 async def get_workflow_raw(workflow_path: str) -> RawWorkflowResponse:
     """Get raw YAML content of a workflow"""
+    # Handle both absolute and relative paths
     path = Path(workflow_path)
+    if not path.is_absolute():
+        # If relative, resolve from current working directory
+        path = Path.cwd() / path
 
     if not path.exists():
         raise HTTPException(status_code=404, detail="Workflow not found")
@@ -244,7 +249,7 @@ async def update_workflow_raw(
         if backup_path.exists():
             try:
                 shutil.copy2(backup_path, path)
-            except Exception:
+            except Exception:  # noqa: S110
                 pass
         raise HTTPException(
             status_code=500, detail=f"Failed to save workflow: {e}"

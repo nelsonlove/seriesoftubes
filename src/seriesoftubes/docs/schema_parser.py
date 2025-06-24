@@ -1,8 +1,7 @@
 """Parse JSON Schema and generate documentation."""
 
-import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import yaml
 
@@ -10,7 +9,7 @@ import yaml
 class PropertyDoc:
     """Documentation for a single property."""
 
-    def __init__(self, name: str, schema: dict[str, Any], required: bool = False):
+    def __init__(self, name: str, schema: dict[str, Any], *, required: bool = False):
         self.name = name
         self.schema = schema
         self.required = required
@@ -24,20 +23,27 @@ class PropertyDoc:
     def _get_type(self) -> str:
         """Extract property type."""
         if "type" in self.schema:
-            return self.schema["type"]
+            return str(self.schema["type"])
         elif "oneOf" in self.schema:
             # For inputs that can be string or object
             types = []
             for option in self.schema["oneOf"]:
                 if "type" in option:
-                    types.append(option["type"])
+                    types.append(str(option["type"]))
             return " | ".join(types) if types else "mixed"
         return "any"
 
     def _get_constraints(self) -> dict[str, Any]:
         """Extract property constraints."""
         constraints = {}
-        for key in ["minimum", "maximum", "minLength", "maxLength", "pattern", "format"]:
+        for key in [
+            "minimum",
+            "maximum",
+            "minLength",
+            "maxLength",
+            "pattern",
+            "format",
+        ]:
             if key in self.schema:
                 constraints[key] = self.schema[key]
         return constraints
@@ -61,7 +67,9 @@ class NodeTypeDoc:
         required = self.config_schema.get("required", [])
 
         for prop_name, prop_schema in props.items():
-            properties.append(PropertyDoc(prop_name, prop_schema, prop_name in required))
+            properties.append(
+                PropertyDoc(prop_name, prop_schema, required=prop_name in required)
+            )
 
         return properties
 
@@ -86,7 +94,8 @@ class SchemaDocGenerator:
     def _load_schema(self) -> dict[str, Any]:
         """Load and parse the YAML schema."""
         with open(self.schema_path) as f:
-            return yaml.safe_load(f)
+            data = yaml.safe_load(f)
+            return data if isinstance(data, dict) else {}
 
     def _extract_node_configs(self) -> dict[str, dict[str, Any]]:
         """Extract node configuration schemas from definitions."""
@@ -99,7 +108,7 @@ class SchemaDocGenerator:
             "http": "http_config",
             "route": "route_config",
             "file": "file_config",
-            "python": "python_config"
+            "python": "python_config",
         }
 
         for node_type, config_name in node_mapping.items():
@@ -127,17 +136,19 @@ class SchemaDocGenerator:
             self._get_node_description(node_type),
             "",
             "## Properties",
-            ""
+            "",
         ]
 
         # Required properties
         if node_doc.required_properties:
-            lines.extend([
-                "### Required Properties",
-                "",
-                "| Property | Type | Description |",
-                "|----------|------|-------------|"
-            ])
+            lines.extend(
+                [
+                    "### Required Properties",
+                    "",
+                    "| Property | Type | Description |",
+                    "|----------|------|-------------|",
+                ]
+            )
 
             for prop in node_doc.required_properties:
                 desc = prop.description.replace("\n", " ")
@@ -147,12 +158,14 @@ class SchemaDocGenerator:
 
         # Optional properties
         if node_doc.optional_properties:
-            lines.extend([
-                "### Optional Properties",
-                "",
-                "| Property | Type | Default | Description |",
-                "|----------|------|---------|-------------|"
-            ])
+            lines.extend(
+                [
+                    "### Optional Properties",
+                    "",
+                    "| Property | Type | Default | Description |",
+                    "|----------|------|---------|-------------|",
+                ]
+            )
 
             for prop in node_doc.optional_properties:
                 desc = prop.description.replace("\n", " ")
@@ -163,12 +176,14 @@ class SchemaDocGenerator:
 
         # Property constraints
         if node_doc.one_of_groups:
-            lines.extend([
-                "### Property Constraints",
-                "",
-                "You must provide ONE of the following property combinations:",
-                ""
-            ])
+            lines.extend(
+                [
+                    "### Property Constraints",
+                    "",
+                    "You must provide ONE of the following property combinations:",
+                    "",
+                ]
+            )
 
             for i, group in enumerate(node_doc.one_of_groups, 1):
                 lines.append(f"{i}. " + " AND ".join(f"`{prop}`" for prop in group))
@@ -176,10 +191,7 @@ class SchemaDocGenerator:
             lines.append("")
 
         # Property details
-        lines.extend([
-            "## Property Details",
-            ""
-        ])
+        lines.extend(["## Property Details", ""])
 
         for prop in node_doc.properties:
             lines.extend(self._generate_property_details(prop))
@@ -196,16 +208,15 @@ class SchemaDocGenerator:
             "http": "Make HTTP API calls with authentication and templating support.",
             "route": "Conditionally route workflow execution based on data conditions.",
             "file": "Read and process files in various formats (JSON, CSV, YAML, PDF, etc.).",
-            "python": "Execute Python code for data transformation and analysis."
+            "python": "Execute Python code for data transformation and analysis.",
         }
-        return descriptions.get(node_type, f"Process data using {node_type} operations.")
+        return descriptions.get(
+            node_type, f"Process data using {node_type} operations."
+        )
 
     def _generate_property_details(self, prop: PropertyDoc) -> list[str]:
         """Generate detailed documentation for a property."""
-        lines = [
-            f"### `{prop.name}`",
-            ""
-        ]
+        lines = [f"### `{prop.name}`", ""]
 
         if prop.description:
             lines.extend([prop.description, ""])
@@ -220,7 +231,9 @@ class SchemaDocGenerator:
             type_info.append(f"**Default:** `{prop.default}`")
 
         if prop.enum:
-            type_info.append(f"**Allowed values:** {', '.join(f'`{v}`' for v in prop.enum)}")
+            type_info.append(
+                f"**Allowed values:** {', '.join(f'`{v}`' for v in prop.enum)}"
+            )
 
         for constraint, value in prop.constraints.items():
             if constraint == "pattern":
@@ -255,14 +268,9 @@ class SchemaDocGenerator:
         examples = self._get_node_examples(node_type)
 
         for i, (title, example) in enumerate(examples, 1):
-            lines.extend([
-                f"### Example {i}: {title}",
-                "",
-                "```yaml",
-                example.strip(),
-                "```",
-                ""
-            ])
+            lines.extend(
+                [f"### Example {i}: {title}", "", "```yaml", example.strip(), "```", ""]
+            )
 
         return lines
 
@@ -270,15 +278,20 @@ class SchemaDocGenerator:
         """Get examples for each node type."""
         examples = {
             "llm": [
-                ("Basic prompt", """
+                (
+                    "Basic prompt",
+                    """
 classify_company:
   type: llm
   config:
     prompt: "Classify this company: {{ company_name }}"
     model: gpt-4
     temperature: 0.7
-"""),
-                ("Structured extraction", """
+""",
+                ),
+                (
+                    "Structured extraction",
+                    """
 extract_data:
   type: llm
   depends_on: [fetch_data]
@@ -296,17 +309,23 @@ extract_data:
           type: integer
         industry:
           type: string
-"""),
+""",
+                ),
             ],
             "http": [
-                ("Simple GET request", """
+                (
+                    "Simple GET request",
+                    """
 fetch_api:
   type: http
   config:
     url: https://api.example.com/data
     method: GET
-"""),
-                ("POST with authentication", """
+""",
+                ),
+                (
+                    "POST with authentication",
+                    """
 create_record:
   type: http
   depends_on: [prepare_data]
@@ -321,10 +340,13 @@ create_record:
     body: "{{ prepare_data }}"
     context:
       prepare_data: prepare_data
-"""),
+""",
+                ),
             ],
             "route": [
-                ("Conditional routing", """
+                (
+                    "Conditional routing",
+                    """
 route_by_size:
   type: route
   depends_on: [analyze_company]
@@ -338,17 +360,23 @@ route_by_size:
         to: process_small_business
       - default: true
         to: process_standard
-"""),
+""",
+                ),
             ],
             "file": [
-                ("Read JSON file", """
+                (
+                    "Read JSON file",
+                    """
 load_data:
   type: file
   config:
     path: data/companies.json
     format: json
-"""),
-                ("Process CSV files", """
+""",
+                ),
+                (
+                    "Process CSV files",
+                    """
 load_csv_data:
   type: file
   config:
@@ -356,17 +384,20 @@ load_csv_data:
     format: csv
     merge: true
     skip_errors: true
-"""),
+""",
+                ),
             ],
             "python": [
-                ("Data transformation", """
+                (
+                    "Data transformation",
+                    """
 transform_data:
   type: python
   depends_on: [load_data]
   config:
     code: |
       data = context['data']
-      
+
       # Transform and filter
       result = {
           'total': len(data),
@@ -375,11 +406,12 @@ transform_data:
               'avg_revenue': sum(d.get('revenue', 0) for d in data) / len(data)
           }
       }
-      
+
       return result
     context:
       data: load_data
-"""),
+""",
+                ),
             ],
         }
 
@@ -412,21 +444,25 @@ transform_data:
             "```",
             "",
             "## Workflow Properties",
-            ""
+            "",
         ]
 
         # Document top-level properties
         workflow_props = self.schema.get("properties", {})
 
-        for prop_name in ["name", "version", "description", "inputs", "nodes", "outputs"]:
+        for prop_name in [
+            "name",
+            "version",
+            "description",
+            "inputs",
+            "nodes",
+            "outputs",
+        ]:
             if prop_name in workflow_props:
                 prop_schema = workflow_props[prop_name]
                 required = prop_name in self.schema.get("required", [])
 
-                lines.extend([
-                    f"### `{prop_name}`",
-                    ""
-                ])
+                lines.extend([f"### `{prop_name}`", ""])
 
                 if "description" in prop_schema:
                     lines.extend([prop_schema["description"], ""])
@@ -443,80 +479,82 @@ transform_data:
                 lines.extend(["", ""])
 
         # Add input types section
-        lines.extend([
-            "## Input Types",
-            "",
-            "Workflow inputs support the following types:",
-            "",
-            "- `string` - Text values",
-            "- `number` - Numeric values (float)",
-            "- `integer` - Whole numbers",
-            "- `boolean` - True/false values",
-            "- `object` - JSON objects",
-            "- `array` - Lists of values",
-            "",
-            "### Input Definition Examples",
-            "",
-            "```yaml",
-            "inputs:",
-            "  # Simple string input (shorthand)",
-            "  company_name: string",
-            "  ",
-            "  # Detailed input with constraints",
-            "  threshold:",
-            "    type: number",
-            "    required: false",
-            "    default: 100",
-            "    description: Revenue threshold",
-            "  ",
-            "  # Object input",
-            "  config:",
-            "    type: object",
-            "    required: true",
-            "```",
-            "",
-            "## Node Dependencies",
-            "",
-            "Nodes can depend on other nodes, creating a directed acyclic graph (DAG):",
-            "",
-            "```yaml",
-            "nodes:",
-            "  fetch_data:",
-            "    type: http",
-            "    config:",
-            "      url: https://api.example.com/data",
-            "  ",
-            "  process_data:",
-            "    type: python",
-            "    depends_on: [fetch_data]  # Waits for fetch_data to complete",
-            "    config:",
-            "      context:",
-            "        data: fetch_data  # Access output from fetch_data",
-            "```",
-            "",
-            "## Context Mapping",
-            "",
-            "Nodes can access data from:",
-            "- Previous node outputs via context mapping",
-            "- Workflow inputs via `inputs` in context",
-            "- Environment variables via Jinja2 templates",
-            "",
-            "```yaml",
-            "process:",
-            "  type: python",
-            "  depends_on: [fetch_data, classify]",
-            "  config:",
-            "    context:",
-            "      raw_data: fetch_data",
-            "      classification: classify",
-            "    code: |",
-            "      # Access context variables",
-            "      data = context['raw_data']",
-            "      category = context['classification']",
-            "      threshold = context['inputs']['threshold']",
-            "```",
-            ""
-        ])
+        lines.extend(
+            [
+                "## Input Types",
+                "",
+                "Workflow inputs support the following types:",
+                "",
+                "- `string` - Text values",
+                "- `number` - Numeric values (float)",
+                "- `integer` - Whole numbers",
+                "- `boolean` - True/false values",
+                "- `object` - JSON objects",
+                "- `array` - Lists of values",
+                "",
+                "### Input Definition Examples",
+                "",
+                "```yaml",
+                "inputs:",
+                "  # Simple string input (shorthand)",
+                "  company_name: string",
+                "  ",
+                "  # Detailed input with constraints",
+                "  threshold:",
+                "    type: number",
+                "    required: false",
+                "    default: 100",
+                "    description: Revenue threshold",
+                "  ",
+                "  # Object input",
+                "  config:",
+                "    type: object",
+                "    required: true",
+                "```",
+                "",
+                "## Node Dependencies",
+                "",
+                "Nodes can depend on other nodes, creating a directed acyclic graph (DAG):",
+                "",
+                "```yaml",
+                "nodes:",
+                "  fetch_data:",
+                "    type: http",
+                "    config:",
+                "      url: https://api.example.com/data",
+                "  ",
+                "  process_data:",
+                "    type: python",
+                "    depends_on: [fetch_data]  # Waits for fetch_data to complete",
+                "    config:",
+                "      context:",
+                "        data: fetch_data  # Access output from fetch_data",
+                "```",
+                "",
+                "## Context Mapping",
+                "",
+                "Nodes can access data from:",
+                "- Previous node outputs via context mapping",
+                "- Workflow inputs via `inputs` in context",
+                "- Environment variables via Jinja2 templates",
+                "",
+                "```yaml",
+                "process:",
+                "  type: python",
+                "  depends_on: [fetch_data, classify]",
+                "  config:",
+                "    context:",
+                "      raw_data: fetch_data",
+                "      classification: classify",
+                "    code: |",
+                "      # Access context variables",
+                "      data = context['raw_data']",
+                "      category = context['classification']",
+                "      threshold = context['inputs']['threshold']",
+                "```",
+                "",
+            ]
+        )
 
         return "\n".join(lines)
 
@@ -601,7 +639,7 @@ transform_data:
             "3. Use `prompt_template` for complex prompts",
             "4. Enable `skip_errors: true` for fault tolerance",
             "5. Use `schema` in LLM nodes for structured data",
-            ""
+            "",
         ]
 
         return "\n".join(lines)
@@ -631,14 +669,16 @@ transform_data:
                 "      ${9}",
                 "",
                 "outputs:",
-                "  ${10:output_name}: ${11:node_name}"
+                "  ${10:output_name}: ${11:node_name}",
             ],
-            "description": "Create a new SeriesOfTubes workflow"
+            "description": "Create a new SeriesOfTubes workflow",
         }
 
         # Node type snippets
         for node_type in self.get_node_types():
-            snippets[f"{node_type.upper()} node"] = self._generate_node_snippet(node_type)
+            snippets[f"{node_type.upper()} node"] = self._generate_node_snippet(
+                node_type
+            )
 
         # Input snippets
         snippets["Workflow input"] = {
@@ -648,9 +688,9 @@ transform_data:
                 "  type: ${2|string,number,boolean,object,array|}",
                 "  required: ${3|true,false|}",
                 "  default: ${4}",
-                "  description: ${5:Input description}"
+                "  description: ${5:Input description}",
             ],
-            "description": "Add a workflow input parameter"
+            "description": "Add a workflow input parameter",
         }
 
         return snippets
@@ -667,7 +707,7 @@ transform_data:
                 "    model: ${5|gpt-4,gpt-3.5-turbo,claude-3-opus-20240229|}",
                 "    temperature: ${6:0.7}",
                 "    ${7:context:}",
-                "      ${8:data}: ${9:source_node}"
+                "      ${8:data}: ${9:source_node}",
             ],
             "http": [
                 "${1:node_name}:",
@@ -680,7 +720,7 @@ transform_data:
                 "      ${7:Content-Type}: ${8:application/json}",
                 "    ${9:auth:}",
                 "      ${10:type}: ${11|bearer,basic,api_key|}",
-                '      ${12:token}: "${13:\\$\\{\\{ env.API_TOKEN \\}\\}}"'
+                '      ${12:token}: "${13:\\$\\{\\{ env.API_TOKEN \\}\\}}"',
             ],
             "route": [
                 "${1:node_name}:",
@@ -693,7 +733,7 @@ transform_data:
                 '      - when: "${5:\\$\\{\\{ data.value > 100 \\}\\}}"',
                 "        to: ${6:high_value_node}",
                 "      - default: true",
-                "        to: ${7:default_node}"
+                "        to: ${7:default_node}",
             ],
             "file": [
                 "${1:node_name}:",
@@ -702,7 +742,7 @@ transform_data:
                 "    ${2|path,pattern|}: ${3:data/file.json}",
                 "    format: ${4|auto,json,csv,yaml,txt,pdf|}",
                 "    ${5:merge}: ${6|true,false|}",
-                "    ${7:skip_errors}: ${8|true,false|}"
+                "    ${7:skip_errors}: ${8|true,false|}",
             ],
             "python": [
                 "${1:node_name}:",
@@ -718,12 +758,12 @@ transform_data:
                 "      ",
                 "      return result",
                 "    context:",
-                "      ${5:data}: ${8:source_node}"
-            ]
+                "      ${5:data}: ${8:source_node}",
+            ],
         }
 
         return {
             "prefix": f"{node_type}node",
             "body": bodies.get(node_type, ["${1:node_name}:", f"  type: {node_type}"]),
-            "description": f"Add a {node_type} node to the workflow"
+            "description": f"Add a {node_type} node to the workflow",
         }

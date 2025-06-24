@@ -177,18 +177,31 @@ disallow_untyped_decorators = true
 no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
+plugins = ["sqlalchemy.ext.mypy.plugin"]
 
 [[tool.mypy.overrides]]
 module = "tests.*"
 disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = false
+warn_return_any = false
+warn_unused_ignores = false
 
 [[tool.mypy.overrides]]
 module = ["typer", "rich.*", "fastapi", "uvicorn", "sse_starlette.*", "PyPDF2", "docx", "openpyxl", "bs4"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = "seriesoftubes.api.*"
+# FastAPI uses dependency injection and Pydantic models extensively
+# These patterns can trigger false positives with strict typing
+warn_unused_ignores = false
+
 [tool.ruff]
 target-version = "py310"
 line-length = 88
+
+# Per-file ignores are defined later in the file
 
 [tool.ruff.lint]
 select = [
@@ -221,12 +234,14 @@ select = [
 ignore = [
     # Allow non-abstract empty methods in abstract base classes
     "B027",
-    # Allow boolean positional values in function calls, like `dict.get(... True)`
-    "FBT003",
     # Ignore checks for possible passwords
     "S105", "S106", "S107",
-    # Ignore complexity
+    # Ignore complexity warnings - these should be addressed case-by-case
     "C901", "PLR0911", "PLR0912", "PLR0913", "PLR0915",
+    # Magic value comparison - sometimes literals are clearer than constants
+    "PLR2004",
+    # Line too long - handled by black formatter
+    "E501",
 ]
 unfixable = [
     # Don't touch unused imports
@@ -241,7 +256,24 @@ ban-relative-imports = "all"
 
 [tool.ruff.lint.per-file-ignores]
 # Tests can use magic values, assertions, and relative imports
-"tests/**/*" = ["PLR2004", "S101", "TID252"]
+"tests/**/*" = ["PLR2004", "S101", "TID252", "ARG001", "ARG002", "D100", "D101", "D102", "D103", "D104", "N806"]
+
+# FastAPI and Typer have framework-specific patterns that trigger false positives
+# API routes: FastAPI's Depends() pattern and 'id' field names
+"src/seriesoftubes/api/**/*.py" = [
+    "B008",  # FastAPI's Depends() is a function call in argument defaults
+    "A003",  # 'id' is a common field name in APIs, not shadowing builtin
+]
+
+# CLI: Typer's boolean flags and Option patterns
+"src/seriesoftubes/cli/**/*.py" = [
+    "FBT001", "FBT002",  # Boolean positional args are how Typer handles flags
+    "B008",  # Typer's Option() is also a function call in defaults
+]
+
+# Scripts and notebooks can have more relaxed rules
+"scripts/**/*.py" = ["T201", "S101"]  # Allow print() and asserts in scripts
+"notebooks/**/*.py" = ["T201", "S101", "E402"]  # Also allow imports not at top
 
 [tool.black]
 target-version = ["py310"]

@@ -62,7 +62,7 @@ async def get_current_user(
     if request.headers.get("X-CLI-User") == "system":
         # Get system user from database
         result = await db.execute(
-            select(User).where(User.username == "system", User.is_system == True)
+            select(User).where(User.username == "system", User.is_system.is_(True))
         )
         system_user = result.scalar_one_or_none()
         if system_user:
@@ -80,17 +80,17 @@ async def get_current_user(
         payload = jwt.decode(
             credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM]
         )
-        user_id: str = payload.get("sub")
+        user_id: str | None = payload.get("sub")
         if user_id is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid authentication credentials",
             )
-    except JWTError:
+    except JWTError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication credentials",
-        )
+        ) from e
 
     # Get user from database
     result = await db.execute(select(User).where(User.id == user_id))

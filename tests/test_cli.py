@@ -3,6 +3,7 @@
 from unittest.mock import patch
 
 import pytest
+from typer import BadParameter
 from typer.testing import CliRunner
 
 from seriesoftubes.cli import app
@@ -56,8 +57,6 @@ class TestParseInputArgs:
 
     def test_invalid_format(self):
         """Test invalid input format"""
-        from typer import BadParameter
-
         with pytest.raises(BadParameter, match="Invalid input format"):
             parse_input_args(["invalid"])
 
@@ -111,12 +110,13 @@ outputs:
         assert result.exit_code == 1
         assert "✗ Validation failed:" in result.stdout
 
-    @patch("seriesoftubes.engine.run_workflow")
+    @patch("seriesoftubes.cli.main.run_workflow")
     def test_run_command(self, mock_run_workflow, tmp_path):
         """Test run command"""
         # Create a simple workflow file
         workflow_file = tmp_path / "test.yaml"
-        workflow_file.write_text("""name: test_workflow
+        workflow_file.write_text(
+            """name: test_workflow
 version: "1.0.0"
 inputs:
   text:
@@ -132,7 +132,8 @@ nodes:
       context:
         text: inputs.text
 outputs:
-  result: echo""")
+  result: echo"""
+        )
 
         # Mock the run_workflow function (it's async)
         mock_run_workflow.return_value = {
@@ -154,7 +155,7 @@ outputs:
         # The CLI now displays outputs differently
         assert mock_run_workflow.called
 
-    @patch("seriesoftubes.engine.run_workflow")
+    @patch("seriesoftubes.cli.main.run_workflow")
     def test_run_command_with_error(self, mock_run_workflow, tmp_path):
         """Test run command with workflow error"""
         workflow_file = tmp_path / "test.yaml"
@@ -333,7 +334,7 @@ outputs:
         assert "Dry run mode - workflow not executed" in result.stdout
         assert "✓ Workflow validation passed!" in result.stdout
 
-    @patch("seriesoftubes.engine.run_workflow")
+    @patch("seriesoftubes.cli.main.run_workflow")
     def test_test_command_execute(self, mock_run_workflow, tmp_path):
         """Test test command with execution"""
         workflow_file = tmp_path / "test.yaml"

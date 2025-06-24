@@ -72,8 +72,8 @@ class HTTPNodeExecutor(NodeExecutor):
                 validated_input = self.validate_input(input_data)
                 url = validated_input["url"]
                 headers = validated_input["headers"]
-                params = validated_input.get("params") or None
-                body = validated_input.get("body") or None
+                params = validated_input.get("params", {})
+                body = validated_input.get("body", {})
 
             # Set timeout
             timeout = config.timeout or app_config.http.timeout

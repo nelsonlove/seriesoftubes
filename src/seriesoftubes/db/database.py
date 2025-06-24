@@ -4,12 +4,11 @@ import os
 from collections.abc import AsyncGenerator
 from pathlib import Path
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from seriesoftubes.config import get_config
-from sqlalchemy import select
-
 from seriesoftubes.db.models import Base, User
 
 

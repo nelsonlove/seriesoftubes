@@ -73,7 +73,7 @@ class RouteNodeExecutor(NodeExecutor):
 
             output = {
                 "selected_route": selected_route,
-                "condition_met": None,  # Default route has no condition
+                "condition_met": "default",  # Default route has no condition
             }
 
             # Apply output validation if configured

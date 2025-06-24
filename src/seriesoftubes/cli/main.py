@@ -1,10 +1,12 @@
 """CLI interface for seriesoftubes (s10s)"""
 
 import asyncio
+import http.server
 import json
 import os
-import shutil
-import tempfile
+import socketserver
+import subprocess
+import sys
 import zipfile
 from pathlib import Path
 from typing import Annotated, Any
@@ -16,8 +18,9 @@ import yaml
 from rich.console import Console
 from rich.table import Table
 
-from seriesoftubes.cli.client import APIClient, get_cli_config
+from seriesoftubes.cli.client import APIClient
 from seriesoftubes.engine import run_workflow
+from seriesoftubes.models import Workflow
 from seriesoftubes.parser import WorkflowParseError, parse_workflow_yaml, validate_dag
 
 app = typer.Typer(
@@ -26,6 +29,17 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 console = Console()
+
+
+def _truncate_description(description: str | None, max_length: int) -> str:
+    """Truncate description to max length with ellipsis if needed."""
+    if not description:
+        return ""
+    return (
+        description[:max_length] + "..."
+        if len(description) > max_length
+        else description
+    )
 
 
 def parse_input_args(input_list: list[str] | None) -> dict[str, Any]:
@@ -89,7 +103,7 @@ def auth(
                 password = typer.prompt("Password", hide_input=True)
 
             try:
-                result = client.login(username, password)
+                _ = client.login(username, password)
                 console.print(f"[green]✓ Logged in as {username}[/green]")
             except httpx.HTTPStatusError as e:
                 console.print(f"[red]✗ Login failed: {e.response.text}[/red]")
@@ -108,7 +122,7 @@ def auth(
                     raise typer.Exit(1)
 
             try:
-                result = client.register(username, email, password)
+                client.register(username, email, password)
                 console.print(f"[green]✓ Registered user {username}[/green]")
                 console.print("Now run 's10s auth login' to authenticate")
             except httpx.HTTPStatusError as e:
@@ -123,11 +137,15 @@ def auth(
 
 @app.command()
 def run(
-    workflow: Annotated[str, typer.Argument(help="Path to workflow YAML file or workflow ID")],
+    workflow: Annotated[
+        str, typer.Argument(help="Path to workflow YAML file or workflow ID")
+    ],
     inputs: Annotated[list[str] | None, typer.Option("--inputs", "-i")] = None,
     output_dir: Annotated[Path | None, typer.Option("--output-dir", "-o")] = None,
-    no_save: Annotated[bool, typer.Option("--no-save")] = False,  # noqa: FBT002
-    api: Annotated[bool, typer.Option("--api", help="Run via API instead of locally")] = False,
+    no_save: Annotated[bool, typer.Option("--no-save")] = False,
+    api: Annotated[
+        bool, typer.Option("--api", help="Run via API instead of locally")
+    ] = False,
 ) -> None:
     """Run a workflow from a YAML file or via API
 
@@ -149,25 +167,31 @@ def run(
             try:
                 # Run the workflow
                 result = client.run_workflow(workflow, parsed_inputs, use_db=True)
-                console.print(f"✓ Started execution: [green]{result['execution_id']}[/green]")
+                console.print(
+                    f"✓ Started execution: [green]{result['execution_id']}[/green]"
+                )
 
                 # Stream updates
                 console.print("\n[bold]Execution progress:[/bold]")
-                import json as json_lib
 
-                for line in client.stream_execution(result["execution_id"], use_db=True):
+                for line in client.stream_execution(
+                    result["execution_id"], use_db=True
+                ):
                     if line.startswith("data:"):
-                        data = json_lib.loads(line[5:])
+                        data = json.loads(line[5:])
                         if data.get("status") == "completed":
-                            console.print("\n[bold green]✓ Workflow completed successfully![/bold green]")
+                            console.print(
+                                "\n[bold green]✓ Workflow completed "
+                                "successfully![/bold green]"
+                            )
                             if data.get("outputs"):
                                 console.print("\n[bold]Outputs:[/bold]")
-                                console.print(json_lib.dumps(data["outputs"], indent=2))
+                                console.print(json.dumps(data["outputs"], indent=2))
                         elif data.get("status") == "failed":
                             console.print("\n[bold red]✗ Workflow failed![/bold red]")
                             if data.get("errors"):
                                 console.print("\n[bold]Errors:[/bold]")
-                                console.print(json_lib.dumps(data["errors"], indent=2))
+                                console.print(json.dumps(data["errors"], indent=2))
                         else:
                             console.print(f"Status: {data.get('status')}")
 
@@ -342,13 +366,15 @@ def list_workflows(
                 table.add_column("Public", style="blue")
                 table.add_column("Description", style="dim")
 
-                for wf in workflows:
+                for wf_data in workflows:
                     table.add_row(
-                        wf["name"],
-                        wf["version"],
-                        wf["username"],
-                        "✓" if wf["is_public"] else "✗",
-                        (wf.get("description") or "")[:50] + "..." if len(wf.get("description", "")) > 50 else wf.get("description", ""),
+                        wf_data["name"],
+                        wf_data["version"],
+                        wf_data["username"],
+                        "✓" if wf_data["is_public"] else "✗",
+                        _truncate_description(
+                            wf_data.get("description", ""), max_length=50
+                        ),
                     )
 
                 console.print(table)
@@ -367,7 +393,7 @@ def list_workflows(
 
     # Apply exclusion patterns
     if exclude:
-        import fnmatch
+        import fnmatch  # noqa: PLC0415
 
         excluded_files = []
         for yaml_file in yaml_files:
@@ -381,32 +407,30 @@ def list_workflows(
         return
 
     # Try to parse each file and collect valid workflows
-    workflows = []
+    local_workflows: list[tuple[Path, Workflow]] = []
     for yaml_file in yaml_files:
         try:
-            wf = parse_workflow_yaml(yaml_file)
+            wf: Workflow = parse_workflow_yaml(yaml_file)
             # Only include files that have nodes (actual workflows)
             if wf.nodes:
-                workflows.append((yaml_file, wf))
+                local_workflows.append((yaml_file, wf))
         except Exception:  # noqa: S112
             # Skip files that aren't valid workflows
             continue
 
-    if not workflows:
+    if not local_workflows:
         console.print("[yellow]No valid workflow files found.[/yellow]")
         return
 
     # Display workflows in a table
-    from rich.table import Table
-
-    table = Table(title=f"Found {len(workflows)} workflow(s)")
+    table = Table(title=f"Found {len(local_workflows)} workflow(s)")
     table.add_column("File", style="cyan")
     table.add_column("Name", style="green")
     table.add_column("Version")
     table.add_column("Nodes", justify="right")
     table.add_column("Description", style="dim")
 
-    for path, wf in workflows:
+    for path, wf in local_workflows:
         relative_path = (
             path.relative_to(directory) if path.is_relative_to(directory) else path
         )
@@ -566,7 +590,10 @@ def upload(
     with APIClient() as client:
         try:
             result = client.upload_workflow_package(path)
-            console.print(f"[green]✓ Uploaded workflow: {result['name']} v{result['version']}[/green]")
+            console.print(
+                f"[green]✓ Uploaded workflow: "
+                f"{result['name']} v{result['version']}[/green]"
+            )
             console.print(f"  ID: {result['id']}")
             console.print(f"  Owner: {result['username']}")
         except httpx.HTTPStatusError as e:
@@ -605,7 +632,10 @@ def create(
             description = description or wf.description
 
             result = client.create_workflow(name, version, yaml_content, description)
-            console.print(f"[green]✓ Created workflow: {result['name']} v{result['version']}[/green]")
+            console.print(
+                f"[green]✓ Created workflow: "
+                f"{result['name']} v{result['version']}[/green]"
+            )
             console.print(f"  ID: {result['id']}")
             console.print(f"  Owner: {result['username']}")
         except httpx.HTTPStatusError as e:
@@ -668,7 +698,7 @@ def docs(
         str, typer.Argument(help="Subcommand: generate, serve")
     ] = "generate",
     *,
-    output: Annotated[
+    output: Annotated[  # noqa ARG001
         Path | None, typer.Option("--output", "-o", help="Output directory")
     ] = None,
     port: Annotated[
@@ -676,11 +706,11 @@ def docs(
     ] = 8000,
 ) -> None:
     """Generate or serve workflow documentation
-    
+
     Commands:
         generate - Generate documentation from schema
         serve    - Serve documentation locally (requires generated docs)
-    
+
     Examples:
         s10s docs generate
         s10s docs serve --port 8080
@@ -690,56 +720,63 @@ def docs(
 
         try:
             # Run the documentation generator
-            import subprocess
-            import sys
-            from pathlib import Path
-
-            script_path = Path(__file__).parent.parent.parent / "scripts" / "generate_docs.py"
+            script_path = (
+                Path(__file__).parent.parent.parent / "scripts" / "generate_docs.py"
+            )
 
             if not script_path.exists():
-                console.print(f"[red]Error: Documentation generator script not found at {script_path}[/red]")
+                console.print(
+                    "[red]Error: Documentation generator script not found at "
+                    f"{script_path}[/red]"
+                )
                 raise typer.Exit(1)
 
             # Run the script
-            result = subprocess.run(
+            result = subprocess.run(  # noqa S603
                 [sys.executable, str(script_path)],
-                check=False, capture_output=True,
-                text=True
+                check=False,
+                capture_output=True,
+                text=True,
             )
 
             if result.returncode == 0:
                 console.print(result.stdout)
-                console.print("\n[bold green]✓ Documentation generated successfully![/bold green]")
+                console.print(
+                    "\n[bold green]✓ Documentation generated successfully![/bold green]"
+                )
                 console.print("\nDocumentation files created in:")
                 console.print("  • docs/reference/nodes/ - Node type reference")
                 console.print("  • docs/guides/ - Workflow guides")
                 console.print("  • .vscode/ - VS Code snippets")
             else:
-                console.print(f"[red]Error generating documentation:[/red]\n{result.stderr}")
+                console.print(
+                    f"[red]Error generating documentation:[/red]\n{result.stderr}"
+                )
                 raise typer.Exit(1)
 
         except Exception as e:
             console.print(f"[red]Failed to generate documentation:[/red] {e}")
-            raise typer.Exit(1)
+            raise typer.Exit(1) from e
 
     elif subcommand == "serve":
         console.print(f"[bold]Serving documentation on port {port}...[/bold]")
 
         docs_dir = Path("docs")
         if not docs_dir.exists():
-            console.print("[red]Error: Documentation not found. Run 's10s docs generate' first.[/red]")
+            console.print(
+                "[red]Error: Documentation not found. "
+                "Run 's10s docs generate' first.[/red]"
+            )
             raise typer.Exit(1)
 
         try:
-            import http.server
-            import os
-            import socketserver
-
             os.chdir(docs_dir)
 
-            Handler = http.server.SimpleHTTPRequestHandler
-            with socketserver.TCPServer(("", port), Handler) as httpd:
-                console.print(f"\n[green]Documentation server running at http://localhost:{port}[/green]")
+            handler = http.server.SimpleHTTPRequestHandler
+            with socketserver.TCPServer(("", port), handler) as httpd:
+                console.print(
+                    f"\n[green]Documentation server running at http://localhost:{port}[/green]"
+                )
                 console.print("[dim]Press Ctrl+C to stop[/dim]\n")
                 httpd.serve_forever()
 
@@ -747,7 +784,7 @@ def docs(
             console.print("\n[yellow]Server stopped[/yellow]")
         except Exception as e:
             console.print(f"[red]Failed to start server:[/red] {e}")
-            raise typer.Exit(1)
+            raise typer.Exit(1) from e
     else:
         console.print(f"[red]Unknown subcommand: {subcommand}[/red]")
         console.print("Available subcommands: generate, serve")

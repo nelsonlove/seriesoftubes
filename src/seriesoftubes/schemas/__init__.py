@@ -213,7 +213,7 @@ class SchemaValidator:
 
 
 # Node type to schema mapping
-NODE_SCHEMAS = {
+NODE_SCHEMAS: dict[str, dict[str, type[NodeSchema]]] = {
     "llm": {"input": LLMNodeInput, "output": LLMNodeOutput},
     "http": {"input": HTTPNodeInput, "output": HTTPNodeOutput},
     "route": {"input": RouteNodeInput, "output": RouteNodeOutput},

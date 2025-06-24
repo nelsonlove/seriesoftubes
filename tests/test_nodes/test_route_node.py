@@ -1,5 +1,7 @@
 """Tests for route node executor"""
 
+from typing import Any
+
 import pytest
 
 from seriesoftubes.models import (
@@ -16,16 +18,16 @@ class MockContext:
 
     def __init__(
         self,
-        outputs: dict[str, any] | None = None,
-        inputs: dict[str, any] | None = None,
+        outputs: dict[str, Any] | None = None,
+        inputs: dict[str, Any] | None = None,
     ):
         self.outputs = outputs or {}
         self.inputs = inputs or {}
 
-    def get_output(self, node_name: str) -> any:
+    def get_output(self, node_name: str) -> Any:
         return self.outputs.get(node_name)
 
-    def get_input(self, input_name: str) -> any:
+    def get_input(self, input_name: str) -> Any:
         return self.inputs.get(input_name)
 
 
@@ -37,6 +39,7 @@ async def test_route_node_executor():
     # Create a route node with conditions
     node = Node(
         name="decide_path",
+        description="Test route node",
         type=NodeType.ROUTE,
         depends_on=["previous_node"],
         config=RouteNodeConfig(
@@ -75,6 +78,7 @@ async def test_route_node_default():
 
     node = Node(
         name="router",
+        description="Test default route",
         type=NodeType.ROUTE,
         depends_on=[],
         config=RouteNodeConfig(
@@ -90,5 +94,5 @@ async def test_route_node_default():
 
     assert result.success
     assert result.output["selected_route"] == "default_path"
-    assert result.output["condition_met"] is None
+    assert result.output["condition_met"] == "default"
     assert result.metadata["condition"] == "default"

@@ -8,7 +8,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sse_starlette.sse import EventSourceResponse
@@ -17,13 +17,14 @@ from seriesoftubes.api.auth import get_current_active_user
 from seriesoftubes.api.execution import execution_manager
 from seriesoftubes.api.models import WorkflowRunRequest
 from seriesoftubes.db import Execution, ExecutionStatus, User, Workflow, get_db
-from seriesoftubes.parser import parse_workflow_yaml
 
 router = APIRouter(prefix="/api/executions", tags=["executions"])
 
 
 class ExecutionResponse(BaseModel):
     """Execution response"""
+
+    model_config = {"from_attributes": True}
 
     id: str
     workflow_id: str
@@ -42,6 +43,8 @@ class ExecutionResponse(BaseModel):
 class ExecutionCreateResponse(BaseModel):
     """Response when creating an execution"""
 
+    model_config = {"from_attributes": True}
+
     execution_id: str
     status: str
     message: str
@@ -59,7 +62,7 @@ async def run_workflow(
     result = await db.execute(
         select(Workflow).where(
             Workflow.id == workflow_id,
-            (Workflow.user_id == current_user.id) | (Workflow.is_public == True),
+            (Workflow.user_id == current_user.id) | (Workflow.is_public),
         )
     )
     workflow = result.scalar_one_or_none()
@@ -84,7 +87,7 @@ async def run_workflow(
     # Start execution asynchronously
     workflow_path = Path(workflow.package_path) / "workflow.yaml"
 
-    async def run_and_update():
+    async def run_and_update() -> None:
         """Run workflow and update database"""
         async with AsyncSession(db.bind) as session:
             try:
@@ -92,47 +95,69 @@ async def run_workflow(
                 result = await session.execute(
                     select(Execution).where(Execution.id == execution.id)
                 )
-                exec_record = result.scalar_one()
+                _ = result.scalar_one()  # Validate execution exists
 
                 # Update status to running
-                exec_record.status = ExecutionStatus.RUNNING.value
+                await session.execute(
+                    update(Execution)
+                    .where(Execution.id == execution.id)
+                    .values(status=ExecutionStatus.RUNNING.value)
+                )
                 await session.commit()
 
                 # Run workflow
-                exec_id = await execution_manager.run_workflow(workflow_path, request.inputs)
+                exec_id = await execution_manager.run_workflow(
+                    workflow_path, request.inputs
+                )
 
                 # Wait for completion and get results
                 while True:
                     status_data = execution_manager.get_status(exec_id)
-                    if status_data["status"] in ["completed", "failed"]:
+                    if status_data and status_data["status"] in ["completed", "failed"]:
                         break
                     await asyncio.sleep(0.5)
 
                 # Update execution record
-                exec_record.status = (
-                    ExecutionStatus.COMPLETED.value
-                    if status_data["status"] == "completed"
-                    else ExecutionStatus.FAILED.value
-                )
-                exec_record.outputs = status_data.get("outputs")
-                exec_record.errors = status_data.get("errors")
-                exec_record.completed_at = datetime.now(timezone.utc)
-                await session.commit()
+                if status_data:
+                    final_status = (
+                        ExecutionStatus.COMPLETED.value
+                        if status_data["status"] == "completed"
+                        else ExecutionStatus.FAILED.value
+                    )
+                    await session.execute(
+                        update(Execution)
+                        .where(Execution.id == execution.id)
+                        .values(
+                            status=final_status,
+                            outputs=status_data.get("outputs"),
+                            errors=status_data.get("errors"),
+                            completed_at=datetime.now(timezone.utc),
+                        )
+                    )
+                    await session.commit()
 
             except Exception as e:
                 # Update execution as failed
-                exec_record.status = ExecutionStatus.FAILED.value
-                exec_record.errors = {"error": str(e)}
-                exec_record.completed_at = datetime.now(timezone.utc)
+                await session.execute(
+                    update(Execution)
+                    .where(Execution.id == execution.id)
+                    .values(
+                        status=ExecutionStatus.FAILED.value,
+                        errors={"error": str(e)},
+                        completed_at=datetime.now(timezone.utc),
+                    )
+                )
                 await session.commit()
 
     # Start execution in background
-    asyncio.create_task(run_and_update())
+    asyncio.create_task(run_and_update())  # noqa: RUF006
 
-    return ExecutionCreateResponse(
-        execution_id=execution.id,
-        status="started",
-        message=f"Workflow execution started with ID: {execution.id}",
+    return ExecutionCreateResponse.model_validate(execution).model_copy(
+        update={
+            "execution_id": execution.id,
+            "status": "started",
+            "message": f"Workflow execution started with ID: {execution.id}",
+        }
     )
 
 
@@ -153,19 +178,14 @@ async def list_executions(
     executions = result.scalars().all()
 
     return [
-        ExecutionResponse(
-            id=e.id,
-            workflow_id=e.workflow_id,
-            workflow_name=e.workflow.name,
-            workflow_version=e.workflow.version,
-            user_id=e.user_id,
-            username=e.user.username,
-            status=e.status,
-            inputs=e.inputs,
-            outputs=e.outputs,
-            errors=e.errors,
-            started_at=e.started_at.isoformat(),
-            completed_at=e.completed_at.isoformat() if e.completed_at else None,
+        ExecutionResponse.model_validate(e).model_copy(
+            update={
+                "workflow_name": e.workflow.name,
+                "workflow_version": e.workflow.version,
+                "username": e.user.username,
+                "started_at": e.started_at.isoformat(),
+                "completed_at": e.completed_at.isoformat() if e.completed_at else None,
+            }
         )
         for e in executions
     ]
@@ -194,19 +214,16 @@ async def get_execution(
             detail="Execution not found",
         )
 
-    return ExecutionResponse(
-        id=execution.id,
-        workflow_id=execution.workflow_id,
-        workflow_name=execution.workflow.name,
-        workflow_version=execution.workflow.version,
-        user_id=execution.user_id,
-        username=execution.user.username,
-        status=execution.status,
-        inputs=execution.inputs,
-        outputs=execution.outputs,
-        errors=execution.errors,
-        started_at=execution.started_at.isoformat(),
-        completed_at=execution.completed_at.isoformat() if execution.completed_at else None,
+    return ExecutionResponse.model_validate(execution).model_copy(
+        update={
+            "workflow_name": execution.workflow.name,
+            "workflow_version": execution.workflow.version,
+            "username": execution.user.username,
+            "started_at": execution.started_at.isoformat(),
+            "completed_at": (
+                execution.completed_at.isoformat() if execution.completed_at else None
+            ),
+        }
     )
 
 
@@ -258,7 +275,10 @@ async def stream_execution(
                 last_status = current_status
 
             # If execution is complete, send final event and close
-            if current_status in [ExecutionStatus.COMPLETED.value, ExecutionStatus.FAILED.value]:
+            if current_status in [
+                ExecutionStatus.COMPLETED.value,
+                ExecutionStatus.FAILED.value,
+            ]:
                 yield {
                     "event": "complete",
                     "data": json.dumps(

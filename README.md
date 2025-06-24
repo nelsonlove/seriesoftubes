@@ -367,48 +367,115 @@ The MVP is fully functional! You can now create and run workflows with LLM calls
 
 ## Development Setup
 
+### Quick Start
+
 ```bash
 # Clone and setup
 git clone https://github.com/nelsonlove/seriesoftubes.git
 cd seriesoftubes
+
+# Create and activate virtual environment
 python -m venv venv
-source venv/bin/activate  # or `venv\Scripts\activate` on Windows
-pip install -e ".[dev]"
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Configure
-cp .tubes.example.yaml .tubes.yaml
-# Edit .tubes.yaml with your API keys
+# Run automated setup
+chmod +x scripts/setup-dev.sh
+./scripts/setup-dev.sh
+```
 
-# Run CLI
+### Manual Setup
+
+1. **Install development dependencies:**
+   ```bash
+   pip install -e ".[dev,api]"
+   ```
+
+2. **Install pre-commit hooks:**
+   ```bash
+   pre-commit install
+   pre-commit install --hook-type commit-msg
+   ```
+
+3. **Configure API keys:**
+   ```bash
+   cp .tubes.example.yaml .tubes.yaml
+   # Edit .tubes.yaml with your API keys
+   ```
+
+4. **Verify setup:**
+   ```bash
+   pre-commit run --all-files
+   ```
+
+### How Pre-commit Works
+
+Our pre-commit configuration uses **local hooks** that run tools from your Python environment. This means:
+
+- ✅ No version conflicts between pre-commit and your environment
+- ✅ No duplicate dependency specifications
+- ✅ Faster execution (no isolated environments)
+- ✅ Easier debugging (same environment as manual runs)
+
+### Available Commands
+
+```bash
+# CLI commands
 s10s --help
 s10s run examples/simple-test/workflow.yaml --inputs company_name="OpenAI"
 s10s list
 s10s test examples/simple-test/workflow.yaml --dry-run
 
-# Run API server (basic skeleton)
-pip install -e ".[api]"
+# API server
 uvicorn seriesoftubes.api.main:app --reload
 # API available at http://localhost:8000
 # Docs at http://localhost:8000/docs
 
-# Run tests
-pytest
-mypy src/
+# Testing and linting
+pytest                      # Run tests
+mypy src/                   # Type checking
+black src/ tests/           # Format code
+ruff check --fix src/ tests/  # Lint and fix
+pre-commit run --all-files  # Run all checks
 
-# Development commands
-hatch run test  # Run tests
-hatch run lint:fmt  # Format code
-hatch run lint:all  # Run all linters
+# Hatch commands
+hatch run test              # Run tests
+hatch run lint:fmt          # Format code
+hatch run lint:all          # Run all linters
 ```
 
-### Pre-commit hooks
+### Troubleshooting
 
-To enforce code formatting and type safety:
-
+#### "command not found" errors
+Make sure you've activated your virtual environment and installed dev dependencies:
 ```bash
+source venv/bin/activate
 pip install -e ".[dev]"
-pre-commit install
 ```
+
+#### Mypy errors about missing imports
+Install API dependencies if checking API code:
+```bash
+pip install -e ".[api]"
+```
+
+#### Skipping hooks temporarily
+```bash
+git commit --no-verify -m "Emergency fix"
+```
+⚠️ Use sparingly - hooks exist to maintain code quality!
+
+### Updating Tools
+
+Since we use local hooks, updating tools is simple:
+```bash
+# Update all dev tools
+pip install -e ".[dev]" --upgrade
+
+# Update specific tool
+pip install --upgrade mypy==1.13.0
+```
+
+No need to update `.pre-commit-config.yaml` - it automatically uses whatever version is installed!
 
 ## Design Principles
 
