@@ -21,9 +21,42 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({ onSelectWorkflow }) 
     isLoading,
     error,
   } = useQuery({
-    queryKey: ['workflows', searchTerm, selectedTag],
-    queryFn: () => workflowAPI.list({ search: searchTerm, tag: selectedTag }),
+    queryKey: ['workflows'], // Remove search/tag from key to prevent refetching
+    queryFn: () => workflowAPI.list({}), // Fetch all workflows once
   });
+
+  // Filter workflows based on search term
+  const filteredWorkflows = React.useMemo(() => {
+    if (!workflows) return [];
+
+    return workflows.filter((workflow) => {
+      // Search filter
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase();
+        const matchesName = workflow.name.toLowerCase().includes(searchLower);
+        const matchesDescription =
+          workflow.description?.toLowerCase().includes(searchLower) || false;
+        const matchesPath = workflow.path.toLowerCase().includes(searchLower);
+        const matchesInputs = Object.keys(workflow.inputs).some((input) =>
+          input.toLowerCase().includes(searchLower)
+        );
+
+        if (!matchesName && !matchesDescription && !matchesPath && !matchesInputs) {
+          return false;
+        }
+      }
+
+      // Tag filter would go here when implemented
+      if (selectedTag) {
+        // return workflow.tags?.includes(selectedTag) || false;
+      }
+
+      return true;
+    });
+  }, [workflows, searchTerm, selectedTag]);
+
+  // Tags feature not implemented in backend yet
+  const allTags: string[] = [];
 
   if (isLoading) {
     return (
@@ -36,9 +69,6 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({ onSelectWorkflow }) 
   if (error) {
     return <Empty description={`Failed to load workflows: ${error.message}`} />;
   }
-
-  // Tags feature not implemented in backend yet
-  const allTags: string[] = [];
 
   return (
     <Space direction="vertical" style={{ width: '100%' }} size="large">
@@ -78,7 +108,7 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({ onSelectWorkflow }) 
       </Card>
 
       <List
-        dataSource={workflows}
+        dataSource={filteredWorkflows}
         renderItem={(workflow: WorkflowSummary) => (
           <Card
             hoverable
