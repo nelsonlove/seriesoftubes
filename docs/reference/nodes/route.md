@@ -6,15 +6,15 @@ Conditionally route workflow execution based on data conditions.
 
 ### Required Properties
 
-| Property | Type | Description |
-|----------|------|-------------|
+| Property | Type  | Description               |
+|----------|-------|---------------------------|
 | `routes` | array | Conditional routing rules |
 
 ### Optional Properties
 
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `context` | object | - | Map context variables from other nodes |
+| Property  | Type   | Default | Description                            |
+|-----------|--------|---------|----------------------------------------|
+| `context` | object | -       | Map context variables from other nodes |
 
 ## Property Details
 
@@ -29,7 +29,6 @@ Map context variables from other nodes
 Conditional routing rules
 
 **Type:** `array` | **Required:** Yes
-
 
 ## Examples
 

@@ -14,7 +14,8 @@ This guide provides comprehensive documentation for creating and understanding S
 
 ## Overview
 
-SeriesOfTubes workflows are defined in YAML files that describe a directed acyclic graph (DAG) of operations. Each workflow consists of:
+SeriesOfTubes workflows are defined in YAML files that describe a directed acyclic graph (DAG) of operations. Each
+workflow consists of:
 
 - **Inputs**: Parameters passed to the workflow
 - **Nodes**: Individual operations that process data
@@ -54,6 +55,7 @@ outputs:
 ### Top-Level Fields
 
 #### `name` (required)
+
 Human-readable name for the workflow.
 
 ```yaml
@@ -61,6 +63,7 @@ name: Company Enrichment Pipeline
 ```
 
 #### `description` (optional)
+
 Detailed description of the workflow's purpose and functionality.
 
 ```yaml
@@ -70,6 +73,7 @@ description: |
 ```
 
 #### `version` (optional)
+
 Semantic version of the workflow (default: "1.0.0").
 
 ```yaml
@@ -77,6 +81,7 @@ version: 2.1.0
 ```
 
 #### `inputs` (optional)
+
 Defines workflow input parameters.
 
 ```yaml
@@ -97,6 +102,7 @@ inputs:
 ```
 
 #### `nodes` (required)
+
 The DAG nodes that make up the workflow. Each node has a unique name and configuration.
 
 ```yaml
@@ -116,6 +122,7 @@ nodes:
 ```
 
 #### `outputs` (optional)
+
 Defines the workflow's output structure.
 
 ```yaml
@@ -216,9 +223,9 @@ fetch_github:
 - **`body`**: Request body for POST/PUT requests
 - **`params`**: Query parameters for GET requests
 - **`auth`**: Authentication configuration
-  - `type`: `bearer`, `basic`, or `api_key`
-  - `token`: Auth token (supports env vars)
-  - `header`: Header name for API key auth
+    - `type`: `bearer`, `basic`, or `api_key`
+    - `token`: Auth token (supports env vars)
+    - `header`: Header name for API key auth
 
 ### Route Node
 
@@ -249,8 +256,8 @@ route_by_size:
 
 - **`context`**: Map variables from other nodes
 - **`routes`**: Array of routing rules
-  - `condition`: Jinja2 expression that evaluates to boolean
-  - `output`: Value to output if condition is true
+    - `condition`: Jinja2 expression that evaluates to boolean
+    - `output`: Value to output if condition is true
 - **`default`**: Output if no conditions match
 
 ### File Node
@@ -276,8 +283,8 @@ load_companies:
 - **`format`**: File format (auto-detected by default)
 - **`encoding`**: Text encoding (default: utf-8)
 - **`csv_options`**: CSV parsing options
-  - `delimiter`: Column delimiter
-  - `has_header`: Whether first row contains headers
+    - `delimiter`: Column delimiter
+    - `has_header`: Whether first row contains headers
 
 ## Template System
 
@@ -294,6 +301,7 @@ Templates have access to:
 ### Template Examples
 
 #### Basic Variable Access
+
 ```yaml
 prompt: |
   Company: {{ inputs.company_name }}
@@ -301,6 +309,7 @@ prompt: |
 ```
 
 #### Accessing Node Outputs
+
 ```yaml
 context:
   data: fetch_data
@@ -311,6 +320,7 @@ prompt: |
 ```
 
 #### Using Filters
+
 ```yaml
 prompt: |
   Found {{ repos.items | length }} repositories
@@ -318,6 +328,7 @@ prompt: |
 ```
 
 #### Conditional Logic
+
 ```yaml
 prompt: |
   {% if company.public %}
@@ -328,6 +339,7 @@ prompt: |
 ```
 
 #### Loops
+
 ```yaml
 prompt: |
   Key products:
@@ -350,6 +362,7 @@ analyze:
 ```
 
 Create `prompts/analysis.j2`:
+
 ```jinja2
 You are analyzing {{ inputs.company_name }}.
 

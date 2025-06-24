@@ -6,19 +6,19 @@ Make HTTP API calls with authentication and templating support.
 
 ### Required Properties
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `url` | string | HTTP endpoint URL (supports Jinja2 templates) |
+| Property | Type   | Description                                   |
+|----------|--------|-----------------------------------------------|
+| `url`    | string | HTTP endpoint URL (supports Jinja2 templates) |
 
 ### Optional Properties
 
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `method` | string | `GET` | HTTP method |
-| `headers` | object | - | HTTP headers (supports Jinja2 templates) |
-| `body` | any | - | Request body (supports Jinja2 templates) |
-| `auth` | object | - | Authentication configuration |
-| `context` | object | - | Map context variables from other nodes |
+| Property  | Type   | Default | Description                              |
+|-----------|--------|---------|------------------------------------------|
+| `method`  | string | `GET`   | HTTP method                              |
+| `headers` | object | -       | HTTP headers (supports Jinja2 templates) |
+| `body`    | any    | -       | Request body (supports Jinja2 templates) |
+| `auth`    | object | -       | Authentication configuration             |
+| `context` | object | -       | Map context variables from other nodes   |
 
 ## Property Details
 
@@ -57,7 +57,6 @@ Authentication configuration
 Map context variables from other nodes
 
 **Type:** `object`
-
 
 ## Examples
 

@@ -30,7 +30,6 @@ Human-readable name for the workflow
 **Type:** `string`
 **Required:** Yes
 
-
 ### `version`
 
 Semantic version of the workflow
@@ -40,14 +39,12 @@ Semantic version of the workflow
 **Default:** `1.0.0`
 **Pattern:** `^\d+\.\d+\.\d+$`
 
-
 ### `description`
 
 Detailed description of what the workflow does
 
 **Type:** `string`
 **Required:** No
-
 
 ### `inputs`
 
@@ -56,7 +53,6 @@ Input parameters for the workflow
 **Type:** `object`
 **Required:** No
 
-
 ### `nodes`
 
 DAG nodes that make up the workflow
@@ -64,14 +60,12 @@ DAG nodes that make up the workflow
 **Type:** `object`
 **Required:** Yes
 
-
 ### `outputs`
 
 Map output names to node names
 
 **Type:** `object`
 **Required:** No
-
 
 ## Input Types
 
@@ -126,6 +120,7 @@ nodes:
 ## Context Mapping
 
 Nodes can access data from:
+
 - Previous node outputs via context mapping
 - Workflow inputs via `inputs` in context
 - Environment variables via Jinja2 templates
