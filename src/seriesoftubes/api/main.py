@@ -108,6 +108,7 @@ async def get_workflow(workflow_path: str) -> WorkflowDetail:
                 "nodes": {
                     name: {
                         "type": node.node_type.value,
+                        "description": node.description,
                         "depends_on": node.depends_on,
                         "config": node.config.model_dump() if node.config else {},
                     }

@@ -57,6 +57,10 @@ properties:
           enum: [llm, http, route, file, python]
           description: Type of node to execute
 
+        description:
+          type: string
+          description: Human-readable description of what this node does
+
         depends_on:
           type: array
           items:

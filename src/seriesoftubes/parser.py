@@ -27,7 +27,9 @@ class WorkflowParseError(Exception):
 
 def parse_node_config(
     node_type: NodeType, config_data: dict[str, Any]
-) -> LLMNodeConfig | HTTPNodeConfig | RouteNodeConfig | FileNodeConfig | PythonNodeConfig:
+) -> (
+    LLMNodeConfig | HTTPNodeConfig | RouteNodeConfig | FileNodeConfig | PythonNodeConfig
+):
     """Parse node configuration based on the node type"""
     if node_type == NodeType.LLM:
         return LLMNodeConfig(**config_data)
@@ -82,6 +84,7 @@ def parse_workflow_yaml(yaml_path: Path) -> Workflow:
             nodes[name] = Node(
                 name=name,
                 type=node_type,
+                description=node_data.get("description"),
                 depends_on=node_data.get("depends_on", []),
                 config=config,
             )

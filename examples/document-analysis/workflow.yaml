@@ -12,6 +12,7 @@ nodes:
   # Load single document
   load_document:
     type: file
+    description: Load and extract text from the specified document file
     config:
       path: "{{ inputs.document_path }}"
       format: auto
@@ -20,6 +21,7 @@ nodes:
   # Load multiple CSV files and merge
   load_data:
     type: file
+    description: Load and merge multiple CSV files with 10% sampling
     config:
       pattern: "data/*.csv"
       merge: true
@@ -28,6 +30,7 @@ nodes:
   # Analyze the document
   analyze_document:
     type: llm
+    description: Generate summary, key topics, and sentiment analysis of the document
     depends_on: [load_document]
     config:
       context:
@@ -44,6 +47,7 @@ nodes:
   # Analyze the data
   analyze_data:
     type: llm
+    description: Analyze structure and content of the loaded CSV data
     depends_on: [load_data]
     config:
       context:

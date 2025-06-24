@@ -187,6 +187,9 @@ class Node(BaseModel):
     """A node in the workflow DAG"""
 
     name: str = Field(..., description="Unique node name", pattern=r"^[a-zA-Z0-9_-]+$")
+    description: str | None = Field(
+        None, description="Human-readable description of what this node does"
+    )
     node_type: NodeType = Field(..., description="Type of node", alias="type")
     depends_on: list[str] = Field(
         default_factory=list, description="List of node dependencies"

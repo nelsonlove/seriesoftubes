@@ -13,6 +13,7 @@ inputs:
 nodes:
   classify_company:
     type: llm
+    description: Classify the company by industry, size, and public/private status
     depends_on: []
     config:
       prompt: |
@@ -29,6 +30,7 @@ nodes:
 
   fetch_data:
     type: http
+    description: Search GitHub for Python repositories related to the company
     depends_on: [classify_company]
     config:
       context:
@@ -45,6 +47,7 @@ nodes:
 
   decide_analysis:
     type: route
+    description: Route to appropriate analysis based on company size
     depends_on: [classify_company]
     config:
       context:
@@ -59,6 +62,7 @@ nodes:
 
   deep_analysis:
     type: llm
+    description: Perform comprehensive analysis for enterprise companies
     depends_on: [fetch_data]
     config:
       context:
@@ -76,6 +80,7 @@ nodes:
 
   quick_analysis:
     type: llm
+    description: Generate quick summary for startup companies
     depends_on: [fetch_data]
     config:
       context:
@@ -85,6 +90,7 @@ nodes:
 
   standard_analysis:
     type: llm
+    description: Create standard analysis for SMB companies
     depends_on: [fetch_data]
     config:
       context:

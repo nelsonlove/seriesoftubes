@@ -19,6 +19,7 @@ nodes:
   # Load sample data
   load_data:
     type: file
+    description: "Load company data from JSON file containing revenue, employee count, and industry information"
     config:
       path: examples/data-analysis/sample_data.json
       format: json
@@ -26,6 +27,7 @@ nodes:
   # Process and filter data using Python
   process_companies:
     type: python
+    description: "Filter companies by revenue threshold and group by industry with statistical analysis"
     depends_on: [load_data]
     config:
       code: |
@@ -78,6 +80,7 @@ nodes:
   # Generate insights with mathematical calculations
   generate_insights:
     type: python
+    description: "Analyze industry statistics to identify top performers and calculate revenue distribution metrics"
     depends_on: [process_companies]
     config:
       code: |
@@ -143,6 +146,7 @@ nodes:
   # Export results in specified format
   export_results:
     type: python
+    description: "Format analysis results as either structured JSON or human-readable summary based on user preference"
     depends_on: [process_companies, generate_insights]
     config:
       code: |
