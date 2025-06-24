@@ -5,7 +5,6 @@ import type {
   ExecutionInput,
   ExecutionResponse,
   ExecutionDetail,
-  ExecutionProgress,
 } from '../types/workflow';
 
 const api = axios.create({
@@ -30,9 +29,9 @@ export const workflowAPI = {
 
   // Run a workflow
   run: async (path: string, inputs: ExecutionInput) => {
-    const response = await api.post<ExecutionResponse>(
+    const response = await api.post<{ execution_id: string; status: string; message: string }>(
       `/workflows/${encodeURIComponent(path)}/run`,
-      inputs
+      { inputs }
     );
     return response.data;
   },
@@ -52,13 +51,27 @@ export const executionAPI = {
   },
 
   // Stream execution progress
-  stream: (id: string, onProgress: (progress: ExecutionProgress) => void) => {
+  stream: (id: string, onUpdate: (data: any) => void) => {
     const eventSource = new EventSource(`/api/executions/${id}/stream`);
 
-    eventSource.onmessage = (event) => {
-      const progress = JSON.parse(event.data) as ExecutionProgress;
-      onProgress(progress);
-    };
+    eventSource.addEventListener('update', (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        onUpdate(data);
+      } catch (error) {
+        console.error('Failed to parse SSE data:', error);
+      }
+    });
+
+    eventSource.addEventListener('complete', (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        onUpdate(data);
+        eventSource.close();
+      } catch (error) {
+        console.error('Failed to parse SSE complete data:', error);
+      }
+    });
 
     eventSource.onerror = (error) => {
       console.error('SSE error:', error);

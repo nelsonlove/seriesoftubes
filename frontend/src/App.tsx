@@ -6,6 +6,7 @@ import { ConfigProvider, Layout, Menu } from 'antd';
 import { AppstoreOutlined, PlayCircleOutlined, ExperimentOutlined } from '@ant-design/icons';
 import { WorkflowsPage } from './pages/Workflows';
 import { ExecutionsPage } from './pages/Executions';
+import { ExecutionDetail } from './pages/Executions/ExecutionDetail';
 import { TestingPage } from './pages/Testing';
 import './App.css';
 
@@ -78,6 +79,7 @@ function App() {
                   <Routes>
                     <Route path="/workflows" element={<WorkflowsPage />} />
                     <Route path="/executions" element={<ExecutionsPage />} />
+                    <Route path="/executions/:id" element={<ExecutionDetail />} />
                     <Route path="/testing" element={<TestingPage />} />
                     <Route path="/" element={<Navigate to="/workflows" replace />} />
                   </Routes>

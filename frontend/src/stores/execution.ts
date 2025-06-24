@@ -17,17 +17,24 @@ export const useExecutionStore = create<ExecutionStore>((set) => ({
   activeExecution: null,
 
   setExecution: (execution) =>
-    set((state) => ({
-      executions: {
-        ...state.executions,
-        [execution.id]: execution,
-      },
-    })),
+    set((state) => {
+      const id = execution.id || execution.execution_id || '';
+      return {
+        executions: {
+          ...state.executions,
+          [id]: { ...execution, id },
+        },
+      };
+    }),
 
   updateProgress: (executionId, nodeId, progress) =>
     set((state) => {
       const execution = state.executions[executionId];
       if (!execution) return state;
+
+      // Determine if we should update the overall execution status
+      const progressStatus = typeof progress === 'string' ? progress : progress.status;
+      const shouldUpdateStatus = progressStatus === 'failed';
 
       return {
         executions: {
@@ -38,7 +45,7 @@ export const useExecutionStore = create<ExecutionStore>((set) => ({
               ...execution.progress,
               [nodeId]: progress,
             },
-            status: progress.status === 'failed' ? 'failed' : execution.status,
+            status: shouldUpdateStatus ? 'failed' : execution.status,
           },
         },
       };

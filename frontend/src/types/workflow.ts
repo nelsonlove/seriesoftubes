@@ -36,12 +36,19 @@ export interface ExecutionInput {
 }
 
 export interface ExecutionResponse {
-  id: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
-  workflow_path: string;
-  created_at: string;
+  id?: string;
+  execution_id?: string;
+  status: string;
+  workflow_path?: string;
+  workflow_name: string;
+  created_at?: string;
+  start_time?: string;
   completed_at?: string;
+  end_time?: string;
+  outputs?: Record<string, any>;
+  errors?: Record<string, string>;
   error?: string;
+  progress?: Record<string, string | ExecutionProgress>;
 }
 
 export interface ExecutionProgress {
@@ -54,7 +61,7 @@ export interface ExecutionProgress {
 }
 
 export interface ExecutionDetail extends ExecutionResponse {
-  inputs: ExecutionInput;
+  inputs?: ExecutionInput;
   outputs?: Record<string, any>;
-  progress: Record<string, ExecutionProgress>;
+  progress?: Record<string, string | ExecutionProgress>;
 }

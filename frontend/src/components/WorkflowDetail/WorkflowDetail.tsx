@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, Spin, Typography, Space, Tag, Descriptions, Button } from 'antd';
 import { PlayCircleOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { workflowAPI } from '../../api/client';
+import { RunWorkflowModal } from '../RunWorkflowModal';
 
 const { Title, Text } = Typography;
 
@@ -11,6 +12,7 @@ interface WorkflowDetailProps {
 }
 
 export const WorkflowDetail: React.FC<WorkflowDetailProps> = ({ path }) => {
+  const [showRunModal, setShowRunModal] = useState(false);
   const { data, isLoading, error } = useQuery({
     queryKey: ['workflow', path],
     queryFn: () => workflowAPI.get(path),
@@ -43,7 +45,11 @@ export const WorkflowDetail: React.FC<WorkflowDetailProps> = ({ path }) => {
         <Space direction="vertical" style={{ width: '100%' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Title level={3}>{workflow.name}</Title>
-            <Button type="primary" icon={<PlayCircleOutlined />}>
+            <Button
+              type="primary"
+              icon={<PlayCircleOutlined />}
+              onClick={() => setShowRunModal(true)}
+            >
               Run Workflow
             </Button>
           </div>
@@ -111,6 +117,12 @@ export const WorkflowDetail: React.FC<WorkflowDetailProps> = ({ path }) => {
           ))}
         </Space>
       </Card>
+
+      <RunWorkflowModal
+        workflow={data}
+        open={showRunModal}
+        onClose={() => setShowRunModal(false)}
+      />
     </Space>
   );
 };
