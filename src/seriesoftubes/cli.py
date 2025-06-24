@@ -5,7 +5,9 @@ import json
 from pathlib import Path
 from typing import Annotated, Any
 
+import jsonschema
 import typer
+import yaml
 from rich.console import Console
 
 from seriesoftubes.engine import run_workflow
@@ -132,23 +134,48 @@ def run(
 def validate(
     workflow: Annotated[Path, typer.Argument(help="Path to workflow YAML file")],
 ) -> None:
-    """Validate a workflow YAML file"""
+    """Validate a workflow YAML file against schema and DAG rules"""
     console.print(f"[bold]Validating workflow:[/bold] {workflow}")
 
     try:
-        # Parse the workflow
+        # First, validate against JSON schema
+        console.print("• Checking schema compliance...")
+        schema_path = Path(__file__).parent / "schemas" / "workflow-schema.yaml"
+        
+        if schema_path.exists():
+            with open(schema_path) as f:
+                schema = yaml.safe_load(f)
+            
+            with open(workflow) as f:
+                workflow_data = yaml.safe_load(f)
+            
+            try:
+                jsonschema.validate(workflow_data, schema)
+                console.print("  ✓ [green]Schema validation passed[/green]")
+            except jsonschema.ValidationError as e:
+                console.print(f"  ✗ [red]Schema validation failed:[/red] {e.message}")
+                if e.path:
+                    console.print(f"    Path: {'.'.join(str(p) for p in e.path)}")
+                raise typer.Exit(1) from None
+        else:
+            console.print("  [yellow]⚠ Schema file not found, skipping schema validation[/yellow]")
+
+        # Parse the workflow with Pydantic
+        console.print("• Parsing workflow structure...")
         wf = parse_workflow_yaml(workflow)
-        console.print(f"✓ Parsed workflow: [green]{wf.name} v{wf.version}[/green]")
+        console.print(f"  ✓ Parsed workflow: [green]{wf.name} v{wf.version}[/green]")
 
         # Validate DAG
+        console.print("• Validating DAG structure...")
         validate_dag(wf)
-        console.print("✓ [green]DAG structure is valid[/green]")
+        console.print("  ✓ [green]No cycles detected[/green]")
+        console.print("  ✓ [green]All dependencies exist[/green]")
 
         # Show summary
         console.print("\n[bold]Workflow Summary:[/bold]")
         console.print(f"  • Inputs: {len(wf.inputs)}")
         console.print(f"  • Nodes: {len(wf.nodes)}")
-        for node_type in ["llm", "http", "route"]:
+        for node_type in ["llm", "http", "route", "file"]:
             count = sum(1 for n in wf.nodes.values() if n.node_type.value == node_type)
             if count > 0:
                 console.print(f"    - {node_type}: {count}")

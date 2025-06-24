@@ -33,6 +33,7 @@ dependencies = [
     "httpx>=0.25.0",
     "rich>=13.0.0",
     "typer>=0.9.0",
+    "jsonschema>=4.0.0",
 ]
 
 [project.optional-dependencies]
@@ -40,6 +41,14 @@ api = [
     "fastapi>=0.104.0",
     "uvicorn[standard]>=0.24.0",
     "python-multipart>=0.0.6",
+    "sse-starlette>=1.6.0",
+]
+docs = [
+    # Optional dependencies for document processing
+    "PyPDF2>=3.0.0",
+    "python-docx>=1.0.0",
+    "openpyxl>=3.1.0",
+    "beautifulsoup4>=4.12.0",
 ]
 dev = [
     "pytest>=7.4.0",
@@ -70,6 +79,17 @@ path = "src/seriesoftubes/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/seriesoftubes"]
+
+[tool.hatch.build.targets.wheel.sources]
+"src" = ""
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/tests",
+    "/README.md",
+    "/LICENSE",
+]
 
 [tool.hatch.envs.default]
 dependencies = [
