@@ -6,10 +6,14 @@ from jinja2 import Template
 
 from seriesoftubes.models import Node, RouteNodeConfig
 from seriesoftubes.nodes.base import NodeContext, NodeExecutor, NodeResult
+from seriesoftubes.schemas import RouteNodeInput, RouteNodeOutput
 
 
 class RouteNodeExecutor(NodeExecutor):
     """Executor for route/conditional nodes"""
+    
+    input_schema_class = RouteNodeInput
+    output_schema_class = RouteNodeOutput
 
     async def execute(self, node: Node, context: NodeContext) -> NodeResult:
         """Execute a route node to determine next path"""
@@ -25,6 +29,12 @@ class RouteNodeExecutor(NodeExecutor):
         try:
             # Prepare context for condition evaluation
             context_data = self.prepare_context_data(node, context)
+            
+            # Validate input if schema is defined
+            if node.config.input_schema:
+                input_data = {"context_data": context_data}
+                validated_input = self.validate_input(input_data)
+                context_data = validated_input["context_data"]
 
             # Evaluate each route condition
             for route in config.routes:
@@ -34,8 +44,17 @@ class RouteNodeExecutor(NodeExecutor):
                 elif route.when:
                     # Evaluate the condition
                     if self._evaluate_condition(route.when, context_data):
+                        output = {
+                            "selected_route": route.to,
+                            "condition_met": route.when,
+                        }
+                        
+                        # Apply output validation if configured
+                        if node.config.output_schema:
+                            output = self.validate_output(output)
+                        
                         return NodeResult(
-                            output=route.to,
+                            output=output,
                             success=True,
                             metadata={
                                 "selected_route": route.to,
@@ -44,8 +63,17 @@ class RouteNodeExecutor(NodeExecutor):
                         )
 
             # If we get here, use the default route
+            output = {
+                "selected_route": selected_route,
+                "condition_met": None,  # Default route has no condition
+            }
+            
+            # Apply output validation if configured
+            if node.config.output_schema:
+                output = self.validate_output(output)
+            
             return NodeResult(
-                output=selected_route,
+                output=output,
                 success=True,
                 metadata={"selected_route": selected_route, "condition": "default"},
             )

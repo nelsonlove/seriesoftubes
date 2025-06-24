@@ -8,6 +8,7 @@ from jinja2 import Template
 from seriesoftubes.config import get_config
 from seriesoftubes.models import HTTPNodeConfig, Node
 from seriesoftubes.nodes.base import NodeContext, NodeExecutor, NodeResult
+from seriesoftubes.schemas import HTTPNodeInput, HTTPNodeOutput
 
 # HTTP status codes
 HTTP_ERROR_THRESHOLD = 400
@@ -15,6 +16,9 @@ HTTP_ERROR_THRESHOLD = 400
 
 class HTTPNodeExecutor(NodeExecutor):
     """Executor for HTTP nodes"""
+    
+    input_schema_class = HTTPNodeInput
+    output_schema_class = HTTPNodeOutput
 
     async def execute(self, node: Node, context: NodeContext) -> NodeResult:
         """Execute an HTTP node"""
@@ -55,6 +59,21 @@ class HTTPNodeExecutor(NodeExecutor):
                 body = {}
                 for key, value in config.body.items():
                     body[key] = self._render_template_value(value, context_data)
+            
+            # Validate input if schema is defined
+            if node.config.input_schema:
+                input_data = {
+                    "url": url,
+                    "method": config.method.value,
+                    "headers": headers,
+                    "params": params or {},
+                    "body": body,
+                }
+                validated_input = self.validate_input(input_data)
+                url = validated_input["url"]
+                headers = validated_input["headers"]
+                params = validated_input.get("params")
+                body = validated_input.get("body")
 
             # Set timeout
             timeout = config.timeout or app_config.http.timeout
@@ -80,9 +99,21 @@ class HTTPNodeExecutor(NodeExecutor):
 
                 # Try to parse JSON response
                 try:
-                    output = response.json()
+                    response_body = response.json()
                 except Exception:
-                    output = response.text
+                    response_body = response.text
+
+                # Structure the output
+                output = {
+                    "status_code": response.status_code,
+                    "headers": dict(response.headers),
+                    "body": response_body,
+                    "url": str(response.url),
+                }
+                
+                # Apply output validation if configured
+                if node.config.output_schema:
+                    output = self.validate_output(output)
 
                 return NodeResult(
                     output=output,

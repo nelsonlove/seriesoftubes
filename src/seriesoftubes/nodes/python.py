@@ -13,6 +13,7 @@ from jinja2 import Template
 
 from seriesoftubes.models import Node, PythonNodeConfig
 from seriesoftubes.nodes.base import NodeContext, NodeExecutor, NodeResult
+from seriesoftubes.schemas import PythonNodeInput, PythonNodeOutput
 
 # Restricted builtins for sandboxed execution
 ALLOWED_BUILTINS = {
@@ -224,6 +225,9 @@ async def _execute_in_process(
 
 class PythonNodeExecutor(NodeExecutor):
     """Executor for Python code nodes with sandboxing"""
+    
+    input_schema_class = PythonNodeInput
+    output_schema_class = PythonNodeOutput
 
     async def execute(self, node: Node, context: NodeContext) -> NodeResult:
         """Execute Python code with security restrictions"""
@@ -240,6 +244,12 @@ class PythonNodeExecutor(NodeExecutor):
         try:
             # Prepare context data
             context_data = self.prepare_context_data(node, context)
+            
+            # Validate input if schema is defined
+            if node.config.input_schema:
+                input_data = {"context": context_data}
+                validated_input = self.validate_input(input_data)
+                context_data = validated_input["context"]
 
             # Get the code to execute
             if config.code:
@@ -285,7 +295,14 @@ class PythonNodeExecutor(NodeExecutor):
                 config.timeout,
             )
 
-            return NodeResult(output=result, success=True)
+            # Structure the output
+            output = {"result": result}
+            
+            # Apply output validation if configured
+            if node.config.output_schema:
+                output = self.validate_output(output)
+
+            return NodeResult(output=output, success=True)
 
         except TimeoutError as e:
             return NodeResult(output=None, success=False, error=str(e))

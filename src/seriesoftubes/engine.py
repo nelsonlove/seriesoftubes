@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from pydantic import ValidationError
+
 from seriesoftubes.models import Node, NodeType, Workflow
 from seriesoftubes.nodes import (
     FileNodeExecutor,
@@ -28,6 +30,7 @@ class ExecutionContext:
         self.errors: dict[str, str] = {}
         self.execution_id = str(uuid4())
         self.start_time = datetime.now(timezone.utc)
+        self.validation_errors: dict[str, list[str]] = {}  # Node validation errors
 
     def get_output(self, node_name: str) -> Any:
         """Get output from a previous node"""
@@ -44,6 +47,12 @@ class ExecutionContext:
     def set_error(self, node_name: str, error: str) -> None:
         """Store error from a node"""
         self.errors[node_name] = error
+
+    def add_validation_error(self, node_name: str, error: str) -> None:
+        """Add a validation error for a node"""
+        if node_name not in self.validation_errors:
+            self.validation_errors[node_name] = []
+        self.validation_errors[node_name].append(error)
 
 
 class WorkflowEngine:
@@ -151,7 +160,18 @@ class WorkflowEngine:
             )
 
         # Execute the node
-        return await executor.execute(node, context)
+        result = await executor.execute(node, context)
+        
+        # If execution was successful, validate output against downstream requirements
+        if result.success:
+            validation_errors = self._validate_node_output(node, result.output, context)
+            if validation_errors:
+                for error in validation_errors:
+                    context.add_validation_error(node.name, error)
+                # Note: We don't fail the node here, just record validation errors
+                # This allows the workflow to continue and collect all validation issues
+        
+        return result
 
     async def _execute_node_async(
         self, node_name: str, node: Node, context: ExecutionContext
@@ -203,6 +223,45 @@ class WorkflowEngine:
 
         return groups
 
+    def _validate_node_output(
+        self, node: Node, output: Any, context: ExecutionContext
+    ) -> list[str]:
+        """Validate node output against downstream node requirements
+        
+        Returns list of validation error messages
+        """
+        errors = []
+        
+        # Find all nodes that depend on this one
+        downstream_nodes = [
+            n for n in context.workflow.nodes.values() 
+            if node.name in n.depends_on
+        ]
+        
+        for downstream_node in downstream_nodes:
+            # Get the executor for the downstream node to check its input schema
+            downstream_executor = self.executors.get(downstream_node.node_type)
+            if not downstream_executor or not downstream_executor.input_schema_class:
+                continue
+                
+            # Check if the downstream node expects this node's output
+            if downstream_node.config and hasattr(downstream_node.config, 'context'):
+                context_mapping = downstream_node.config.context
+                
+                # Find which context keys map to this node's output
+                for context_key, source in context_mapping.items():
+                    if source == node.name:
+                        # For now, just check basic type compatibility
+                        # Full schema validation would require understanding how
+                        # the output maps to the downstream node's full input
+                        # This is a simplified check
+                        if output is None:
+                            errors.append(
+                                f"Output is None but required by {downstream_node.name}.{context_key}"
+                            )
+        
+        return errors
+
 
 async def run_workflow(
     workflow: Workflow,
@@ -233,6 +292,7 @@ async def run_workflow(
         "success": len(context.errors) == 0,
         "outputs": {},
         "errors": context.errors,
+        "validation_errors": context.validation_errors,
     }
 
     # Map final outputs

@@ -12,6 +12,7 @@ from jinja2 import Template
 
 from seriesoftubes.models import FileNodeConfig, Node
 from seriesoftubes.nodes.base import NodeContext, NodeExecutor, NodeResult
+from seriesoftubes.schemas import FileNodeInput, FileNodeOutput
 
 # Optional imports for document processing
 try:
@@ -45,6 +46,9 @@ except ImportError:
 
 class FileNodeExecutor(NodeExecutor):
     """Executor for file ingestion nodes"""
+    
+    input_schema_class = FileNodeInput
+    output_schema_class = FileNodeOutput
 
     async def execute(self, node: Node, context: NodeContext) -> NodeResult:
         """Execute a file ingestion node"""
@@ -60,6 +64,29 @@ class FileNodeExecutor(NodeExecutor):
         try:
             # Prepare context for template rendering
             context_data = self.prepare_context_data(node, context)
+            
+            # Validate input if schema is defined
+            if node.config.input_schema:
+                # Extract the rendered path/pattern for validation
+                rendered_path = None
+                rendered_pattern = None
+                
+                if config.path:
+                    rendered_path = self._render_template(config.path, context_data)
+                elif config.pattern:
+                    rendered_pattern = self._render_template(config.pattern, context_data)
+                
+                input_data = {
+                    "path": rendered_path,
+                    "pattern": rendered_pattern,
+                }
+                validated_input = self.validate_input(input_data)
+                
+                # Update config with validated values
+                if validated_input.get("path"):
+                    config.path = validated_input["path"]
+                if validated_input.get("pattern"):
+                    config.pattern = validated_input["pattern"]
 
             # Get file paths
             paths = self._get_file_paths(config, context_data)
@@ -74,10 +101,24 @@ class FileNodeExecutor(NodeExecutor):
             # Process based on number of files and output mode
             if len(paths) == 1:
                 # Single file
-                output = await self._process_single_file(paths[0], config)
+                data = await self._process_single_file(paths[0], config)
             else:
                 # Multiple files
-                output = await self._process_multiple_files(paths, config)
+                data = await self._process_multiple_files(paths, config)
+
+            # Structure the output
+            output = {
+                "data": data,
+                "metadata": {
+                    "files_read": len(paths),
+                    "output_mode": config.output_mode,
+                    "format": config.format_type,
+                },
+            }
+            
+            # Apply output validation if configured
+            if node.config.output_schema:
+                output = self.validate_output(output)
 
             return NodeResult(
                 output=output,

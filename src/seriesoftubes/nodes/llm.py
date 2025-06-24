@@ -10,10 +10,14 @@ from jinja2 import Template
 from seriesoftubes.config import get_config
 from seriesoftubes.models import LLMNodeConfig, Node
 from seriesoftubes.nodes.base import NodeContext, NodeExecutor, NodeResult
+from seriesoftubes.schemas import LLMNodeInput, LLMNodeOutput
 
 
 class LLMNodeExecutor(NodeExecutor):
     """Executor for LLM nodes"""
+    
+    input_schema_class = LLMNodeInput
+    output_schema_class = LLMNodeOutput
 
     async def execute(self, node: Node, context: NodeContext) -> NodeResult:
         """Execute an LLM node"""
@@ -30,6 +34,15 @@ class LLMNodeExecutor(NodeExecutor):
         try:
             # Prepare prompt
             prompt = self._prepare_prompt(config, context, node)
+            
+            # Validate input if schema is defined
+            context_data = self.prepare_context_data(node, context)
+            input_data = {"prompt": prompt, "context_data": context_data}
+            
+            # Apply input validation if configured
+            if node.config.input_schema:
+                validated_input = self.validate_input(input_data)
+                prompt = validated_input.get("prompt", prompt)
 
             # Get model and temperature
             model = config.model or app_config.llm.model
@@ -37,7 +50,7 @@ class LLMNodeExecutor(NodeExecutor):
 
             # Make API call based on provider
             if app_config.llm.provider == "openai":
-                output = await self._call_openai(
+                content = await self._call_openai(
                     prompt,
                     model,
                     temperature,
@@ -45,7 +58,7 @@ class LLMNodeExecutor(NodeExecutor):
                     app_config.llm.api_key,
                 )
             elif app_config.llm.provider == "anthropic":
-                output = await self._call_anthropic(
+                content = await self._call_anthropic(
                     prompt,
                     model,
                     temperature,
@@ -58,6 +71,18 @@ class LLMNodeExecutor(NodeExecutor):
                     success=False,
                     error=f"Unsupported LLM provider: {app_config.llm.provider}",
                 )
+
+            # Structure the output
+            output = {
+                "response": content if isinstance(content, str) else json.dumps(content),
+                "structured_output": content if isinstance(content, dict) else None,
+                "model_used": model,
+                "token_usage": None,  # TODO: Extract from API responses
+            }
+            
+            # Apply output validation if configured
+            if node.config.output_schema:
+                output = self.validate_output(output)
 
             return NodeResult(output=output, success=True)
 

@@ -2,9 +2,9 @@
 
 import os
 from abc import ABC, abstractmethod
-from typing import Any, Protocol
+from typing import Any, Protocol, Type
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from seriesoftubes.models import Node
 
@@ -32,6 +32,10 @@ class NodeContext(Protocol):
 
 class NodeExecutor(ABC):
     """Base class for node executors"""
+    
+    # Override these in subclasses to define schemas
+    input_schema_class: Type[BaseModel] | None = None
+    output_schema_class: Type[BaseModel] | None = None
 
     @abstractmethod
     async def execute(self, node: Node, context: NodeContext) -> NodeResult:
@@ -73,4 +77,53 @@ class NodeExecutor(ABC):
 
         # Return raw data - users should use bracket notation or filters in templates
         # e.g., data['items'] not data.items, or data|items not data.items()
+        return data
+
+    def validate_input(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Validate input data against the input schema
+        
+        Args:
+            data: Input data to validate
+            
+        Returns:
+            Validated data
+            
+        Raises:
+            ValidationError: If validation fails
+        """
+        if self.input_schema_class and self.input_schema_class is not None:
+            try:
+                validated = self.input_schema_class(**data)
+                return validated.model_dump()
+            except ValidationError as e:
+                raise ValidationError(
+                    f"Input validation failed: {e}"
+                ) from e
+        return data
+    
+    def validate_output(self, data: Any) -> Any:
+        """Validate output data against the output schema
+        
+        Args:
+            data: Output data to validate
+            
+        Returns:
+            Validated data
+            
+        Raises:
+            ValidationError: If validation fails
+        """
+        if self.output_schema_class and self.output_schema_class is not None:
+            try:
+                # Handle different output formats
+                if isinstance(data, dict) and self.output_schema_class.model_fields:
+                    validated = self.output_schema_class(**data)
+                else:
+                    # Wrap non-dict outputs
+                    validated = self.output_schema_class(result=data)
+                return validated.model_dump()
+            except ValidationError as e:
+                raise ValidationError(
+                    f"Output validation failed: {e}"
+                ) from e
         return data
