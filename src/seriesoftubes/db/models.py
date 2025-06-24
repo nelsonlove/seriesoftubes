@@ -110,7 +110,10 @@ class Workflow(Base):
     )
 
     def __repr__(self) -> str:
-        return f"<Workflow(name='{self.name}', version='{self.version}', user_id='{self.user_id}')>"
+        return (
+            f"<Workflow(name='{self.name}', version='{self.version}', "
+            f"user_id='{self.user_id}')>"
+        )
 
 
 class ExecutionStatus(enum.Enum):
@@ -158,7 +161,10 @@ class Execution(Base):
     user = relationship("User", back_populates="executions")
 
     def __repr__(self) -> str:
-        return f"<Execution(id='{self.id}', workflow_id='{self.workflow_id}', status='{self.status}')>"
+        return (
+            f"<Execution(id='{self.id}', workflow_id='{self.workflow_id}', "
+            f"status='{self.status}')>"
+        )
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for API responses"""

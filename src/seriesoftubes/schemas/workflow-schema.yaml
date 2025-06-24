@@ -54,7 +54,7 @@ properties:
       properties:
         type:
           type: string
-          enum: [llm, http, route, file, python]
+          enum: [ llm, http, route, file, python ]
           description: Type of node to execute
 
         description:
@@ -66,7 +66,7 @@ properties:
           items:
             type: string
           description: List of node names this node depends on
-          default: []
+          default: [ ]
 
         config:
           type: object
@@ -94,7 +94,7 @@ definitions:
     properties:
       provider:
         type: string
-        enum: [openai, anthropic]
+        enum: [ openai, anthropic ]
         default: openai
         description: LLM provider to use
 
@@ -139,8 +139,8 @@ definitions:
         minimum: 1
         description: Maximum tokens in response
     oneOf:
-      - required: [prompt]
-      - required: [prompt_template]
+      - required: [ prompt ]
+      - required: [ prompt_template ]
 
   http_config:
     type: object
@@ -154,7 +154,7 @@ definitions:
 
       method:
         type: string
-        enum: [GET, POST, PUT, DELETE, PATCH]
+        enum: [ GET, POST, PUT, DELETE, PATCH ]
         default: GET
         description: HTTP method
 
@@ -173,7 +173,7 @@ definitions:
         properties:
           type:
             type: string
-            enum: [bearer, basic, api_key]
+            enum: [ bearer, basic, api_key ]
           token:
             type: string
             description: Auth token (supports env vars via Jinja2)
@@ -236,7 +236,7 @@ definitions:
 
       format:
         type: string
-        enum: [auto, json, jsonl, csv, yaml, txt, pdf, docx, xlsx, html]
+        enum: [ auto, json, jsonl, csv, yaml, txt, pdf, docx, xlsx, html ]
         default: auto
         description: File format (auto-detected by default)
 
@@ -252,7 +252,7 @@ definitions:
 
       output_mode:
         type: string
-        enum: [content, list, dict]
+        enum: [ content, list, dict ]
         default: content
         description: Output mode - content (single), list (records), dict (collection)
 
@@ -297,8 +297,8 @@ definitions:
         default: false
         description: Skip files/rows with errors
     oneOf:
-      - required: [path]
-      - required: [pattern]
+      - required: [ path ]
+      - required: [ pattern ]
 
   python_config:
     type: object
@@ -338,11 +338,11 @@ definitions:
         type: array
         items:
           type: string
-        default: []
+        default: [ ]
         description: List of allowed module imports
         examples:
-          - [math, statistics, collections]
-          - [pandas, numpy]
+          - [ math, statistics, collections ]
+          - [ pandas, numpy ]
 
       max_output_size:
         type: integer
@@ -351,5 +351,5 @@ definitions:
         default: 10485760
         description: Maximum output size in bytes (10MB default)
     oneOf:
-      - required: [code]
-      - required: [file]
+      - required: [ code ]
+      - required: [ file ]

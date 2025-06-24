@@ -17,7 +17,6 @@ from sse_starlette.sse import EventSourceResponse
 from seriesoftubes.api.auth_routes import router as auth_router
 from seriesoftubes.api.execution import execution_manager
 from seriesoftubes.api.execution_routes import router as execution_router
-from seriesoftubes.api.workflow_routes import router as workflow_router
 from seriesoftubes.api.models import (
     ExecutionStatus,
     RawWorkflowResponse,
@@ -27,6 +26,7 @@ from seriesoftubes.api.models import (
     WorkflowRunRequest,
     WorkflowRunResponse,
 )
+from seriesoftubes.api.workflow_routes import router as workflow_router
 from seriesoftubes.db import init_db
 from seriesoftubes.parser import WorkflowParseError, parse_workflow_yaml
 

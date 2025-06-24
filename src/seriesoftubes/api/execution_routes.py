@@ -83,7 +83,7 @@ async def run_workflow(
 
     # Start execution asynchronously
     workflow_path = Path(workflow.package_path) / "workflow.yaml"
-    
+
     async def run_and_update():
         """Run workflow and update database"""
         async with AsyncSession(db.bind) as session:
@@ -93,14 +93,14 @@ async def run_workflow(
                     select(Execution).where(Execution.id == execution.id)
                 )
                 exec_record = result.scalar_one()
-                
+
                 # Update status to running
                 exec_record.status = ExecutionStatus.RUNNING.value
                 await session.commit()
 
                 # Run workflow
                 exec_id = await execution_manager.run_workflow(workflow_path, request.inputs)
-                
+
                 # Wait for completion and get results
                 while True:
                     status_data = execution_manager.get_status(exec_id)

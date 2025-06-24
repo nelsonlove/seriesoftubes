@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import NullPool
 
 from seriesoftubes.config import get_config
+from sqlalchemy import select
+
 from seriesoftubes.db.models import Base, User
 
 
@@ -79,8 +81,6 @@ async def ensure_system_user() -> User:
     """Ensure the system user exists"""
     async with async_session() as session:
         # Check if system user exists
-        from sqlalchemy import select
-
         result = await session.execute(select(User).where(User.username == "system"))
         system_user = result.scalar_one_or_none()
 
@@ -94,6 +94,6 @@ async def ensure_system_user() -> User:
             )
             session.add(system_user)
             await session.commit()
-            print("Created system user")
+            # System user created successfully
 
         return system_user

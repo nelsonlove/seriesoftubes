@@ -9,8 +9,8 @@ import yaml
 
 class PropertyDoc:
     """Documentation for a single property."""
-    
-    def __init__(self, name: str, schema: Dict[str, Any], required: bool = False):
+
+    def __init__(self, name: str, schema: dict[str, Any], required: bool = False):
         self.name = name
         self.schema = schema
         self.required = required
@@ -20,7 +20,7 @@ class PropertyDoc:
         self.examples = schema.get("examples", [])
         self.enum = schema.get("enum", [])
         self.constraints = self._get_constraints()
-    
+
     def _get_type(self) -> str:
         """Extract property type."""
         if "type" in self.schema:
@@ -33,8 +33,8 @@ class PropertyDoc:
                     types.append(option["type"])
             return " | ".join(types) if types else "mixed"
         return "any"
-    
-    def _get_constraints(self) -> Dict[str, Any]:
+
+    def _get_constraints(self) -> dict[str, Any]:
         """Extract property constraints."""
         constraints = {}
         for key in ["minimum", "maximum", "minLength", "maxLength", "pattern", "format"]:
@@ -45,27 +45,27 @@ class PropertyDoc:
 
 class NodeTypeDoc:
     """Documentation for a node type."""
-    
-    def __init__(self, name: str, config_schema: Dict[str, Any]):
+
+    def __init__(self, name: str, config_schema: dict[str, Any]):
         self.name = name
         self.config_schema = config_schema
         self.properties = self._parse_properties()
         self.required_properties = [p for p in self.properties if p.required]
         self.optional_properties = [p for p in self.properties if not p.required]
         self.one_of_groups = self._parse_one_of_groups()
-    
-    def _parse_properties(self) -> List[PropertyDoc]:
+
+    def _parse_properties(self) -> list[PropertyDoc]:
         """Parse all properties from the schema."""
         properties = []
         props = self.config_schema.get("properties", {})
         required = self.config_schema.get("required", [])
-        
+
         for prop_name, prop_schema in props.items():
             properties.append(PropertyDoc(prop_name, prop_schema, prop_name in required))
-        
+
         return properties
-    
-    def _parse_one_of_groups(self) -> List[List[str]]:
+
+    def _parse_one_of_groups(self) -> list[list[str]]:
         """Parse oneOf constraints to find mutually exclusive property groups."""
         groups = []
         if "oneOf" in self.config_schema:
@@ -77,22 +77,22 @@ class NodeTypeDoc:
 
 class SchemaDocGenerator:
     """Generate documentation from workflow schema."""
-    
+
     def __init__(self, schema_path: Path):
         self.schema_path = schema_path
         self.schema = self._load_schema()
         self.node_configs = self._extract_node_configs()
-    
-    def _load_schema(self) -> Dict[str, Any]:
+
+    def _load_schema(self) -> dict[str, Any]:
         """Load and parse the YAML schema."""
         with open(self.schema_path) as f:
             return yaml.safe_load(f)
-    
-    def _extract_node_configs(self) -> Dict[str, Dict[str, Any]]:
+
+    def _extract_node_configs(self) -> dict[str, dict[str, Any]]:
         """Extract node configuration schemas from definitions."""
         configs = {}
         definitions = self.schema.get("definitions", {})
-        
+
         # Map node types to their config schemas
         node_mapping = {
             "llm": "llm_config",
@@ -101,25 +101,25 @@ class SchemaDocGenerator:
             "file": "file_config",
             "python": "python_config"
         }
-        
+
         for node_type, config_name in node_mapping.items():
             if config_name in definitions:
                 configs[node_type] = definitions[config_name]
-        
+
         return configs
-    
-    def get_node_types(self) -> List[str]:
+
+    def get_node_types(self) -> list[str]:
         """Get list of available node types."""
         return list(self.node_configs.keys())
-    
+
     def generate_node_documentation(self, node_type: str) -> str:
         """Generate markdown documentation for a specific node type."""
         if node_type not in self.node_configs:
             return f"# Error: Unknown node type '{node_type}'"
-        
+
         config_schema = self.node_configs[node_type]
         node_doc = NodeTypeDoc(node_type, config_schema)
-        
+
         # Build markdown
         lines = [
             f"# Node Type: `{node_type}`",
@@ -129,7 +129,7 @@ class SchemaDocGenerator:
             "## Properties",
             ""
         ]
-        
+
         # Required properties
         if node_doc.required_properties:
             lines.extend([
@@ -138,13 +138,13 @@ class SchemaDocGenerator:
                 "| Property | Type | Description |",
                 "|----------|------|-------------|"
             ])
-            
+
             for prop in node_doc.required_properties:
                 desc = prop.description.replace("\n", " ")
                 lines.append(f"| `{prop.name}` | {prop.type} | {desc} |")
-            
+
             lines.append("")
-        
+
         # Optional properties
         if node_doc.optional_properties:
             lines.extend([
@@ -153,14 +153,14 @@ class SchemaDocGenerator:
                 "| Property | Type | Default | Description |",
                 "|----------|------|---------|-------------|"
             ])
-            
+
             for prop in node_doc.optional_properties:
                 desc = prop.description.replace("\n", " ")
                 default = f"`{prop.default}`" if prop.default is not None else "-"
                 lines.append(f"| `{prop.name}` | {prop.type} | {default} | {desc} |")
-            
+
             lines.append("")
-        
+
         # Property constraints
         if node_doc.one_of_groups:
             lines.extend([
@@ -169,26 +169,26 @@ class SchemaDocGenerator:
                 "You must provide ONE of the following property combinations:",
                 ""
             ])
-            
+
             for i, group in enumerate(node_doc.one_of_groups, 1):
                 lines.append(f"{i}. " + " AND ".join(f"`{prop}`" for prop in group))
-            
+
             lines.append("")
-        
+
         # Property details
         lines.extend([
             "## Property Details",
             ""
         ])
-        
+
         for prop in node_doc.properties:
             lines.extend(self._generate_property_details(prop))
-        
+
         # Examples
         lines.extend(self._generate_node_examples(node_type))
-        
+
         return "\n".join(lines)
-    
+
     def _get_node_description(self, node_type: str) -> str:
         """Get description for a node type."""
         descriptions = {
@@ -199,29 +199,29 @@ class SchemaDocGenerator:
             "python": "Execute Python code for data transformation and analysis."
         }
         return descriptions.get(node_type, f"Process data using {node_type} operations.")
-    
-    def _generate_property_details(self, prop: PropertyDoc) -> List[str]:
+
+    def _generate_property_details(self, prop: PropertyDoc) -> list[str]:
         """Generate detailed documentation for a property."""
         lines = [
             f"### `{prop.name}`",
             ""
         ]
-        
+
         if prop.description:
             lines.extend([prop.description, ""])
-        
+
         # Type and constraints
         type_info = [f"**Type:** `{prop.type}`"]
-        
+
         if prop.required:
             type_info.append("**Required:** Yes")
-        
+
         if prop.default is not None:
             type_info.append(f"**Default:** `{prop.default}`")
-        
+
         if prop.enum:
             type_info.append(f"**Allowed values:** {', '.join(f'`{v}`' for v in prop.enum)}")
-        
+
         for constraint, value in prop.constraints.items():
             if constraint == "pattern":
                 type_info.append(f"**Pattern:** `{value}`")
@@ -229,9 +229,9 @@ class SchemaDocGenerator:
                 type_info.append(f"**Format:** {value}")
             else:
                 type_info.append(f"**{constraint.title()}:** {value}")
-        
+
         lines.extend([" | ".join(type_info), ""])
-        
+
         # Examples
         if prop.examples:
             lines.extend(["**Examples:**", ""])
@@ -244,16 +244,16 @@ class SchemaDocGenerator:
                 else:
                     lines.append(f"- `{example}`")
             lines.append("")
-        
+
         return lines
-    
-    def _generate_node_examples(self, node_type: str) -> List[str]:
+
+    def _generate_node_examples(self, node_type: str) -> list[str]:
         """Generate example sections for a node type."""
         lines = ["", "## Examples", ""]
-        
+
         # Add node-specific examples
         examples = self._get_node_examples(node_type)
-        
+
         for i, (title, example) in enumerate(examples, 1):
             lines.extend([
                 f"### Example {i}: {title}",
@@ -263,10 +263,10 @@ class SchemaDocGenerator:
                 "```",
                 ""
             ])
-        
+
         return lines
-    
-    def _get_node_examples(self, node_type: str) -> List[Tuple[str, str]]:
+
+    def _get_node_examples(self, node_type: str) -> list[tuple[str, str]]:
         """Get examples for each node type."""
         examples = {
             "llm": [
@@ -382,9 +382,9 @@ transform_data:
 """),
             ],
         }
-        
+
         return examples.get(node_type, [])
-    
+
     def generate_workflow_guide(self) -> str:
         """Generate a guide for workflow structure."""
         lines = [
@@ -398,7 +398,7 @@ transform_data:
             "",
             "```yaml",
             "name: My Workflow Name",
-            "version: \"1.0.0\"",
+            'version: "1.0.0"',
             "description: What this workflow does",
             "",
             "inputs:",
@@ -414,34 +414,34 @@ transform_data:
             "## Workflow Properties",
             ""
         ]
-        
+
         # Document top-level properties
         workflow_props = self.schema.get("properties", {})
-        
+
         for prop_name in ["name", "version", "description", "inputs", "nodes", "outputs"]:
             if prop_name in workflow_props:
                 prop_schema = workflow_props[prop_name]
                 required = prop_name in self.schema.get("required", [])
-                
+
                 lines.extend([
                     f"### `{prop_name}`",
                     ""
                 ])
-                
+
                 if "description" in prop_schema:
                     lines.extend([prop_schema["description"], ""])
-                
+
                 lines.append(f"**Type:** `{prop_schema.get('type', 'object')}`")
                 lines.append(f"**Required:** {'Yes' if required else 'No'}")
-                
+
                 if "default" in prop_schema:
                     lines.append(f"**Default:** `{prop_schema['default']}`")
-                
+
                 if "pattern" in prop_schema:
                     lines.append(f"**Pattern:** `{prop_schema['pattern']}`")
-                
+
                 lines.extend(["", ""])
-        
+
         # Add input types section
         lines.extend([
             "## Input Types",
@@ -517,9 +517,9 @@ transform_data:
             "```",
             ""
         ])
-        
+
         return "\n".join(lines)
-    
+
     def generate_quick_reference(self) -> str:
         """Generate a quick reference guide."""
         lines = [
@@ -542,7 +542,7 @@ transform_data:
             "extract_info:",
             "  type: llm",
             "  config:",
-            "    prompt: \"Extract company info from: {{ text }}\"",
+            '    prompt: "Extract company info from: {{ text }}"',
             "    model: gpt-4",
             "    schema:",
             "      type: object",
@@ -559,7 +559,7 @@ transform_data:
             "    url: https://api.example.com/data",
             "    auth:",
             "      type: bearer",
-            "      token: \"{{ env.API_TOKEN }}\"",
+            '      token: "{{ env.API_TOKEN }}"',
             "```",
             "",
             "### Conditional Routing",
@@ -568,7 +568,7 @@ transform_data:
             "  type: route",
             "  config:",
             "    routes:",
-            "      - when: \"{{ value > 100 }}\"",
+            '      - when: "{{ value > 100 }}"',
             "        to: high_value_path",
             "      - default: true",
             "        to: standard_path",
@@ -603,19 +603,19 @@ transform_data:
             "5. Use `schema` in LLM nodes for structured data",
             ""
         ]
-        
+
         return "\n".join(lines)
-    
-    def generate_vscode_snippets(self) -> Dict[str, Any]:
+
+    def generate_vscode_snippets(self) -> dict[str, Any]:
         """Generate VS Code snippets for workflow authoring."""
         snippets = {}
-        
+
         # Workflow template
         snippets["SeriesOfTubes Workflow"] = {
             "prefix": "workflow",
             "body": [
                 "name: ${1:Workflow Name}",
-                "version: \"1.0.0\"",
+                'version: "1.0.0"',
                 "description: ${2:What this workflow does}",
                 "",
                 "inputs:",
@@ -635,11 +635,11 @@ transform_data:
             ],
             "description": "Create a new SeriesOfTubes workflow"
         }
-        
+
         # Node type snippets
         for node_type in self.get_node_types():
             snippets[f"{node_type.upper()} node"] = self._generate_node_snippet(node_type)
-        
+
         # Input snippets
         snippets["Workflow input"] = {
             "prefix": "input",
@@ -652,10 +652,10 @@ transform_data:
             ],
             "description": "Add a workflow input parameter"
         }
-        
+
         return snippets
-    
-    def _generate_node_snippet(self, node_type: str) -> Dict[str, Any]:
+
+    def _generate_node_snippet(self, node_type: str) -> dict[str, Any]:
         """Generate VS Code snippet for a specific node type."""
         bodies = {
             "llm": [
@@ -663,7 +663,7 @@ transform_data:
                 "  type: llm",
                 "  ${2:depends_on: [${3:dependency}]}",
                 "  config:",
-                "    prompt: \"${4:Your prompt here}\"",
+                '    prompt: "${4:Your prompt here}"',
                 "    model: ${5|gpt-4,gpt-3.5-turbo,claude-3-opus-20240229|}",
                 "    temperature: ${6:0.7}",
                 "    ${7:context:}",
@@ -680,7 +680,7 @@ transform_data:
                 "      ${7:Content-Type}: ${8:application/json}",
                 "    ${9:auth:}",
                 "      ${10:type}: ${11|bearer,basic,api_key|}",
-                "      ${12:token}: \"${13:\\$\\{\\{ env.API_TOKEN \\}\\}}\""
+                '      ${12:token}: "${13:\\$\\{\\{ env.API_TOKEN \\}\\}}"'
             ],
             "route": [
                 "${1:node_name}:",
@@ -690,7 +690,7 @@ transform_data:
                 "    context:",
                 "      ${3:data}: ${4:source_node}",
                 "    routes:",
-                "      - when: \"${5:\\$\\{\\{ data.value > 100 \\}\\}}\"",
+                '      - when: "${5:\\$\\{\\{ data.value > 100 \\}\\}}"',
                 "        to: ${6:high_value_node}",
                 "      - default: true",
                 "        to: ${7:default_node}"
@@ -721,7 +721,7 @@ transform_data:
                 "      ${5:data}: ${8:source_node}"
             ]
         }
-        
+
         return {
             "prefix": f"{node_type}node",
             "body": bodies.get(node_type, ["${1:node_name}:", f"  type: {node_type}"]),

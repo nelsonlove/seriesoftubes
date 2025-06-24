@@ -81,20 +81,20 @@ def auth(
             else:
                 console.print("[yellow]⚠ Not authenticated[/yellow]")
                 console.print("Run 's10s auth login' to authenticate")
-        
+
         elif action == "login":
             if not username:
                 username = typer.prompt("Username")
             if not password:
                 password = typer.prompt("Password", hide_input=True)
-            
+
             try:
                 result = client.login(username, password)
                 console.print(f"[green]✓ Logged in as {username}[/green]")
             except httpx.HTTPStatusError as e:
                 console.print(f"[red]✗ Login failed: {e.response.text}[/red]")
                 raise typer.Exit(1) from e
-        
+
         elif action == "register":
             if not username:
                 username = typer.prompt("Username")
@@ -106,7 +106,7 @@ def auth(
                 if password != confirm:
                     console.print("[red]✗ Passwords don't match[/red]")
                     raise typer.Exit(1)
-            
+
             try:
                 result = client.register(username, email, password)
                 console.print(f"[green]✓ Registered user {username}[/green]")
@@ -114,7 +114,7 @@ def auth(
             except httpx.HTTPStatusError as e:
                 console.print(f"[red]✗ Registration failed: {e.response.text}[/red]")
                 raise typer.Exit(1) from e
-        
+
         else:
             console.print(f"[red]✗ Unknown action: {action}[/red]")
             console.print("Valid actions: login, register, status")
@@ -144,18 +144,18 @@ def run(
     if api:
         # Run via API
         console.print(f"[bold]Running workflow via API:[/bold] {workflow}")
-        
+
         with APIClient() as client:
             try:
                 # Run the workflow
                 result = client.run_workflow(workflow, parsed_inputs, use_db=True)
                 console.print(f"✓ Started execution: [green]{result['execution_id']}[/green]")
-                
+
                 # Stream updates
                 console.print("\n[bold]Execution progress:[/bold]")
                 import json as json_lib
-                
-                for line in client.stream_execution(result['execution_id'], use_db=True):
+
+                for line in client.stream_execution(result["execution_id"], use_db=True):
                     if line.startswith("data:"):
                         data = json_lib.loads(line[5:])
                         if data.get("status") == "completed":
@@ -170,14 +170,14 @@ def run(
                                 console.print(json_lib.dumps(data["errors"], indent=2))
                         else:
                             console.print(f"Status: {data.get('status')}")
-                            
+
             except httpx.HTTPStatusError as e:
                 console.print(f"[red]✗ API error: {e.response.text}[/red]")
                 raise typer.Exit(1) from e
     else:
         # Run locally
         console.print(f"[bold]Running workflow locally:[/bold] {workflow}")
-        
+
         try:
             # Parse the workflow
             wf = parse_workflow_yaml(Path(workflow))
@@ -324,16 +324,16 @@ def list_workflows(
     if api:
         # List from API
         console.print("[bold]Listing workflows from API:[/bold]")
-        
+
         with APIClient() as client:
             try:
                 workflows = client.list_workflows(use_db=True)
-                
+
                 if not workflows:
                     console.print("\n[yellow]No workflows found in database[/yellow]")
                     console.print("Upload workflows using 's10s workflow upload'")
                     return
-                
+
                 # Create table
                 table = Table(show_header=True, header_style="bold magenta")
                 table.add_column("Name", style="cyan")
@@ -341,7 +341,7 @@ def list_workflows(
                 table.add_column("Owner", style="yellow")
                 table.add_column("Public", style="blue")
                 table.add_column("Description", style="dim")
-                
+
                 for wf in workflows:
                     table.add_row(
                         wf["name"],
@@ -350,15 +350,15 @@ def list_workflows(
                         "✓" if wf["is_public"] else "✗",
                         (wf.get("description") or "")[:50] + "..." if len(wf.get("description", "")) > 50 else wf.get("description", ""),
                     )
-                
+
                 console.print(table)
                 console.print(f"\n[dim]Total workflows: {len(workflows)}[/dim]")
-                
+
             except httpx.HTTPStatusError as e:
                 console.print(f"[red]✗ API error: {e.response.text}[/red]")
                 raise typer.Exit(1) from e
         return
-    
+
     # List from filesystem
     console.print(f"[bold]Searching for workflows in:[/bold] {directory}")
 
@@ -556,13 +556,13 @@ def upload(
     if not path.exists():
         console.print(f"[red]✗ File not found: {path}[/red]")
         raise typer.Exit(1)
-    
+
     if not path.suffix == ".zip":
         console.print("[red]✗ File must be a ZIP archive[/red]")
         raise typer.Exit(1)
-    
+
     console.print(f"[bold]Uploading workflow package:[/bold] {path}")
-    
+
     with APIClient() as client:
         try:
             result = client.upload_workflow_package(path)
@@ -590,20 +590,20 @@ def create(
     if not path.exists():
         console.print(f"[red]✗ File not found: {path}[/red]")
         raise typer.Exit(1)
-    
+
     console.print(f"[bold]Creating workflow from:[/bold] {path}")
-    
+
     with APIClient() as client:
         try:
             # Read and parse workflow
             yaml_content = path.read_text()
             wf = parse_workflow_yaml(path)
-            
+
             # Use workflow metadata or provided values
             name = name or wf.name
             version = version or wf.version
             description = description or wf.description
-            
+
             result = client.create_workflow(name, version, yaml_content, description)
             console.print(f"[green]✓ Created workflow: {result['name']} v{result['version']}[/green]")
             console.print(f"  ID: {result['id']}")
@@ -630,23 +630,23 @@ def package(
     if not path.exists():
         console.print(f"[red]✗ Directory not found: {path}[/red]")
         raise typer.Exit(1)
-    
+
     workflow_file = path / "workflow.yaml"
     if not workflow_file.exists():
         console.print(f"[red]✗ No workflow.yaml found in {path}[/red]")
         raise typer.Exit(1)
-    
+
     # Parse workflow to get metadata
     wf = parse_workflow_yaml(workflow_file)
     name = name or wf.name
     version = version or wf.version
-    
+
     # Determine output path
     if not output:
         output = Path(f"{name}_{version}.zip")
-    
+
     console.print(f"[bold]Creating workflow package:[/bold] {output}")
-    
+
     with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as zf:
         # Add all files from the directory
         file_count = 0
@@ -656,7 +656,7 @@ def package(
                 zf.write(file, arcname)
                 console.print(f"  Added: {arcname}")
                 file_count += 1
-    
+
     console.print(f"[green]✓ Created package: {output}[/green]")
     console.print(f"  Files: {file_count}")
     console.print(f"  Size: {output.stat().st_size / 1024:.1f} KB")
@@ -687,26 +687,26 @@ def docs(
     """
     if subcommand == "generate":
         console.print("[bold]Generating documentation from schema...[/bold]")
-        
+
         try:
             # Run the documentation generator
-            from pathlib import Path
             import subprocess
             import sys
-            
+            from pathlib import Path
+
             script_path = Path(__file__).parent.parent.parent / "scripts" / "generate_docs.py"
-            
+
             if not script_path.exists():
                 console.print(f"[red]Error: Documentation generator script not found at {script_path}[/red]")
                 raise typer.Exit(1)
-            
+
             # Run the script
             result = subprocess.run(
                 [sys.executable, str(script_path)],
-                capture_output=True,
+                check=False, capture_output=True,
                 text=True
             )
-            
+
             if result.returncode == 0:
                 console.print(result.stdout)
                 console.print("\n[bold green]✓ Documentation generated successfully![/bold green]")
@@ -717,32 +717,32 @@ def docs(
             else:
                 console.print(f"[red]Error generating documentation:[/red]\n{result.stderr}")
                 raise typer.Exit(1)
-                
+
         except Exception as e:
             console.print(f"[red]Failed to generate documentation:[/red] {e}")
             raise typer.Exit(1)
-            
+
     elif subcommand == "serve":
         console.print(f"[bold]Serving documentation on port {port}...[/bold]")
-        
+
         docs_dir = Path("docs")
         if not docs_dir.exists():
             console.print("[red]Error: Documentation not found. Run 's10s docs generate' first.[/red]")
             raise typer.Exit(1)
-        
+
         try:
             import http.server
-            import socketserver
             import os
-            
+            import socketserver
+
             os.chdir(docs_dir)
-            
+
             Handler = http.server.SimpleHTTPRequestHandler
             with socketserver.TCPServer(("", port), Handler) as httpd:
                 console.print(f"\n[green]Documentation server running at http://localhost:{port}[/green]")
                 console.print("[dim]Press Ctrl+C to stop[/dim]\n")
                 httpd.serve_forever()
-                
+
         except KeyboardInterrupt:
             console.print("\n[yellow]Server stopped[/yellow]")
         except Exception as e:

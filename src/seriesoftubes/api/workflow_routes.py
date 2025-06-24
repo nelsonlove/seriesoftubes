@@ -16,7 +16,7 @@ from sqlalchemy.orm import selectinload
 
 from seriesoftubes.api.auth import get_current_active_user
 from seriesoftubes.api.models import WorkflowInfo
-from seriesoftubes.db import Workflow, User, get_db
+from seriesoftubes.db import User, Workflow, get_db
 from seriesoftubes.parser import parse_workflow_yaml
 
 router = APIRouter(prefix="/api/workflows", tags=["workflows"])
@@ -182,7 +182,7 @@ async def upload_workflow_package(
 
     # Read ZIP file
     content = await file.read()
-    
+
     try:
         with zipfile.ZipFile(io.BytesIO(content)) as zf:
             # Check for workflow.yaml
@@ -194,7 +194,7 @@ async def upload_workflow_package(
 
             # Extract workflow.yaml content
             yaml_content = zf.read("workflow.yaml").decode("utf-8")
-            
+
             # Parse to get metadata
             yaml_data = yaml.safe_load(yaml_content)
             name = yaml_data.get("name", "untitled")

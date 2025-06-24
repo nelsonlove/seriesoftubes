@@ -18,13 +18,13 @@ class CLIConfig(BaseModel):
 def get_cli_config() -> CLIConfig:
     """Get CLI configuration"""
     config_path = Path.home() / ".seriesoftubes" / "cli_config.json"
-    
+
     if config_path.exists():
         import json
         with open(config_path) as f:
             data = json.load(f)
         return CLIConfig(**data)
-    
+
     # Default config
     return CLIConfig(
         api_url=os.getenv("SERIESOFTUBES_API_URL", "http://localhost:8000")
@@ -35,7 +35,7 @@ def save_cli_config(config: CLIConfig) -> None:
     """Save CLI configuration"""
     config_path = Path.home() / ".seriesoftubes" / "cli_config.json"
     config_path.parent.mkdir(parents=True, exist_ok=True)
-    
+
     import json
     with open(config_path, "w") as f:
         json.dump(config.model_dump(), f, indent=2)
@@ -58,10 +58,10 @@ class APIClient:
             "Content-Type": "application/json",
             "X-CLI-User": "system",  # Use system user for CLI
         }
-        
+
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
-        
+
         return headers
 
     @property
@@ -103,11 +103,11 @@ class APIClient:
         )
         response.raise_for_status()
         data = response.json()
-        
+
         # Save token
         if "access_token" in data:
             self.set_token(data["access_token"])
-        
+
         return data
 
     # Workflow methods
@@ -119,7 +119,7 @@ class APIClient:
         else:
             # List from filesystem
             response = self.client.get("/workflows", params={"directory": directory})
-        
+
         response.raise_for_status()
         return response.json()
 
@@ -151,7 +151,7 @@ class APIClient:
         with open(zip_path, "rb") as f:
             files = {"file": (zip_path.name, f, "application/zip")}
             response = self.client.post("/api/workflows/upload", files=files)
-        
+
         response.raise_for_status()
         return response.json()
 
@@ -171,7 +171,7 @@ class APIClient:
                 f"/workflows/{workflow_path}/run",
                 json={"inputs": inputs},
             )
-        
+
         response.raise_for_status()
         return response.json()
 
@@ -187,7 +187,7 @@ class APIClient:
             response = self.client.get(f"/api/executions/{execution_id}")
         else:
             response = self.client.get(f"/executions/{execution_id}")
-        
+
         response.raise_for_status()
         return response.json()
 
@@ -197,7 +197,7 @@ class APIClient:
             url = f"/api/executions/{execution_id}/stream"
         else:
             url = f"/executions/{execution_id}/stream"
-        
+
         # Use streaming
         with self.client.stream("GET", url) as response:
             response.raise_for_status()
