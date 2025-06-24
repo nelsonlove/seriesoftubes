@@ -54,3 +54,20 @@ class ErrorResponse(BaseModel):
 
     detail: str = Field(..., description="Error message")
     code: str | None = Field(None, description="Error code")
+
+
+class RawWorkflowResponse(BaseModel):
+    """Raw workflow YAML content"""
+
+    content: str = Field(..., description="Raw YAML content")
+    path: str = Field(..., description="File path")
+    modified: float = Field(..., description="Last modification timestamp")
+
+
+class RawWorkflowUpdate(BaseModel):
+    """Update raw workflow YAML"""
+
+    content: str = Field(..., description="New YAML content")
+    expected_modified: float | None = Field(
+        None, description="Expected modification timestamp for conflict detection"
+    )
