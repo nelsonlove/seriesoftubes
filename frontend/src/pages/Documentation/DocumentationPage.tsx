@@ -16,9 +16,17 @@ interface DocFile {
 
 const docFiles: DocFile[] = [
   // Quick Reference
-  { path: '/docs/reference/quick-reference.md', title: 'Quick Reference', category: 'Getting Started' },
-  { path: '/docs/guides/workflow-structure.md', title: 'Workflow Structure', category: 'Getting Started' },
-  
+  {
+    path: '/docs/reference/quick-reference.md',
+    title: 'Quick Reference',
+    category: 'Getting Started',
+  },
+  {
+    path: '/docs/guides/workflow-structure.md',
+    title: 'Workflow Structure',
+    category: 'Getting Started',
+  },
+
   // Node Types
   { path: '/docs/reference/nodes/llm.md', title: 'LLM Node', category: 'Node Types' },
   { path: '/docs/reference/nodes/http.md', title: 'HTTP Node', category: 'Node Types' },
@@ -48,7 +56,7 @@ export const DocumentationPage: React.FC = () => {
     const fetchDoc = async () => {
       setLoading(true);
       setError(null);
-      
+
       try {
         const response = await fetch(selectedDoc.path);
         if (!response.ok) {
@@ -69,18 +77,21 @@ export const DocumentationPage: React.FC = () => {
 
   // Group documents by category
   const menuItems: MenuProps['items'] = Object.entries(
-    docFiles.reduce((acc, doc) => {
-      if (!acc[doc.category]) {
-        acc[doc.category] = [];
-      }
-      acc[doc.category].push(doc);
-      return acc;
-    }, {} as Record<string, DocFile[]>)
+    docFiles.reduce(
+      (acc, doc) => {
+        if (!acc[doc.category]) {
+          acc[doc.category] = [];
+        }
+        acc[doc.category].push(doc);
+        return acc;
+      },
+      {} as Record<string, DocFile[]>
+    )
   ).map(([category, docs]) => ({
     key: category,
     label: category,
     icon: getIcon(category),
-    children: docs.map(doc => ({
+    children: docs.map((doc) => ({
       key: doc.path,
       label: doc.title,
       onClick: () => setSelectedDoc(doc),
@@ -117,40 +128,35 @@ export const DocumentationPage: React.FC = () => {
               <Spin size="large" />
             </div>
           )}
-          
-          {error && (
-            <Alert
-              message="Error"
-              description={error}
-              type="error"
-              showIcon
-            />
-          )}
-          
+
+          {error && <Alert message="Error" description={error} type="error" showIcon />}
+
           {!loading && !error && (
             <div className="markdown-body" style={{ maxWidth: '900px', margin: '0 auto' }}>
-              <ReactMarkdown 
+              <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={{
                   // Custom rendering for code blocks
-                  code({ node, inline, className, children, ...props }) {
+                  code({ inline, className, children, ...props }) {
                     const match = /language-(\w+)/.exec(className || '');
                     return !inline && match ? (
-                      <Card 
-                        size="small" 
-                        style={{ 
+                      <Card
+                        size="small"
+                        style={{
                           marginBottom: 16,
                           fontFamily: 'Monaco, Consolas, "Courier New", monospace',
                         }}
                       >
-                        <div style={{ 
-                          fontSize: '12px', 
-                          color: '#666', 
-                          marginBottom: '8px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}>
+                        <div
+                          style={{
+                            fontSize: '12px',
+                            color: '#666',
+                            marginBottom: '8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
                           <CodeOutlined />
                           {match[1]}
                         </div>
@@ -159,14 +165,14 @@ export const DocumentationPage: React.FC = () => {
                         </pre>
                       </Card>
                     ) : (
-                      <code 
-                        {...props} 
-                        style={{ 
-                          backgroundColor: '#f0f0f0', 
-                          padding: '2px 4px', 
+                      <code
+                        {...props}
+                        style={{
+                          backgroundColor: '#f0f0f0',
+                          padding: '2px 4px',
                           borderRadius: '3px',
                           fontFamily: 'Monaco, Consolas, "Courier New", monospace',
-                          fontSize: '0.9em'
+                          fontSize: '0.9em',
                         }}
                       >
                         {children}
@@ -177,11 +183,13 @@ export const DocumentationPage: React.FC = () => {
                   table({ children }) {
                     return (
                       <div style={{ overflowX: 'auto', marginBottom: 16 }}>
-                        <table style={{ 
-                          width: '100%', 
-                          borderCollapse: 'collapse',
-                          border: '1px solid #e8e8e8'
-                        }}>
+                        <table
+                          style={{
+                            width: '100%',
+                            borderCollapse: 'collapse',
+                            border: '1px solid #e8e8e8',
+                          }}
+                        >
                           {children}
                         </table>
                       </div>
@@ -189,23 +197,27 @@ export const DocumentationPage: React.FC = () => {
                   },
                   th({ children }) {
                     return (
-                      <th style={{ 
-                        padding: '12px', 
-                        textAlign: 'left',
-                        backgroundColor: '#fafafa',
-                        borderBottom: '2px solid #e8e8e8',
-                        fontWeight: 600
-                      }}>
+                      <th
+                        style={{
+                          padding: '12px',
+                          textAlign: 'left',
+                          backgroundColor: '#fafafa',
+                          borderBottom: '2px solid #e8e8e8',
+                          fontWeight: 600,
+                        }}
+                      >
                         {children}
                       </th>
                     );
                   },
                   td({ children }) {
                     return (
-                      <td style={{ 
-                        padding: '12px',
-                        borderBottom: '1px solid #e8e8e8'
-                      }}>
+                      <td
+                        style={{
+                          padding: '12px',
+                          borderBottom: '1px solid #e8e8e8',
+                        }}
+                      >
                         {children}
                       </td>
                     );

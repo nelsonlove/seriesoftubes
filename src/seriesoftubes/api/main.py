@@ -94,7 +94,7 @@ async def list_workflows(directory: str = ".") -> list[WorkflowInfo]:
                         name=workflow.name,
                         version=workflow.version,
                         description=workflow.description,
-                        path=str(yaml_file),
+                        path=str(yaml_file.relative_to(base_path)),
                         inputs={
                             name: {
                                 "type": input_def.input_type,
@@ -111,46 +111,6 @@ async def list_workflows(directory: str = ".") -> list[WorkflowInfo]:
             continue
 
     return workflows
-
-
-@app.get("/workflows/{workflow_path:path}", response_model=WorkflowDetail)
-async def get_workflow(workflow_path: str) -> WorkflowDetail:
-    """Get details about a specific workflow"""
-    path = Path(workflow_path)
-
-    if not path.exists():
-        raise HTTPException(status_code=404, detail="Workflow not found")
-
-    try:
-        workflow = parse_workflow_yaml(path)
-        return WorkflowDetail(
-            path=str(path),
-            workflow={
-                "name": workflow.name,
-                "version": workflow.version,
-                "description": workflow.description,
-                "inputs": {
-                    name: {
-                        "type": input_def.input_type,
-                        "required": input_def.required,
-                        "default": input_def.default,
-                    }
-                    for name, input_def in workflow.inputs.items()
-                },
-                "nodes": {
-                    name: {
-                        "type": node.node_type.value,
-                        "description": node.description,
-                        "depends_on": node.depends_on,
-                        "config": node.config.model_dump() if node.config else {},
-                    }
-                    for name, node in workflow.nodes.items()
-                },
-                "outputs": workflow.outputs,
-            },
-        )
-    except WorkflowParseError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @app.get("/workflows/{workflow_path:path}/raw", response_model=RawWorkflowResponse)
@@ -274,6 +234,46 @@ async def run_workflow(
         status="started",
         message=f"Workflow execution started with ID: {execution_id}",
     )
+
+
+@app.get("/workflows/{workflow_path:path}", response_model=WorkflowDetail)
+async def get_workflow(workflow_path: str) -> WorkflowDetail:
+    """Get details about a specific workflow"""
+    path = Path(workflow_path)
+
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    try:
+        workflow = parse_workflow_yaml(path)
+        return WorkflowDetail(
+            path=str(path),
+            workflow={
+                "name": workflow.name,
+                "version": workflow.version,
+                "description": workflow.description,
+                "inputs": {
+                    name: {
+                        "type": input_def.input_type,
+                        "required": input_def.required,
+                        "default": input_def.default,
+                    }
+                    for name, input_def in workflow.inputs.items()
+                },
+                "nodes": {
+                    name: {
+                        "type": node.node_type.value,
+                        "description": node.description,
+                        "depends_on": node.depends_on,
+                        "config": node.config.model_dump() if node.config else {},
+                    }
+                    for name, node in workflow.nodes.items()
+                },
+                "outputs": workflow.outputs,
+            },
+        )
+    except WorkflowParseError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @app.get("/executions", response_model=list[ExecutionStatus])

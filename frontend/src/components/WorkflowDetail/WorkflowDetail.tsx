@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Card, Spin, Typography, Space, Tag, Descriptions, Button } from 'antd';
-import { PlayCircleOutlined } from '@ant-design/icons';
+import { PlayCircleOutlined, EditOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { workflowAPI } from '../../api/client';
 import { RunWorkflowModal } from '../RunWorkflowModal';
+import { YamlEditorModal } from '../YamlEditor';
 
 const { Title, Text } = Typography;
 
@@ -13,7 +14,8 @@ interface WorkflowDetailProps {
 
 export const WorkflowDetail: React.FC<WorkflowDetailProps> = ({ path }) => {
   const [showRunModal, setShowRunModal] = useState(false);
-  const { data, isLoading, error } = useQuery({
+  const [showYamlEditor, setShowYamlEditor] = useState(false);
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['workflow', path],
     queryFn: () => workflowAPI.get(path),
     enabled: !!path,
@@ -45,13 +47,18 @@ export const WorkflowDetail: React.FC<WorkflowDetailProps> = ({ path }) => {
         <Space direction="vertical" style={{ width: '100%' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Title level={3}>{workflow.name}</Title>
-            <Button
-              type="primary"
-              icon={<PlayCircleOutlined />}
-              onClick={() => setShowRunModal(true)}
-            >
-              Run Workflow
-            </Button>
+            <Space>
+              <Button icon={<EditOutlined />} onClick={() => setShowYamlEditor(true)}>
+                Edit YAML
+              </Button>
+              <Button
+                type="primary"
+                icon={<PlayCircleOutlined />}
+                onClick={() => setShowRunModal(true)}
+              >
+                Run Workflow
+              </Button>
+            </Space>
           </div>
 
           <Descriptions column={1}>
@@ -129,6 +136,13 @@ export const WorkflowDetail: React.FC<WorkflowDetailProps> = ({ path }) => {
         workflow={data}
         open={showRunModal}
         onClose={() => setShowRunModal(false)}
+      />
+
+      <YamlEditorModal
+        workflowPath={path}
+        open={showYamlEditor}
+        onClose={() => setShowYamlEditor(false)}
+        onSave={() => refetch()}
       />
     </Space>
   );

@@ -3,7 +3,12 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConfigProvider, Layout, Menu } from 'antd';
-import { AppstoreOutlined, PlayCircleOutlined, ExperimentOutlined, BookOutlined } from '@ant-design/icons';
+import {
+  AppstoreOutlined,
+  PlayCircleOutlined,
+  ExperimentOutlined,
+  BookOutlined,
+} from '@ant-design/icons';
 import { WorkflowsPage } from './pages/Workflows';
 import { ExecutionsPage } from './pages/Executions';
 import { ExecutionDetail } from './pages/Executions/ExecutionDetail';

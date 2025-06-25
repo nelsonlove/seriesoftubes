@@ -137,10 +137,7 @@ all = [
 ]
 
 [tool.hatch.envs.api]
-extra-dependencies = [
-    "fastapi>=0.104.0",
-    "uvicorn[standard]>=0.24.0",
-]
+features = ["api"]
 
 [tool.hatch.envs.api.scripts]
 serve = "uvicorn seriesoftubes.api.main:app --reload --host 0.0.0.0 --port 8000"

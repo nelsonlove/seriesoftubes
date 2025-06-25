@@ -35,6 +35,30 @@ export const workflowAPI = {
     );
     return response.data;
   },
+
+  // Get raw YAML content
+  getRaw: async (path: string) => {
+    // Use the root-level endpoint, not under /api
+    const response = await axios.get<{ content: string; path: string; modified: number }>(
+      `/workflows/${encodeURIComponent(path)}/raw`
+    );
+    return response.data;
+  },
+
+  // Update raw YAML content
+  updateRaw: async (path: string, content: string, expectedModified?: number) => {
+    // Use the root-level endpoint, not under /api
+    const response = await axios.put<{
+      success: boolean;
+      path: string;
+      modified: number;
+      workflow: { name: string; version: string };
+    }>(`/workflows/${encodeURIComponent(path)}/raw`, {
+      content,
+      expected_modified: expectedModified,
+    });
+    return response.data;
+  },
 };
 
 export const executionAPI = {
