@@ -7,13 +7,9 @@ import yaml
 from pydantic import ValidationError
 
 from seriesoftubes.models import (
-    FileNodeConfig,
-    HTTPNodeConfig,
-    LLMNodeConfig,
+    BaseNodeConfig,
     Node,
     NodeType,
-    PythonNodeConfig,
-    RouteNodeConfig,
     Workflow,
     WorkflowInput,
 )
@@ -27,23 +23,12 @@ class WorkflowParseError(Exception):
 
 def parse_node_config(
     node_type: NodeType, config_data: dict[str, Any]
-) -> (
-    LLMNodeConfig | HTTPNodeConfig | RouteNodeConfig | FileNodeConfig | PythonNodeConfig
-):
+) -> BaseNodeConfig:
     """Parse node configuration based on the node type"""
-    if node_type == NodeType.LLM:
-        return LLMNodeConfig(**config_data)
-    elif node_type == NodeType.HTTP:
-        return HTTPNodeConfig(**config_data)
-    elif node_type == NodeType.ROUTE:
-        return RouteNodeConfig(**config_data)
-    elif node_type == NodeType.FILE:
-        return FileNodeConfig(**config_data)
-    elif node_type == NodeType.PYTHON:
-        return PythonNodeConfig(**config_data)
-    else:
-        msg = f"Unknown node type: {node_type}"
-        raise WorkflowParseError(msg)
+    # The Node model will handle the config validation automatically
+    # based on the node type, so we just return the raw config data
+    # This will be validated when creating the Node instance
+    return config_data
 
 
 def parse_workflow_yaml(yaml_path: Path) -> Workflow:
@@ -177,15 +162,23 @@ def validate_dag(workflow: Workflow) -> None:
                 msg = f"Workflow contains a cycle involving node '{node_name}'"
                 raise WorkflowParseError(msg)
 
-    # Validate route nodes point to existing nodes
-    for node_name, node in nodes.items():
-        if node.node_type == NodeType.ROUTE:
-            # Config is RouteNodeConfig when node_type is ROUTE (validated)
-            config = cast(RouteNodeConfig, node.config)
-            for route in config.routes:
-                if route.to not in nodes:
-                    msg = (
-                        f"Route in node '{node_name}' points to "
-                        f"non-existent node '{route.to}'"
-                    )
-                    raise WorkflowParseError(msg)
+    # Additional validation for specific node types can be added here
+    # For now, basic DAG validation is sufficient
+
+
+class WorkflowParser:
+    """Parser for workflow YAML files"""
+    
+    def parse_file(self, file_path: str | Path) -> Workflow:
+        """Parse a workflow from a YAML file"""
+        if isinstance(file_path, str):
+            file_path = Path(file_path)
+        return parse_workflow_yaml(file_path)
+    
+    def parse_string(self, yaml_content: str) -> Workflow:
+        """Parse a workflow from a YAML string"""
+        import tempfile
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            f.write(yaml_content)
+            f.flush()
+            return self.parse_file(f.name)

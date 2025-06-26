@@ -6,23 +6,23 @@ Read and process files in various formats (JSON, CSV, YAML, PDF, etc.).
 
 ### Optional Properties
 
-| Property       | Type    | Default   | Description                                                       |
-|----------------|---------|-----------|-------------------------------------------------------------------|
-| `path`         | string  | -         | Single file path (supports Jinja2 templates)                      |
-| `pattern`      | string  | -         | Glob pattern for multiple files                                   |
-| `context`      | object  | -         | Map context variables from other nodes                            |
-| `format`       | string  | `auto`    | File format (auto-detected by default)                            |
-| `encoding`     | string  | `utf-8`   | Text encoding for text files                                      |
-| `extract_text` | boolean | `True`    | Extract text from documents (PDF, DOCX, HTML)                     |
-| `output_mode`  | string  | `content` | Output mode - content (single), list (records), dict (collection) |
-| `merge`        | boolean | `False`   | Merge multiple files into single output                           |
-| `stream`       | boolean | `False`   | Stream large files in chunks                                      |
-| `chunk_size`   | integer | `1000`    | Rows per chunk for streaming                                      |
-| `sample`       | number  | -         | Sample fraction (0.0-1.0)                                         |
-| `limit`        | integer | -         | Limit number of records                                           |
-| `delimiter`    | string  | `,`       | CSV delimiter                                                     |
-| `has_header`   | boolean | `True`    | CSV has header row                                                |
-| `skip_errors`  | boolean | `False`   | Skip files/rows with errors                                       |
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `path` | string | - | Single file path (supports Jinja2 templates) |
+| `pattern` | string | - | Glob pattern for multiple files |
+| `context` | object | - | Map context variables from other nodes |
+| `format` | string | `auto` | File format (auto-detected by default) |
+| `encoding` | string | `utf-8` | Text encoding for text files |
+| `extract_text` | boolean | `True` | Extract text from documents (PDF, DOCX, HTML) |
+| `output_mode` | string | `content` | Output mode - content (single), list (records), dict (collection) |
+| `merge` | boolean | `False` | Merge multiple files into single output |
+| `stream` | boolean | `False` | Stream large files in chunks |
+| `chunk_size` | integer | `1000` | Rows per chunk for streaming |
+| `sample` | number | - | Sample fraction (0.0-1.0) |
+| `limit` | integer | - | Limit number of records |
+| `delimiter` | string | `,` | CSV delimiter |
+| `has_header` | boolean | `True` | CSV has header row |
+| `skip_errors` | boolean | `False` | Skip files/rows with errors |
 
 ### Property Constraints
 
@@ -55,8 +55,7 @@ Map context variables from other nodes
 
 File format (auto-detected by default)
 
-**Type:** `string` | **Default:** `auto` | **Allowed values:** `auto`, `json`, `jsonl`, `csv`, `yaml`, `txt`, `pdf`,
-`docx`, `xlsx`, `html`
+**Type:** `string` | **Default:** `auto` | **Allowed values:** `auto`, `json`, `jsonl`, `csv`, `yaml`, `txt`, `pdf`, `docx`, `xlsx`, `html`
 
 ### `encoding`
 
@@ -123,6 +122,7 @@ CSV has header row
 Skip files/rows with errors
 
 **Type:** `boolean` | **Default:** `False`
+
 
 ## Examples
 

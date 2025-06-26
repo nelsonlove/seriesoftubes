@@ -54,7 +54,7 @@ properties:
       properties:
         type:
           type: string
-          enum: [ llm, http, route, file, python ]
+          enum: [ llm, http, file, python, split, aggregate, filter, transform, join, foreach, conditional ]
           description: Type of node to execute
 
         description:
@@ -74,9 +74,15 @@ properties:
           oneOf:
             - $ref: "#/definitions/llm_config"
             - $ref: "#/definitions/http_config"
-            - $ref: "#/definitions/route_config"
             - $ref: "#/definitions/file_config"
             - $ref: "#/definitions/python_config"
+            - $ref: "#/definitions/split_config"
+            - $ref: "#/definitions/aggregate_config"
+            - $ref: "#/definitions/filter_config"
+            - $ref: "#/definitions/transform_config"
+            - $ref: "#/definitions/join_config"
+            - $ref: "#/definitions/foreach_config"
+            - $ref: "#/definitions/conditional_config"
 
   outputs:
     type: object
@@ -353,3 +359,196 @@ definitions:
     oneOf:
       - required: [ code ]
       - required: [ file ]
+
+  split_config:
+    type: object
+    required:
+      - field
+    properties:
+      field:
+        type: string
+        description: Field containing array to split
+      
+      item_name:
+        type: string
+        default: item
+        description: Name for each item in downstream context
+      
+      context:
+        type: object
+        description: Map context variables from other nodes
+        additionalProperties:
+          type: string
+
+  aggregate_config:
+    type: object
+    properties:
+      mode:
+        type: string
+        enum: [ array, object, merge ]
+        default: array
+        description: "Aggregation mode: array (collect into array), object (merge into object), merge (deep merge)"
+      
+      field:
+        type: string
+        description: Optional - extract specific field from each result
+      
+      context:
+        type: object
+        description: Map context variables from other nodes
+        additionalProperties:
+          type: string
+
+  filter_config:
+    type: object
+    required:
+      - condition
+    properties:
+      condition:
+        type: string
+        description: Jinja2 condition expression
+        examples:
+          - "{{ item.score > 0.8 }}"
+          - "{{ item.type == 'company' }}"
+      
+      field:
+        type: string
+        description: Array field to filter (if not provided, filters root array)
+      
+      context:
+        type: object
+        description: Map context variables from other nodes
+        additionalProperties:
+          type: string
+
+  transform_config:
+    type: object
+    required:
+      - template
+    properties:
+      template:
+        description: Jinja2 template for transforming each item
+        oneOf:
+          - type: string
+            description: String template
+          - type: object
+            description: Object template
+            additionalProperties: true
+        examples:
+          - "{{ item | upper }}"
+          - { name: "{{ item.name }}", score: "{{ item.score * 100 }}" }
+      
+      field:
+        type: string
+        description: Array field to transform (if not provided, transforms root array)
+      
+      context:
+        type: object
+        description: Map context variables from other nodes
+        additionalProperties:
+          type: string
+
+  join_config:
+    type: object
+    required:
+      - sources
+    properties:
+      sources:
+        type: object
+        description: Named data sources to join (name -> node.field)
+        additionalProperties:
+          type: string
+        examples:
+          - left: companies_data
+            right: revenue_data.companies
+      
+      join_type:
+        type: string
+        enum: [ inner, left, right, outer, cross, merge ]
+        default: merge
+        description: Type of join to perform
+      
+      join_keys:
+        type: object
+        description: Join key mappings for inner/left joins (source1_key -> source2_key)
+        additionalProperties:
+          type: string
+        examples:
+          - company_id: id
+            name: company_name
+      
+      context:
+        type: object
+        description: Map context variables from other nodes
+        additionalProperties:
+          type: string
+
+  foreach_config:
+    type: object
+    required:
+      - array_field
+      - subgraph_nodes
+    properties:
+      array_field:
+        type: string
+        description: Field containing array to iterate over
+      
+      item_name:
+        type: string
+        default: item
+        description: Name for each item in subgraph context
+      
+      subgraph_nodes:
+        type: array
+        items:
+          type: string
+        description: List of node names to execute for each item
+      
+      parallel:
+        type: boolean
+        default: true
+        description: Execute iterations in parallel (default) or sequentially
+      
+      collect_output:
+        type: string
+        description: Output field name to collect from each iteration
+      
+      context:
+        type: object
+        description: Map context variables from other nodes
+        additionalProperties:
+          type: string
+
+  conditional_config:
+    type: object
+    required:
+      - conditions
+    properties:
+      conditions:
+        type: array
+        description: List of conditions to evaluate in order
+        items:
+          type: object
+          required:
+            - then
+          properties:
+            condition:
+              type: string
+              description: Jinja2 condition expression (omit for default)
+            then:
+              type: string
+              description: Target/output value if condition is true
+            is_default:
+              type: boolean
+              default: false
+              description: Whether this is the default condition
+      
+      fallback:
+        type: string
+        description: Fallback value if no conditions match and no default
+      
+      context:
+        type: object
+        description: Map context variables from other nodes
+        additionalProperties:
+          type: string

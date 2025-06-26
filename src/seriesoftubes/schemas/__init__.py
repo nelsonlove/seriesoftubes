@@ -4,7 +4,7 @@ from abc import ABC
 from pathlib import Path
 from typing import Any, TypeVar
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 SCHEMA_DIR = Path(__file__).parent
 WORKFLOW_SCHEMA_PATH = SCHEMA_DIR / "workflow-schema.yaml"
@@ -15,15 +15,14 @@ T = TypeVar("T", bound=BaseModel)
 class NodeSchema(BaseModel, ABC):
     """Base class for all node schemas"""
 
-    class Config:
-        """Pydantic config"""
-
+    model_config = ConfigDict(
         # Allow extra fields by default for flexibility
-        extra = "allow"
+        extra="allow",
         # Use enum values instead of names
-        use_enum_values = True
+        use_enum_values=True,
         # Validate on assignment
-        validate_assignment = True
+        validate_assignment=True,
+    )
 
 
 class NodeInputSchema(NodeSchema):
@@ -75,6 +74,9 @@ class LLMNodeOutput(NodeOutputSchema):
 
 
 # HTTP Node Schemas
+from pydantic import HttpUrl, field_validator
+
+
 class HTTPNodeInput(NodeInputSchema):
     """Input schema for HTTP nodes"""
 
@@ -83,6 +85,21 @@ class HTTPNodeInput(NodeInputSchema):
     headers: dict[str, str] = Field(default_factory=dict, description="HTTP headers")
     params: dict[str, Any] = Field(default_factory=dict, description="Query parameters")
     body: dict[str, Any] | str | None = Field(None, description="Request body")
+
+    @field_validator("url")
+    @classmethod
+    def validate_url(cls, v: str) -> str:
+        """Validate that the URL is properly formatted"""
+        if not v or not v.strip():
+            raise ValueError("URL cannot be empty")
+        
+        # Basic URL validation - must start with http:// or https://
+        if not v.startswith(("http://", "https://")):
+            raise ValueError("URL must start with http:// or https://")
+        
+        # Could use HttpUrl for stricter validation, but that would require
+        # converting back to string for the actual request
+        return v
 
 
 class HTTPNodeOutput(NodeOutputSchema):
@@ -107,7 +124,7 @@ class RouteNodeOutput(NodeOutputSchema):
     """Output schema for route nodes"""
 
     selected_route: str = Field(..., description="The node that was routed to")
-    condition_met: str | None = Field(None, description="The condition that was met")
+    condition_met: str = Field(..., description="The condition that was met or 'default'")
 
 
 # File Node Schemas
@@ -116,6 +133,22 @@ class FileNodeInput(NodeInputSchema):
 
     path: str | None = Field(None, description="File path to read")
     pattern: str | None = Field(None, description="Glob pattern for multiple files")
+    
+    @field_validator("path")
+    @classmethod
+    def validate_path(cls, v: str | None) -> str | None:
+        """Validate that the path is not empty if provided"""
+        if v is not None and not v.strip():
+            raise ValueError("Path cannot be empty")
+        return v
+    
+    @field_validator("pattern")
+    @classmethod
+    def validate_pattern(cls, v: str | None) -> str | None:
+        """Validate that the pattern is not empty if provided"""
+        if v is not None and not v.strip():
+            raise ValueError("Pattern cannot be empty")
+        return v
 
 
 class FileNodeOutput(NodeOutputSchema):

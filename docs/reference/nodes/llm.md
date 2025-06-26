@@ -6,16 +6,16 @@ Execute Large Language Model (LLM) API calls with optional structured extraction
 
 ### Optional Properties
 
-| Property          | Type    | Default  | Description                            |
-|-------------------|---------|----------|----------------------------------------|
-| `provider`        | string  | `openai` | LLM provider to use                    |
-| `model`           | string  | -        | Model identifier                       |
-| `prompt`          | string  | -        | Inline prompt template (Jinja2)        |
-| `prompt_template` | string  | -        | Path to external prompt template file  |
-| `context`         | object  | -        | Map context variables from other nodes |
-| `schema`          | object  | -        | JSON schema for structured extraction  |
-| `temperature`     | number  | `0.7`    | LLM temperature setting                |
-| `max_tokens`      | integer | -        | Maximum tokens in response             |
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `provider` | string | `openai` | LLM provider to use |
+| `model` | string | - | Model identifier |
+| `prompt` | string | - | Inline prompt template (Jinja2) |
+| `prompt_template` | string | - | Path to external prompt template file |
+| `context` | object | - | Map context variables from other nodes |
+| `schema` | object | - | JSON schema for structured extraction |
+| `temperature` | number | `0.7` | LLM temperature setting |
+| `max_tokens` | integer | - | Maximum tokens in response |
 
 ### Property Constraints
 
@@ -85,6 +85,7 @@ LLM temperature setting
 Maximum tokens in response
 
 **Type:** `integer` | **Minimum:** 1
+
 
 ## Examples
 

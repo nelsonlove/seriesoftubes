@@ -19,6 +19,8 @@ class PropertyDoc:
         self.examples = schema.get("examples", [])
         self.enum = schema.get("enum", [])
         self.constraints = self._get_constraints()
+        self.nested_properties: list['PropertyDoc'] = []
+        self.array_item_properties: list['PropertyDoc'] = []
 
     def _get_type(self) -> str:
         """Extract property type."""
@@ -67,11 +69,40 @@ class NodeTypeDoc:
         required = self.config_schema.get("required", [])
 
         for prop_name, prop_schema in props.items():
-            properties.append(
-                PropertyDoc(prop_name, prop_schema, required=prop_name in required)
-            )
+            prop_doc = PropertyDoc(prop_name, prop_schema, required=prop_name in required)
+            properties.append(prop_doc)
+            
+            # Parse nested properties for objects
+            if prop_schema.get("type") == "object" and "properties" in prop_schema:
+                prop_doc.nested_properties = self._parse_nested_properties(
+                    prop_schema["properties"],
+                    prop_schema.get("required", []),
+                    prefix=f"{prop_name}."
+                )
+            
+            # Parse array item properties
+            elif prop_schema.get("type") == "array" and "items" in prop_schema:
+                items_schema = prop_schema["items"]
+                if isinstance(items_schema, dict) and "properties" in items_schema:
+                    prop_doc.array_item_properties = self._parse_nested_properties(
+                        items_schema["properties"],
+                        items_schema.get("required", []),
+                        prefix=f"{prop_name}[]."
+                    )
 
         return properties
+    
+    def _parse_nested_properties(self, props: dict[str, Any], required: list[str], prefix: str = "") -> list['PropertyDoc']:
+        """Parse nested properties."""
+        nested = []
+        for prop_name, prop_schema in props.items():
+            nested_prop = PropertyDoc(
+                f"{prefix}{prop_name}", 
+                prop_schema, 
+                required=prop_name in required
+            )
+            nested.append(nested_prop)
+        return nested
 
     def _parse_one_of_groups(self) -> list[list[str]]:
         """Parse oneOf constraints to find mutually exclusive property groups."""
@@ -106,9 +137,15 @@ class SchemaDocGenerator:
         node_mapping = {
             "llm": "llm_config",
             "http": "http_config",
-            "route": "route_config",
             "file": "file_config",
             "python": "python_config",
+            "split": "split_config",
+            "aggregate": "aggregate_config",
+            "filter": "filter_config",
+            "transform": "transform_config",
+            "join": "join_config",
+            "foreach": "foreach_config",
+            "conditional": "conditional_config",
         }
 
         for node_type, config_name in node_mapping.items():
@@ -206,9 +243,15 @@ class SchemaDocGenerator:
         descriptions = {
             "llm": "Execute Large Language Model (LLM) API calls with optional structured extraction.",
             "http": "Make HTTP API calls with authentication and templating support.",
-            "route": "Conditionally route workflow execution based on data conditions.",
             "file": "Read and process files in various formats (JSON, CSV, YAML, PDF, etc.).",
             "python": "Execute Python code for data transformation and analysis.",
+            "split": "Split arrays into parallel processing streams.",
+            "aggregate": "Collect parallel results into single output.",
+            "filter": "Filter arrays based on conditions.",
+            "transform": "Transform data structures using templates.",
+            "join": "Join multiple data sources using various join strategies.",
+            "foreach": "Execute a subgraph for each item in an array.",
+            "conditional": "Conditionally route or return values based on expressions.",
         }
         return descriptions.get(
             node_type, f"Process data using {node_type} operations."
@@ -244,6 +287,32 @@ class SchemaDocGenerator:
                 type_info.append(f"**{constraint.title()}:** {value}")
 
         lines.extend([" | ".join(type_info), ""])
+
+        # Nested properties for objects
+        if prop.nested_properties:
+            lines.extend(["**Properties:**", ""])
+            lines.extend([
+                "| Property | Type | Required | Description |",
+                "|----------|------|----------|-------------|"
+            ])
+            for nested in prop.nested_properties:
+                req = "Yes" if nested.required else "No"
+                desc = nested.description.replace("\n", " ")
+                lines.append(f"| `{nested.name}` | `{nested.type}` | {req} | {desc} |")
+            lines.append("")
+
+        # Array item properties
+        if prop.array_item_properties:
+            lines.extend(["**Array Item Properties:**", ""])
+            lines.extend([
+                "| Property | Type | Required | Description |",
+                "|----------|------|----------|-------------|"
+            ])
+            for item_prop in prop.array_item_properties:
+                req = "Yes" if item_prop.required else "No"
+                desc = item_prop.description.replace("\n", " ")
+                lines.append(f"| `{item_prop.name}` | `{item_prop.type}` | {req} | {desc} |")
+            lines.append("")
 
         # Examples
         if prop.examples:
@@ -569,9 +638,15 @@ transform_data:
             "|-----------|---------|----------------|",
             "| `llm` | LLM API calls | `prompt`, `model`, `schema` |",
             "| `http` | HTTP requests | `url`, `method`, `headers` |",
-            "| `route` | Conditional routing | `routes`, `when`, `to` |",
             "| `file` | File operations | `path`/`pattern`, `format` |",
             "| `python` | Python execution | `code`/`file`, `context` |",
+            "| `split` | Split arrays | `field`, `item_name` |",
+            "| `aggregate` | Collect results | `mode`, `field` |",
+            "| `filter` | Filter arrays | `condition`, `field` |",
+            "| `transform` | Transform data | `template`, `field` |",
+            "| `join` | Join data sources | `sources`, `join_type` |",
+            "| `foreach` | Iterate subgraph | `array_field`, `subgraph_nodes` |",
+            "| `conditional` | Conditional logic | `conditions`, `fallback` |",
             "",
             "## Common Patterns",
             "",
@@ -600,16 +675,18 @@ transform_data:
             '      token: "{{ env.API_TOKEN }}"',
             "```",
             "",
-            "### Conditional Routing",
+            "### Conditional Logic",
             "```yaml",
-            "route:",
-            "  type: route",
+            "decide_action:",
+            "  type: conditional",
             "  config:",
-            "    routes:",
-            '      - when: "{{ value > 100 }}"',
-            "        to: high_value_path",
-            "      - default: true",
-            "        to: standard_path",
+            "    conditions:",
+            '      - condition: "{{ score > 0.8 }}"',
+            "        then: process_high_value",
+            '      - condition: "{{ score > 0.5 }}"',
+            "        then: process_medium",
+            "      - is_default: true",
+            "        then: process_low",
             "```",
             "",
             "### Python Data Processing",

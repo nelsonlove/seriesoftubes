@@ -15,7 +15,8 @@ class ExecutionManager:
     """Manages workflow executions for the API"""
 
     def __init__(self) -> None:
-        # In-memory storage for now (could be Redis in production)
+        # In-memory storage for now
+        # # TODO could be Redis in production
         self.executions: dict[str, dict[str, Any]] = {}
         self.tasks: dict[str, asyncio.Task[Any]] = {}
 

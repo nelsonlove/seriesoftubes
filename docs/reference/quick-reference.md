@@ -2,18 +2,23 @@
 
 ## Available Node Types
 
-| Node Type | Purpose             | Key Properties              |
-|-----------|---------------------|-----------------------------|
-| `llm`     | LLM API calls       | `prompt`, `model`, `schema` |
-| `http`    | HTTP requests       | `url`, `method`, `headers`  |
-| `route`   | Conditional routing | `routes`, `when`, `to`      |
-| `file`    | File operations     | `path`/`pattern`, `format`  |
-| `python`  | Python execution    | `code`/`file`, `context`    |
+| Node Type | Purpose | Key Properties |
+|-----------|---------|----------------|
+| `llm` | LLM API calls | `prompt`, `model`, `schema` |
+| `http` | HTTP requests | `url`, `method`, `headers` |
+| `file` | File operations | `path`/`pattern`, `format` |
+| `python` | Python execution | `code`/`file`, `context` |
+| `split` | Split arrays | `field`, `item_name` |
+| `aggregate` | Collect results | `mode`, `field` |
+| `filter` | Filter arrays | `condition`, `field` |
+| `transform` | Transform data | `template`, `field` |
+| `join` | Join data sources | `sources`, `join_type` |
+| `foreach` | Iterate subgraph | `array_field`, `subgraph_nodes` |
+| `conditional` | Conditional logic | `conditions`, `fallback` |
 
 ## Common Patterns
 
 ### LLM with Structured Output
-
 ```yaml
 extract_info:
   type: llm
@@ -28,7 +33,6 @@ extract_info:
 ```
 
 ### API Call with Auth
-
 ```yaml
 api_call:
   type: http
@@ -39,21 +43,21 @@ api_call:
       token: "{{ env.API_TOKEN }}"
 ```
 
-### Conditional Routing
-
+### Conditional Logic
 ```yaml
-route:
-  type: route
+decide_action:
+  type: conditional
   config:
-    routes:
-      - when: "{{ value > 100 }}"
-        to: high_value_path
-      - default: true
-        to: standard_path
+    conditions:
+      - condition: "{{ score > 0.8 }}"
+        then: process_high_value
+      - condition: "{{ score > 0.5 }}"
+        then: process_medium
+      - is_default: true
+        then: process_low
 ```
 
 ### Python Data Processing
-
 ```yaml
 analyze:
   type: python
