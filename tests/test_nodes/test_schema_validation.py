@@ -1,7 +1,7 @@
 """Tests for schema validation in node executors"""
 
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -191,7 +191,7 @@ async def test_llm_node_structured_output_validation():
         depends_on=[],
         config=LLMNodeConfig(
             prompt="Extract data",
-            schema_definition={
+            schema={
                 "type": "object",
                 "properties": {"name": {"type": "string"}},
             },
@@ -206,9 +206,9 @@ async def test_llm_node_structured_output_validation():
         mock_config.return_value.llm.model = "gpt-4"
         mock_config.return_value.llm.temperature = 0.5
 
-        with patch.object(executor, "_call_openai") as mock_call:
-            # Return structured data
-            mock_call.return_value = {"name": "John Doe", "age": 30}
+        with patch("seriesoftubes.nodes.llm.get_provider") as mock_get_provider:
+            mock_provider = mock_get_provider.return_value
+            mock_provider.call = AsyncMock(return_value={"name": "John Doe", "age": 30})
 
             result = await executor.execute(node, context)
 

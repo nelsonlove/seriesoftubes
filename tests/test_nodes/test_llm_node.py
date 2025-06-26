@@ -1,7 +1,7 @@
 """Tests for LLM node executor"""
 
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -56,8 +56,9 @@ async def test_llm_node_with_openai():
         mock_config.return_value.llm.model = "gpt-4"
         mock_config.return_value.llm.temperature = 0.5
 
-        with patch.object(executor, "_call_openai") as mock_call:
-            mock_call.return_value = {"extracted": "information"}
+        with patch("seriesoftubes.nodes.llm.get_provider") as mock_get_provider:
+            mock_provider = mock_get_provider.return_value
+            mock_provider.call = AsyncMock(return_value={"extracted": "information"})
 
             result = await executor.execute(node, context)
 
@@ -65,14 +66,15 @@ async def test_llm_node_with_openai():
             assert result.output["response"] == '{"extracted": "information"}'
             assert result.output["structured_output"] == {"extracted": "information"}
             assert result.output["model_used"] == "gpt-4o-mini"
-            # Check that the prompt contains the expected data
-            # (It will be formatted as DotDict in the actual call)
-            call_args = mock_call.call_args[0]
+
+            # Check provider was called correctly
+            mock_get_provider.assert_called_once_with("openai", "test-key")
+            mock_provider.call.assert_called_once()
+            call_args = mock_provider.call.call_args[0]
             assert "Hello world" in call_args[0]
             assert call_args[1] == "gpt-4o-mini"
             assert call_args[2] == 0.7
             assert call_args[3] is None
-            assert call_args[4] == "test-key"
 
 
 @pytest.mark.asyncio
@@ -98,8 +100,9 @@ async def test_llm_node_with_anthropic():
         mock_config.return_value.llm.model = "claude-3-opus"
         mock_config.return_value.llm.temperature = 0.5
 
-        with patch.object(executor, "_call_anthropic") as mock_call:
-            mock_call.return_value = {"summary": "text summary"}
+        with patch("seriesoftubes.nodes.llm.get_provider") as mock_get_provider:
+            mock_provider = mock_get_provider.return_value
+            mock_provider.call = AsyncMock(return_value={"summary": "text summary"})
 
             result = await executor.execute(node, context)
 
@@ -107,12 +110,13 @@ async def test_llm_node_with_anthropic():
             assert result.output["response"] == '{"summary": "text summary"}'
             assert result.output["structured_output"] == {"summary": "text summary"}
             assert result.output["model_used"] == "claude-3-sonnet"
-            mock_call.assert_called_once_with(
+
+            mock_get_provider.assert_called_once_with("anthropic", "test-key")
+            mock_provider.call.assert_called_once_with(
                 "Summarize this text",
                 "claude-3-sonnet",
                 0.5,
                 None,
-                "test-key",
             )
 
 
@@ -136,7 +140,7 @@ async def test_llm_node_with_schema():
         depends_on=[],
         config=LLMNodeConfig(
             prompt="Extract person information",
-            schema_definition=schema_def,
+            schema=schema_def,
         ),
     )
 
@@ -148,8 +152,9 @@ async def test_llm_node_with_schema():
         mock_config.return_value.llm.model = "gpt-4"
         mock_config.return_value.llm.temperature = 0.5
 
-        with patch.object(executor, "_call_openai") as mock_call:
-            mock_call.return_value = {"name": "John", "age": 30}
+        with patch("seriesoftubes.nodes.llm.get_provider") as mock_get_provider:
+            mock_provider = mock_get_provider.return_value
+            mock_provider.call = AsyncMock(return_value={"name": "John", "age": 30})
 
             result = await executor.execute(node, context)
 
@@ -157,14 +162,15 @@ async def test_llm_node_with_schema():
             assert result.output["response"] == '{"name": "John", "age": 30}'
             assert result.output["structured_output"] == {"name": "John", "age": 30}
             assert result.output["model_used"] == "gpt-4"
+
             # Check call was made with correct schema
-            call_args = mock_call.call_args[0]
-            assert call_args[0] == "Extract person information"
-            assert call_args[1] == "gpt-4"
-            assert call_args[2] == 0.5
-            # Schema might be None if not properly passed through
-            # assert call_args[3] == schema_def
-            assert call_args[4] == "test-key"
+            mock_get_provider.assert_called_once_with("openai", "test-key")
+            mock_provider.call.assert_called_once_with(
+                "Extract person information",
+                "gpt-4",
+                0.5,
+                schema_def,
+            )
 
 
 @pytest.mark.asyncio
@@ -194,8 +200,9 @@ async def test_llm_node_with_prompt_file(tmp_path):
         mock_config.return_value.llm.model = "gpt-4"
         mock_config.return_value.llm.temperature = 0.5
 
-        with patch.object(executor, "_call_openai") as mock_call:
-            mock_call.return_value = {"analysis": "results"}
+        with patch("seriesoftubes.nodes.llm.get_provider") as mock_get_provider:
+            mock_provider = mock_get_provider.return_value
+            mock_provider.call = AsyncMock(return_value={"analysis": "results"})
 
             result = await executor.execute(node, context)
 
@@ -203,9 +210,11 @@ async def test_llm_node_with_prompt_file(tmp_path):
             assert result.output["response"] == '{"analysis": "results"}'
             assert result.output["structured_output"] == {"analysis": "results"}
             assert result.output["model_used"] == "gpt-4"
+
             # Should use the template with context data
-            mock_call.assert_called_once()
-            assert "Analyze this: test data" in mock_call.call_args[0][0]
+            mock_get_provider.assert_called_once_with("openai", "test-key")
+            mock_provider.call.assert_called_once()
+            assert "Analyze this: test data" in mock_provider.call.call_args[0][0]
 
 
 @pytest.mark.asyncio
@@ -228,8 +237,9 @@ async def test_llm_node_error_handling():
         mock_config.return_value.llm.model = "gpt-4"
         mock_config.return_value.llm.temperature = 0.5
 
-        with patch.object(executor, "_call_openai") as mock_call:
-            mock_call.side_effect = Exception("API Error")
+        with patch("seriesoftubes.nodes.llm.get_provider") as mock_get_provider:
+            mock_provider = mock_get_provider.return_value
+            mock_provider.call = AsyncMock(side_effect=Exception("API Error"))
 
             result = await executor.execute(node, context)
 
