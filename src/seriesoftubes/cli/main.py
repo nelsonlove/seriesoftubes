@@ -71,66 +71,85 @@ def parse_input_args(input_list: list[str] | None) -> dict[str, Any]:
     return inputs
 
 
-@app.command()
-def auth(
-    action: Annotated[str, typer.Argument(help="Action: login, register, or status")],
+# Create auth subcommand group
+auth_app = typer.Typer(
+    name="auth",
+    help="Authenticate with the SeriesOfTubes API",
+    no_args_is_help=True,
+)
+app.add_typer(auth_app, name="auth")
+
+
+@auth_app.command()
+def status() -> None:
+    """Check authentication status
+
+    Example:
+        s10s auth status
+    """
+    with APIClient() as client:
+        if client.token:
+            console.print("[green]✓ Authenticated[/green]")
+            console.print(f"API URL: {client.config.api_url}")
+        else:
+            console.print("[yellow]⚠ Not authenticated[/yellow]")
+            console.print("Run 's10s auth login' to authenticate")
+
+
+@auth_app.command()
+def login(
+    username: Annotated[str | None, typer.Option("--username", "-u")] = None,
+    password: Annotated[str | None, typer.Option("--password", "-p")] = None,
+) -> None:
+    """Login to the SeriesOfTubes API
+
+    Example:
+        s10s auth login -u myuser
+    """
+    with APIClient() as client:
+        if not username:
+            username = typer.prompt("Username")
+        if not password:
+            password = typer.prompt("Password", hide_input=True)
+
+        try:
+            _ = client.login(username, password)
+            console.print(f"[green]✓ Logged in as {username}[/green]")
+        except httpx.HTTPStatusError as e:
+            console.print(f"[red]✗ Login failed: {e.response.text}[/red]")
+            raise typer.Exit(1) from e
+
+
+@auth_app.command()
+def register(
     username: Annotated[str | None, typer.Option("--username", "-u")] = None,
     password: Annotated[str | None, typer.Option("--password", "-p")] = None,
     email: Annotated[str | None, typer.Option("--email", "-e")] = None,
 ) -> None:
-    """Authenticate with the SeriesOfTubes API
+    """Register a new user
 
-    Examples:
-        s10s auth status
-        s10s auth login -u myuser
+    Example:
         s10s auth register -u newuser -e user@example.com
     """
     with APIClient() as client:
-        if action == "status":
-            if client.token:
-                console.print("[green]✓ Authenticated[/green]")
-                console.print(f"API URL: {client.config.api_url}")
-            else:
-                console.print("[yellow]⚠ Not authenticated[/yellow]")
-                console.print("Run 's10s auth login' to authenticate")
+        if not username:
+            username = typer.prompt("Username")
+        if not email:
+            email = typer.prompt("Email")
+        if not password:
+            password = typer.prompt("Password", hide_input=True)
+            confirm = typer.prompt("Confirm password", hide_input=True)
+            if password != confirm:
+                console.print("[red]✗ Passwords don't match[/red]")
+                raise typer.Exit(1)
 
-        elif action == "login":
-            if not username:
-                username = typer.prompt("Username")
-            if not password:
-                password = typer.prompt("Password", hide_input=True)
-
-            try:
-                _ = client.login(username, password)
-                console.print(f"[green]✓ Logged in as {username}[/green]")
-            except httpx.HTTPStatusError as e:
-                console.print(f"[red]✗ Login failed: {e.response.text}[/red]")
-                raise typer.Exit(1) from e
-
-        elif action == "register":
-            if not username:
-                username = typer.prompt("Username")
-            if not email:
-                email = typer.prompt("Email")
-            if not password:
-                password = typer.prompt("Password", hide_input=True)
-                confirm = typer.prompt("Confirm password", hide_input=True)
-                if password != confirm:
-                    console.print("[red]✗ Passwords don't match[/red]")
-                    raise typer.Exit(1)
-
-            try:
-                client.register(username, email, password)
-                console.print(f"[green]✓ Registered user {username}[/green]")
-                console.print("Now run 's10s auth login' to authenticate")
-            except httpx.HTTPStatusError as e:
-                console.print(f"[red]✗ Registration failed: {e.response.text}[/red]")
-                raise typer.Exit(1) from e
-
-        else:
-            console.print(f"[red]✗ Unknown action: {action}[/red]")
-            console.print("Valid actions: login, register, status")
-            raise typer.Exit(1)
+        try:
+            client.register(username, email, password)
+            console.print(f"[green]✓ Registered user {username}[/green]")
+            console.print("Now run 's10s auth login' to authenticate")
+        except httpx.HTTPStatusError as e:
+            console.print(f"[red]✗ Registration failed: {e.response.text}[/red]")
+            raise typer.Exit(1) from e
 
 
 @app.command()
@@ -340,8 +359,14 @@ def download(
 
             # Save to file
             if format == "yaml":
+                if not isinstance(content, str):
+                    console.print("[red]✗ Invalid response format from server[/red]")
+                    raise typer.Exit(1)
                 output.write_text(content)
             else:
+                if not isinstance(content, bytes):
+                    console.print("[red]✗ Invalid response format from server[/red]")
+                    raise typer.Exit(1)
                 output.write_bytes(content)
 
             console.print(f"✓ Downloaded to: [green]{output}[/green]")
@@ -518,7 +543,7 @@ def list_workflows(
 
     # Apply exclusion patterns
     if exclude:
-        import fnmatch
+        import fnmatch  # noqa: PLC0415
 
         excluded_files = []
         for yaml_file in yaml_files:
@@ -756,7 +781,7 @@ def create(
             version = version or wf.version
             description = description or wf.description
 
-            result = client.create_workflow(name, version, yaml_content, description)
+            result = client.create_workflow(yaml_content, is_public=False)
             console.print(
                 f"[green]✓ Created workflow: "
                 f"{result['name']} v{result['version']}[/green]"
@@ -817,103 +842,106 @@ def package(
     console.print(f"  Size: {output.stat().st_size / 1024:.1f} KB")
 
 
-@app.command()
-def docs(
-    subcommand: Annotated[
-        str, typer.Argument(help="Subcommand: generate, serve")
-    ] = "generate",
-    *,
+# Create docs subcommand group
+docs_app = typer.Typer(
+    name="docs",
+    help="Generate or serve workflow documentation",
+    no_args_is_help=True,
+)
+app.add_typer(docs_app, name="docs")
+
+
+@docs_app.command()
+def generate(
     output: Annotated[  # noqa ARG001
         Path | None, typer.Option("--output", "-o", help="Output directory")
     ] = None,
+) -> None:
+    """Generate documentation from schema
+
+    Example:
+        s10s docs generate
+    """
+    console.print("[bold]Generating documentation from schema...[/bold]")
+
+    try:
+        # Run the documentation generator
+        script_path = (
+            Path(__file__).parent.parent.parent / "scripts" / "generate_docs.py"
+        )
+
+        if not script_path.exists():
+            console.print(
+                "[red]Error: Documentation generator script not found at "
+                f"{script_path}[/red]"
+            )
+            raise typer.Exit(1)
+
+        # Run the script
+        result = subprocess.run(  # noqa S603
+            [sys.executable, str(script_path)],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        if result.returncode == 0:
+            console.print(result.stdout)
+            console.print(
+                "\n[bold green]✓ Documentation generated successfully![/bold green]"
+            )
+            console.print("\nDocumentation files created in:")
+            console.print("  • docs/reference/nodes/ - Node type reference")
+            console.print("  • docs/guides/ - Workflow guides")
+            console.print("  • .vscode/ - VS Code snippets")
+        else:
+            console.print(
+                f"[red]Error generating documentation:[/red]\n{result.stderr}"
+            )
+            raise typer.Exit(1)
+
+    except Exception as e:
+        console.print(f"[red]Failed to generate documentation:[/red] {e}")
+        raise typer.Exit(1) from e
+
+
+@docs_app.command()
+def serve(
     port: Annotated[
         int, typer.Option("--port", "-p", help="Port for serving docs")
     ] = 8000,
 ) -> None:
-    """Generate or serve workflow documentation
+    """Serve documentation locally (requires generated docs)
 
-    Commands:
-        generate - Generate documentation from schema
-        serve    - Serve documentation locally (requires generated docs)
-
-    Examples:
-        s10s docs generate
+    Example:
         s10s docs serve --port 8080
     """
-    if subcommand == "generate":
-        console.print("[bold]Generating documentation from schema...[/bold]")
+    console.print(f"[bold]Serving documentation on port {port}...[/bold]")
 
-        try:
-            # Run the documentation generator
-            script_path = (
-                Path(__file__).parent.parent.parent / "scripts" / "generate_docs.py"
-            )
-
-            if not script_path.exists():
-                console.print(
-                    "[red]Error: Documentation generator script not found at "
-                    f"{script_path}[/red]"
-                )
-                raise typer.Exit(1)
-
-            # Run the script
-            result = subprocess.run(  # noqa S603
-                [sys.executable, str(script_path)],
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            if result.returncode == 0:
-                console.print(result.stdout)
-                console.print(
-                    "\n[bold green]✓ Documentation generated successfully![/bold green]"
-                )
-                console.print("\nDocumentation files created in:")
-                console.print("  • docs/reference/nodes/ - Node type reference")
-                console.print("  • docs/guides/ - Workflow guides")
-                console.print("  • .vscode/ - VS Code snippets")
-            else:
-                console.print(
-                    f"[red]Error generating documentation:[/red]\n{result.stderr}"
-                )
-                raise typer.Exit(1)
-
-        except Exception as e:
-            console.print(f"[red]Failed to generate documentation:[/red] {e}")
-            raise typer.Exit(1) from e
-
-    elif subcommand == "serve":
-        console.print(f"[bold]Serving documentation on port {port}...[/bold]")
-
-        docs_dir = Path("docs")
-        if not docs_dir.exists():
-            console.print(
-                "[red]Error: Documentation not found. "
-                "Run 's10s docs generate' first.[/red]"
-            )
-            raise typer.Exit(1)
-
-        try:
-            os.chdir(docs_dir)
-
-            handler = http.server.SimpleHTTPRequestHandler
-            with socketserver.TCPServer(("", port), handler) as httpd:
-                console.print(
-                    f"\n[green]Documentation server running at http://localhost:{port}[/green]"
-                )
-                console.print("[dim]Press Ctrl+C to stop[/dim]\n")
-                httpd.serve_forever()
-
-        except KeyboardInterrupt:
-            console.print("\n[yellow]Server stopped[/yellow]")
-        except Exception as e:
-            console.print(f"[red]Failed to start server:[/red] {e}")
-            raise typer.Exit(1) from e
-    else:
-        console.print(f"[red]Unknown subcommand: {subcommand}[/red]")
-        console.print("Available subcommands: generate, serve")
+    docs_dir = Path("docs")
+    if not docs_dir.exists():
+        console.print(
+            "[red]Error: Documentation not found. "
+            "Run 's10s docs generate' first.[/red]"
+        )
         raise typer.Exit(1)
+
+    try:
+        os.chdir(docs_dir)
+
+        handler = http.server.SimpleHTTPRequestHandler
+        with socketserver.TCPServer(("", port), handler) as httpd:
+            console.print(
+                f"\n[green]Documentation server running at http://localhost:{port}[/green]"
+            )
+            console.print("[dim]Press Ctrl+C to stop[/dim]\n")
+            httpd.serve_forever()
+
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Server stopped[/yellow]")
+    except Exception as e:
+        console.print(f"[red]Failed to start server:[/red] {e}")
+        raise typer.Exit(1) from e
 
 
 if __name__ == "__main__":
