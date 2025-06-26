@@ -99,7 +99,7 @@ def _execute_python_code(
 ) -> Any:
     """Execute Python code in a restricted environment"""
     # Create restricted globals
-    import builtins
+    import builtins  # noqa: PLC0415
 
     restricted_builtins = {}
     for name in ALLOWED_BUILTINS:

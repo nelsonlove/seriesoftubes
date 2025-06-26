@@ -563,7 +563,7 @@ async def download_workflow(
     db: AsyncSession = Depends(get_db),
     *,
     format: str = "yaml",  # yaml or tubes (zip)  # noqa: A002
-):
+) -> Response:
     """Download a workflow as YAML or .tubes package"""
 
     # Get workflow

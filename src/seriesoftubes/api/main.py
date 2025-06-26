@@ -5,7 +5,7 @@ import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import yaml
 from fastapi import FastAPI, HTTPException
@@ -72,7 +72,7 @@ async def get_workflow_schema() -> dict[str, Any]:
     try:
         with open(schema_path) as f:
             schema = yaml.safe_load(f)
-        return schema
+        return cast(dict[str, Any], schema)
     except Exception as e:
         logger.error(f"Failed to load workflow schema: {e}")
         raise HTTPException(

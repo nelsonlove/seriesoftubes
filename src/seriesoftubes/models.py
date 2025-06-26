@@ -90,7 +90,7 @@ class RouteConfig(BaseModel):
 
     when: str | None = Field(None, description="Condition expression")
     to: str = Field(..., description="Target node name")
-    default: bool = Field(False, description="Is this the default route")
+    default: bool = Field(default=False, description="Is this the default route")
 
 
 class RouteNodeConfig(BaseNodeConfig):
@@ -116,7 +116,7 @@ class FileNodeConfig(BaseNodeConfig):
     )
     encoding: str = Field("utf-8", description="File encoding")
     extract_text: bool = Field(
-        True, description="Extract text from documents (PDF, DOCX, HTML)"
+        default=True, description="Extract text from documents (PDF, DOCX, HTML)"
     )
 
     # Output structure
@@ -124,20 +124,22 @@ class FileNodeConfig(BaseNodeConfig):
         "content",
         description="Output mode: content (single), list (records), dict (collection)",
     )
-    merge: bool = Field(False, description="Merge multiple files into single output")
+    merge: bool = Field(
+        default=False, description="Merge multiple files into single output"
+    )
 
     # Streaming options for large files
-    stream: bool = Field(False, description="Stream large files in chunks")
+    stream: bool = Field(default=False, description="Stream large files in chunks")
     chunk_size: int = Field(1000, description="Rows per chunk for streaming")
     sample: float | None = Field(None, description="Sample fraction (0.0-1.0)")
     limit: int | None = Field(None, description="Limit number of records")
 
     # CSV specific
     delimiter: str = Field(",", description="CSV delimiter")
-    has_header: bool = Field(True, description="CSV has header row")
+    has_header: bool = Field(default=True, description="CSV has header row")
 
     # Error handling
-    skip_errors: bool = Field(False, description="Skip files/rows with errors")
+    skip_errors: bool = Field(default=False, description="Skip files/rows with errors")
 
     @model_validator(mode="after")
     def validate_paths(self) -> Self:
@@ -238,7 +240,7 @@ class WorkflowInput(BaseModel):
     """Workflow input definition"""
 
     input_type: str = Field("string", description="Input type", alias="type")
-    required: bool = Field(True, description="Is this input required")
+    required: bool = Field(default=True, description="Is this input required")
     default: Any | None = Field(None, description="Default value if not provided")
 
     @model_validator(mode="after")

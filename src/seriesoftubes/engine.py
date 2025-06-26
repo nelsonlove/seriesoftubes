@@ -307,7 +307,7 @@ async def run_workflow(
         exec_output_dir.mkdir(parents=True, exist_ok=True)
 
         # Save execution summary
-        import json
+        import json  # noqa: PLC0415
 
         with open(exec_output_dir / "execution.json", "w") as f:
             json.dump(results, f, indent=2)

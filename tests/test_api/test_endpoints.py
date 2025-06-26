@@ -107,7 +107,7 @@ class TestAPIEndpoints:
         assert data["status"] == "started"
 
         # Give it a moment to execute
-        import time
+        import time  # noqa: PLC0415
 
         time.sleep(0.5)
 

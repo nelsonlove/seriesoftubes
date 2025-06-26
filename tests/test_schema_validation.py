@@ -170,7 +170,7 @@ class TestSchemaValidation:
 
     def test_schema_class_assignment(self):
         """Test that schema classes are properly assigned to executors"""
-        from seriesoftubes.nodes import (
+        from seriesoftubes.nodes import (  # noqa: PLC0415
             FileNodeExecutor,
             HTTPNodeExecutor,
             LLMNodeExecutor,
