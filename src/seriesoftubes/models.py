@@ -12,9 +12,15 @@ class NodeType(str, Enum):
 
     LLM = "llm"
     HTTP = "http"
-    ROUTE = "route"
     FILE = "file"  # New file ingestion node type
     PYTHON = "python"  # Python code execution node type
+    SPLIT = "split"  # Split arrays into parallel processing streams
+    AGGREGATE = "aggregate"  # Collect parallel results into single output
+    FILTER = "filter"  # Filter arrays based on conditions
+    TRANSFORM = "transform"  # Transform data structures
+    JOIN = "join"  # Join multiple data sources
+    FOREACH = "foreach"  # Execute subgraph for each item in array
+    CONDITIONAL = "conditional"  # Enhanced conditional processing
 
 
 class HTTPMethod(str, Enum):
@@ -85,18 +91,6 @@ class HTTPNodeConfig(BaseNodeConfig):
     timeout: int | None = Field(None, description="Request timeout in seconds")
 
 
-class RouteConfig(BaseModel):
-    """Configuration for a single route"""
-
-    when: str | None = Field(None, description="Condition expression")
-    to: str = Field(..., description="Target node name")
-    default: bool = Field(default=False, description="Is this the default route")
-
-
-class RouteNodeConfig(BaseNodeConfig):
-    """Configuration for route/conditional nodes"""
-
-    routes: list[RouteConfig] = Field(..., description="List of routing rules")
 
 
 class FileNodeConfig(BaseNodeConfig):
@@ -193,6 +187,115 @@ class PythonNodeConfig(BaseNodeConfig):
         return self
 
 
+class SplitNodeConfig(BaseNodeConfig):
+    """Configuration for split nodes"""
+
+    field: str = Field(..., description="Field containing array to split")
+    item_name: str = Field(
+        "item", description="Name for each item in downstream context"
+    )
+
+
+class AggregateNodeConfig(BaseNodeConfig):
+    """Configuration for aggregate nodes"""
+
+    mode: str = Field(
+        "array",
+        description="Aggregation mode: array, object, merge",
+    )
+    field: str | None = Field(
+        None, description="Optional: extract specific field from each result"
+    )
+
+    @field_validator("mode")
+    @classmethod
+    def validate_mode(cls, v: str) -> str:
+        """Validate aggregation mode"""
+        valid_modes = {"array", "object", "merge"}
+        if v not in valid_modes:
+            msg = f"Mode must be one of: {', '.join(valid_modes)}"
+            raise ValueError(msg)
+        return v
+
+
+class FilterNodeConfig(BaseNodeConfig):
+    """Configuration for filter nodes"""
+
+    condition: str = Field(..., description="Jinja2 condition expression")
+    field: str | None = Field(
+        None, description="Array field to filter (if not provided, filters root array)"
+    )
+
+
+class TransformNodeConfig(BaseNodeConfig):
+    """Configuration for transform nodes"""
+
+    template: dict[str, Any] | str = Field(
+        ..., description="Jinja2 template for transforming each item"
+    )
+    field: str | None = Field(
+        None, description="Array field to transform (if not provided, transforms root array)"
+    )
+
+
+class JoinType(str, Enum):
+    """Join types"""
+
+    INNER = "inner"
+    LEFT = "left"
+    RIGHT = "right"
+    OUTER = "outer"
+    CROSS = "cross"
+    MERGE = "merge"
+
+
+class JoinNodeConfig(BaseNodeConfig):
+    """Configuration for join nodes"""
+
+    sources: dict[str, str] = Field(..., description="Named data sources to join (name -> node.field)")
+    join_type: JoinType = Field(JoinType.MERGE, description="Type of join to perform")
+    join_keys: dict[str, str] | None = Field(
+        None, description="Join key mappings for inner/left joins (source1_key -> source2_key)"
+    )
+
+
+class ForEachNodeConfig(BaseNodeConfig):
+    """Configuration for foreach nodes"""
+
+    array_field: str = Field(..., description="Field containing array to iterate over")
+    item_name: str = Field(
+        "item", description="Name for each item in subgraph context"
+    )
+    subgraph_nodes: list[str] = Field(
+        ..., description="List of node names to execute for each item"
+    )
+    parallel: bool = Field(
+        True, description="Execute iterations in parallel (default) or sequentially"
+    )
+    collect_output: str | None = Field(
+        None, description="Output field name to collect from each iteration"
+    )
+
+
+class ConditionalCondition(BaseModel):
+    """A single condition in a conditional node"""
+
+    condition: str = Field(..., description="Jinja2 condition expression")
+    then: str = Field(..., description="Target/output value if condition is true")
+    is_default: bool = Field(False, description="Whether this is the default condition")
+
+
+class ConditionalNodeConfig(BaseNodeConfig):
+    """Configuration for conditional nodes - replaces old ROUTE functionality"""
+
+    conditions: list[ConditionalCondition] = Field(
+        ..., description="List of conditions to evaluate in order"
+    )
+    fallback: str | None = Field(
+        None, description="Fallback value if no conditions match and no default"
+    )
+
+
 class Node(BaseModel):
     """A node in the workflow DAG"""
 
@@ -225,12 +328,24 @@ class Node(BaseModel):
             return LLMNodeConfig(**v)
         elif node_type == NodeType.HTTP:
             return HTTPNodeConfig(**v)
-        elif node_type == NodeType.ROUTE:
-            return RouteNodeConfig(**v)
         elif node_type == NodeType.FILE:
             return FileNodeConfig(**v)
         elif node_type == NodeType.PYTHON:
             return PythonNodeConfig(**v)
+        elif node_type == NodeType.SPLIT:
+            return SplitNodeConfig(**v)
+        elif node_type == NodeType.AGGREGATE:
+            return AggregateNodeConfig(**v)
+        elif node_type == NodeType.FILTER:
+            return FilterNodeConfig(**v)
+        elif node_type == NodeType.TRANSFORM:
+            return TransformNodeConfig(**v)
+        elif node_type == NodeType.JOIN:
+            return JoinNodeConfig(**v)
+        elif node_type == NodeType.FOREACH:
+            return ForeachNodeConfig(**v)
+        elif node_type == NodeType.CONDITIONAL:
+            return ConditionalNodeConfig(**v)
         else:
             msg = f"Unknown node type: {node_type}"
             raise ValueError(msg)

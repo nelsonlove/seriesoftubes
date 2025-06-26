@@ -75,6 +75,13 @@ class NodeExecutor(ABC):
         # Add environment variables
         data["env"] = dict(os.environ)
 
+        # Add split item data if available (for parallel execution contexts)
+        if hasattr(context, 'outputs'):
+            for key, value in context.outputs.items():
+                # Only add single values, not complex split metadata
+                if not isinstance(value, dict) or not value.get('parallel_data'):
+                    data[key] = value
+
         # Return raw data - users should use bracket notation or filters in templates
         # e.g., data['items'] not data.items, or data|items not data.items()
         return data

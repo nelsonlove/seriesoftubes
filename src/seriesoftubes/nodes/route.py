@@ -3,6 +3,7 @@
 from typing import Any
 
 from jinja2 import Template
+from pydantic import ValidationError
 
 from seriesoftubes.models import Node, RouteNodeConfig
 from seriesoftubes.nodes.base import NodeContext, NodeExecutor, NodeResult
@@ -30,11 +31,24 @@ class RouteNodeExecutor(NodeExecutor):
             # Prepare context for condition evaluation
             context_data = self.prepare_context_data(node, context)
 
-            # Validate input if schema is defined
-            if node.config.input_schema:
-                input_data = {"context_data": context_data}
+            # Always validate input when schema is defined
+            input_data = {"context_data": context_data}
+            
+            try:
                 validated_input = self.validate_input(input_data)
                 context_data = validated_input["context_data"]
+            except ValidationError as e:
+                # Format validation errors for clarity
+                error_details = []
+                for error in e.errors():
+                    field = ".".join(str(x) for x in error["loc"])
+                    error_details.append(f"  - {field}: {error['msg']}")
+                
+                return NodeResult(
+                    output=None,
+                    success=False,
+                    error=f"Input validation failed for node '{node.name}':\n" + "\n".join(error_details),
+                )
 
             # Evaluate each route condition
             selected_route = None
@@ -50,9 +64,21 @@ class RouteNodeExecutor(NodeExecutor):
                             "condition_met": route.when,
                         }
 
-                        # Apply output validation if configured
-                        if node.config.output_schema:
+                        # Always validate output when schema is defined
+                        try:
                             output = self.validate_output(output)
+                        except ValidationError as e:
+                            # Format validation errors for clarity
+                            error_details = []
+                            for error in e.errors():
+                                field = ".".join(str(x) for x in error["loc"])
+                                error_details.append(f"  - {field}: {error['msg']}")
+                            
+                            return NodeResult(
+                                output=None,
+                                success=False,
+                                error=f"Output validation failed for node '{node.name}':\n" + "\n".join(error_details),
+                            )
 
                         return NodeResult(
                             output=output,
@@ -76,9 +102,21 @@ class RouteNodeExecutor(NodeExecutor):
                 "condition_met": "default",  # Default route has no condition
             }
 
-            # Apply output validation if configured
-            if node.config.output_schema:
+            # Always validate output when schema is defined
+            try:
                 output = self.validate_output(output)
+            except ValidationError as e:
+                # Format validation errors for clarity
+                error_details = []
+                for error in e.errors():
+                    field = ".".join(str(x) for x in error["loc"])
+                    error_details.append(f"  - {field}: {error['msg']}")
+                
+                return NodeResult(
+                    output=None,
+                    success=False,
+                    error=f"Output validation failed for node '{node.name}':\n" + "\n".join(error_details),
+                )
 
             return NodeResult(
                 output=output,

@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from jinja2 import Template
+from pydantic import ValidationError
 
 from seriesoftubes.models import Node, PythonNodeConfig
 from seriesoftubes.nodes.base import NodeContext, NodeExecutor, NodeResult
@@ -245,11 +246,24 @@ class PythonNodeExecutor(NodeExecutor):
             # Prepare context data
             context_data = self.prepare_context_data(node, context)
 
-            # Validate input if schema is defined
-            if node.config.input_schema:
-                input_data = {"context": context_data}
+            # Always validate input when schema is defined
+            input_data = {"context": context_data}
+            
+            try:
                 validated_input = self.validate_input(input_data)
                 context_data = validated_input["context"]
+            except ValidationError as e:
+                # Format validation errors for clarity
+                error_details = []
+                for error in e.errors():
+                    field = ".".join(str(x) for x in error["loc"])
+                    error_details.append(f"  - {field}: {error['msg']}")
+                
+                return NodeResult(
+                    output=None,
+                    success=False,
+                    error=f"Input validation failed for node '{node.name}':\n" + "\n".join(error_details),
+                )
 
             # Get the code to execute
             if config.code:
@@ -298,9 +312,21 @@ class PythonNodeExecutor(NodeExecutor):
             # Structure the output
             output = {"result": result}
 
-            # Apply output validation if configured
-            if node.config.output_schema:
+            # Always validate output when schema is defined
+            try:
                 output = self.validate_output(output)
+            except ValidationError as e:
+                # Format validation errors for clarity
+                error_details = []
+                for error in e.errors():
+                    field = ".".join(str(x) for x in error["loc"])
+                    error_details.append(f"  - {field}: {error['msg']}")
+                
+                return NodeResult(
+                    output=None,
+                    success=False,
+                    error=f"Output validation failed for node '{node.name}':\n" + "\n".join(error_details),
+                )
 
             return NodeResult(output=output, success=True)
 

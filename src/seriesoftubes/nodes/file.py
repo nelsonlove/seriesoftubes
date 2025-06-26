@@ -9,6 +9,7 @@ from typing import Any
 
 import yaml
 from jinja2 import Template
+from pydantic import ValidationError
 
 from seriesoftubes.models import FileNodeConfig, Node
 from seriesoftubes.nodes.base import NodeContext, NodeExecutor, NodeResult
@@ -65,30 +66,42 @@ class FileNodeExecutor(NodeExecutor):
             # Prepare context for template rendering
             context_data = self.prepare_context_data(node, context)
 
-            # Validate input if schema is defined
-            if node.config.input_schema:
-                # Extract the rendered path/pattern for validation
-                rendered_path = None
-                rendered_pattern = None
+            # Always validate input when schema is defined
+            # Extract the rendered path/pattern for validation
+            rendered_path = None
+            rendered_pattern = None
 
-                if config.path:
-                    rendered_path = self._render_template(config.path, context_data)
-                elif config.pattern:
-                    rendered_pattern = self._render_template(
-                        config.pattern, context_data
-                    )
+            if config.path:
+                rendered_path = self._render_template(config.path, context_data)
+            elif config.pattern:
+                rendered_pattern = self._render_template(
+                    config.pattern, context_data
+                )
 
-                input_data = {
-                    "path": rendered_path,
-                    "pattern": rendered_pattern,
-                }
+            input_data = {
+                "path": rendered_path,
+                "pattern": rendered_pattern,
+            }
+            
+            try:
                 validated_input = self.validate_input(input_data)
-
                 # Update config with validated values
                 if validated_input.get("path"):
                     config.path = validated_input["path"]
                 if validated_input.get("pattern"):
                     config.pattern = validated_input["pattern"]
+            except ValidationError as e:
+                # Format validation errors for clarity
+                error_details = []
+                for error in e.errors():
+                    field = ".".join(str(x) for x in error["loc"])
+                    error_details.append(f"  - {field}: {error['msg']}")
+                
+                return NodeResult(
+                    output=None,
+                    success=False,
+                    error=f"Input validation failed for node '{node.name}':\n" + "\n".join(error_details),
+                )
 
             # Get file paths
             paths = self._get_file_paths(config, context_data)
@@ -118,9 +131,21 @@ class FileNodeExecutor(NodeExecutor):
                 },
             }
 
-            # Apply output validation if configured
-            if node.config.output_schema:
+            # Always validate output when schema is defined
+            try:
                 output = self.validate_output(output)
+            except ValidationError as e:
+                # Format validation errors for clarity
+                error_details = []
+                for error in e.errors():
+                    field = ".".join(str(x) for x in error["loc"])
+                    error_details.append(f"  - {field}: {error['msg']}")
+                
+                return NodeResult(
+                    output=None,
+                    success=False,
+                    error=f"Output validation failed for node '{node.name}':\n" + "\n".join(error_details),
+                )
 
             return NodeResult(
                 output=output,

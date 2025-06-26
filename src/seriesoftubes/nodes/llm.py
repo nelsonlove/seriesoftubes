@@ -8,6 +8,8 @@ import httpx
 from jinja2 import Template
 
 from seriesoftubes.config import get_config
+from pydantic import ValidationError
+
 from seriesoftubes.models import LLMNodeConfig, Node
 from seriesoftubes.nodes.base import NodeContext, NodeExecutor, NodeResult
 from seriesoftubes.schemas import LLMNodeInput, LLMNodeOutput
@@ -35,14 +37,26 @@ class LLMNodeExecutor(NodeExecutor):
             # Prepare prompt
             prompt = self._prepare_prompt(config, context, node)
 
-            # Validate input if schema is defined
+            # Prepare and validate input
             context_data = self.prepare_context_data(node, context)
             input_data = {"prompt": prompt, "context_data": context_data}
 
-            # Apply input validation if configured
-            if node.config.input_schema:
+            # Always validate input when schema is defined
+            try:
                 validated_input = self.validate_input(input_data)
                 prompt = validated_input.get("prompt", prompt)
+            except ValidationError as e:
+                # Format validation errors for clarity
+                error_details = []
+                for error in e.errors():
+                    field = ".".join(str(x) for x in error["loc"])
+                    error_details.append(f"  - {field}: {error['msg']}")
+                
+                return NodeResult(
+                    output=None,
+                    success=False,
+                    error=f"Input validation failed for node '{node.name}':\n" + "\n".join(error_details),
+                )
 
             # Get model and temperature
             model = config.model or app_config.llm.model
@@ -82,9 +96,21 @@ class LLMNodeExecutor(NodeExecutor):
                 "token_usage": None,  # TODO: Extract from API responses
             }
 
-            # Apply output validation if configured
-            if node.config.output_schema:
+            # Always validate output when schema is defined
+            try:
                 output = self.validate_output(output)
+            except ValidationError as e:
+                # Format validation errors for clarity
+                error_details = []
+                for error in e.errors():
+                    field = ".".join(str(x) for x in error["loc"])
+                    error_details.append(f"  - {field}: {error['msg']}")
+                
+                return NodeResult(
+                    output=None,
+                    success=False,
+                    error=f"Output validation failed for node '{node.name}':\n" + "\n".join(error_details),
+                )
 
             return NodeResult(output=output, success=True)
 

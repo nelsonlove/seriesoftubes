@@ -8,13 +8,19 @@ from uuid import uuid4
 
 from seriesoftubes.models import Node, NodeType, Workflow
 from seriesoftubes.nodes import (
+    AggregateNodeExecutor,
+    ConditionalNodeExecutor,
     FileNodeExecutor,
+    FilterNodeExecutor,
+    ForEachNodeExecutor,
     HTTPNodeExecutor,
+    JoinNodeExecutor,
     LLMNodeExecutor,
     NodeExecutor,
     NodeResult,
     PythonNodeExecutor,
-    RouteNodeExecutor,
+    SplitNodeExecutor,
+    TransformNodeExecutor,
 )
 
 
@@ -29,6 +35,12 @@ class ExecutionContext:
         self.execution_id = str(uuid4())
         self.start_time = datetime.now(timezone.utc)
         self.validation_errors: dict[str, list[str]] = {}  # Node validation errors
+        
+        # Parallel execution support
+        self.parallel_results: list[Any] = []  # Results from parallel processing
+        self.split_contexts: dict[str, list['ExecutionContext']] = {}  # Split node contexts
+        self.is_parallel_context = False  # Whether this is a parallel execution context
+        self.parent_context: 'ExecutionContext' | None = None  # Parent context for parallel execution
 
     def get_output(self, node_name: str) -> Any:
         """Get output from a previous node"""
@@ -61,9 +73,15 @@ class WorkflowEngine:
         self.executors: dict[NodeType, NodeExecutor] = {
             NodeType.LLM: LLMNodeExecutor(),
             NodeType.HTTP: HTTPNodeExecutor(),
-            NodeType.ROUTE: RouteNodeExecutor(),
             NodeType.FILE: FileNodeExecutor(),
             NodeType.PYTHON: PythonNodeExecutor(),
+            NodeType.SPLIT: SplitNodeExecutor(),
+            NodeType.AGGREGATE: AggregateNodeExecutor(),
+            NodeType.FILTER: FilterNodeExecutor(),
+            NodeType.TRANSFORM: TransformNodeExecutor(),
+            NodeType.JOIN: JoinNodeExecutor(),
+            NodeType.FOREACH: ForEachNodeExecutor(),
+            NodeType.CONDITIONAL: ConditionalNodeExecutor(),
         }
 
     async def execute(
@@ -87,27 +105,57 @@ class WorkflowEngine:
         # Get execution order and groups for parallel execution
         execution_groups = self._get_execution_groups(workflow)
 
+        # Track split contexts for parallel execution
+        split_data: dict[str, dict[str, Any]] = {}  # node_name -> split info
+        
         # Execute nodes in parallel groups
         for group in execution_groups:
             # Skip if we've encountered errors (fail fast)
             if context.errors:
                 break
 
-            # Execute all nodes in this group in parallel
-            tasks = []
+            # Check if any node in this group follows a split node
+            group_has_split_dependency = False
+            split_source = None
+            
             for node_name in group:
                 node = workflow.nodes[node_name]
+                for dep in node.depends_on:
+                    if dep in split_data:
+                        group_has_split_dependency = True
+                        split_source = dep
+                        break
+                if group_has_split_dependency:
+                    break
 
-                # Check if we should skip this node (for routing)
-                if self._should_skip_node(node, context):
-                    continue
+            if group_has_split_dependency and split_source:
+                # Execute this group in parallel for each split item
+                await self._execute_split_group(group, context, split_data[split_source])
+            else:
+                # Regular parallel execution within group
+                tasks = []
+                for node_name in group:
+                    node = workflow.nodes[node_name]
 
-                # Create task for this node
-                tasks.append(self._execute_node_async(node_name, node, context))
+                    # Check if we should skip this node
+                    if self._should_skip_node(node, context):
+                        continue
 
-            # Wait for all tasks in this group to complete
-            if tasks:
-                await asyncio.gather(*tasks)
+                    # Check if this is a split node
+                    if node.node_type == NodeType.SPLIT:
+                        result = await self._execute_split_node(node_name, node, context)
+                        if result.success and isinstance(result.output, dict):
+                            split_data[node_name] = result.output
+                            context.set_output(node_name, result.output)
+                        else:
+                            context.set_error(node_name, result.error or "Split node failed")
+                    else:
+                        # Create task for this node
+                        tasks.append(self._execute_node_async(node_name, node, context))
+
+                # Wait for all tasks in this group to complete
+                if tasks:
+                    await asyncio.gather(*tasks)
 
         return context
 
@@ -176,13 +224,144 @@ class WorkflowEngine:
     ) -> None:
         """Execute a node and update context (for parallel execution)"""
         try:
-            result = await self._execute_node(node, context)
+            # Special handling for split nodes
+            if node.node_type == NodeType.SPLIT:
+                result = await self._execute_split_node(node_name, node, context)
+            else:
+                result = await self._execute_node(node, context)
+                
             if result.success:
                 context.set_output(node_name, result.output)
             else:
                 context.set_error(node_name, result.error or "Unknown error")
         except Exception as e:
             context.set_error(node_name, str(e))
+
+    async def _execute_split_node(
+        self, node_name: str, node: Node, context: ExecutionContext
+    ) -> NodeResult:
+        """Execute a split node and set up parallel execution contexts"""
+        # Execute the split node normally first
+        result = await self._execute_node(node, context)
+        
+        if not result.success:
+            return result
+            
+        # Extract split information
+        split_output = result.output
+        if not isinstance(split_output, dict) or 'split_items' not in split_output:
+            return NodeResult(
+                output=None,
+                success=False,
+                error="Split node did not return expected split_items format",
+            )
+        
+        split_items = split_output['split_items']
+        item_name = split_output.get('item_name', 'item')
+        
+        # Return split information for the execution engine to handle
+        return NodeResult(
+            output={
+                'split_items': split_items,
+                'item_name': item_name,
+                'parallel_data': True,  # Flag to indicate this is parallel data
+            },
+            success=True,
+            metadata=result.metadata
+        )
+
+    async def _execute_split_group(
+        self, group: list[str], context: ExecutionContext, split_info: dict[str, Any]
+    ) -> None:
+        """Execute a group of nodes in parallel for each split item"""
+        split_items = split_info['split_items']
+        item_name = split_info['item_name']
+        
+        # Create parallel execution tasks for each split item
+        parallel_tasks = []
+        
+        for item_index, item in enumerate(split_items):
+            # Create a parallel execution context for this item
+            parallel_context = ExecutionContext(context.workflow, context.inputs)
+            parallel_context.is_parallel_context = True
+            parallel_context.parent_context = context
+            
+            # Copy existing outputs to parallel context
+            parallel_context.outputs = context.outputs.copy()
+            
+            # Add the current item to the parallel context
+            # Add it both as an output and as a special attribute for context preparation
+            parallel_context.outputs[item_name] = item
+            # Store the item in a way that prepare_context_data can access it
+            setattr(parallel_context, f'_split_item_{item_name}', item)
+            
+            # Create task to execute this group for this item
+            task = self._execute_group_for_item(group, parallel_context, item_index)
+            parallel_tasks.append(task)
+        
+        # Execute all parallel tasks
+        parallel_results = await asyncio.gather(*parallel_tasks, return_exceptions=True)
+        
+        # Collect results and handle aggregate nodes
+        for node_name in group:
+            node = context.workflow.nodes[node_name]
+            
+            if node.node_type == NodeType.AGGREGATE:
+                # Aggregate the parallel results
+                item_results = []
+                for i, result in enumerate(parallel_results):
+                    if isinstance(result, Exception):
+                        context.set_error(f"{node_name}_item_{i}", str(result))
+                    elif isinstance(result, dict) and node_name in result:
+                        item_results.append(result[node_name])
+                
+                # Execute the aggregate node with collected results
+                aggregate_context = ExecutionContext(context.workflow, context.inputs)
+                aggregate_context.outputs = context.outputs.copy()
+                aggregate_context.parallel_results = item_results
+                
+                aggregate_result = await self._execute_node(node, aggregate_context)
+                if aggregate_result.success:
+                    context.set_output(node_name, aggregate_result.output)
+                else:
+                    context.set_error(node_name, aggregate_result.error or "Aggregate failed")
+            else:
+                # For non-aggregate nodes, collect all results as array
+                item_results = []
+                for i, result in enumerate(parallel_results):
+                    if isinstance(result, Exception):
+                        context.set_error(f"{node_name}_item_{i}", str(result))
+                    elif isinstance(result, dict) and node_name in result:
+                        item_results.append(result[node_name])
+                
+                context.set_output(node_name, item_results)
+
+    async def _execute_group_for_item(
+        self, group: list[str], parallel_context: ExecutionContext, item_index: int
+    ) -> dict[str, Any]:
+        """Execute a group of nodes for a single split item"""
+        results = {}
+        
+        for node_name in group:
+            node = parallel_context.workflow.nodes[node_name]
+            
+            # Skip aggregate nodes in parallel execution - they'll be handled later
+            if node.node_type == NodeType.AGGREGATE:
+                continue
+                
+            try:
+                result = await self._execute_node(node, parallel_context)
+                if result.success:
+                    parallel_context.set_output(node_name, result.output)
+                    results[node_name] = result.output
+                else:
+                    parallel_context.set_error(node_name, result.error or "Unknown error")
+                    results[node_name] = None
+            except Exception as e:
+                parallel_context.set_error(node_name, str(e))
+                results[node_name] = None
+        
+        return results
 
     def _get_execution_groups(self, workflow: Workflow) -> list[list[str]]:
         """Group nodes by execution level for parallel processing
