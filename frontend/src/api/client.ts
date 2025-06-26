@@ -6,6 +6,7 @@ import type {
   ExecutionResponse,
   ExecutionDetail,
 } from '../types/workflow';
+import { useAuthStore } from '../stores/auth';
 
 const api = axios.create({
   baseURL: '/api',
@@ -13,6 +14,31 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// Add auth token to requests
+api.interceptors.request.use(
+  (config) => {
+    const token = useAuthStore.getState().token;
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Handle 401 responses
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Clear auth and redirect to login
+      useAuthStore.getState().logout();
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
 
 export const workflowAPI = {
   // List all workflows

@@ -59,7 +59,7 @@ outputs:
   result: process"""
         )
 
-        result = runner.invoke(app, ["list", "-d", tmpdir])
+        result = runner.invoke(app, ["list", "--local", "-d", tmpdir])
         assert result.exit_code == 0
         assert "test-workflow" in result.stdout
         assert "1.0.0" in result.stdout
@@ -88,7 +88,7 @@ outputs:
 """
         )
 
-        result = runner.invoke(app, ["validate", str(workflow_path)])
+        result = runner.invoke(app, ["validate", str(workflow_path), "--local"])
         assert result.exit_code == 0
         assert "Workflow is valid" in result.stdout
 
@@ -169,17 +169,17 @@ outputs:
         with patch("seriesoftubes.cli.main.APIClient") as MockClient:
             mock_client = Mock()
             MockClient.return_value.__enter__.return_value = mock_client
-            mock_client.upload_workflow_package.return_value = {
+            mock_client.upload_workflow_file.return_value = {
                 "id": "123",
                 "name": "test-workflow",
                 "version": "1.0.0",
                 "username": "test-user",
             }
 
-            result = runner.invoke(app, ["workflow", "upload", str(zip_path)])
+            result = runner.invoke(app, ["workflow", "upload-package", str(zip_path)])
             assert result.exit_code == 0
             assert "Uploaded workflow: test-workflow v1.0.0" in result.stdout
-            mock_client.upload_workflow_package.assert_called_once()
+            mock_client.upload_workflow_file.assert_called_once()
 
 
 def test_run_workflow_local():
@@ -209,7 +209,7 @@ outputs:
 """
         )
 
-        result = runner.invoke(app, ["run", str(workflow_path), "--no-save"])
+        result = runner.invoke(app, ["run", str(workflow_path), "--local", "--no-save"])
         # Python nodes might not work in test environment, but workflow should parse
         assert "Loaded workflow: test-workflow v1.0.0" in result.stdout
 
@@ -228,11 +228,14 @@ def test_run_workflow_api_with_mock():
 
         # Mock stream response
         mock_client.stream_execution.return_value = [
-            'data: {"status": "running"}',
-            'data: {"status": "completed", "outputs": {"result": "test"}}',
+            {"event": "update", "data": '{"status": "running"}'},
+            {
+                "event": "complete",
+                "data": '{"status": "completed", "outputs": {"result": "test"}}',
+            },
         ]
 
-        result = runner.invoke(app, ["run", "workflow-id", "--api", "-i", "text=hello"])
+        result = runner.invoke(app, ["run", "workflow-id", "-i", "text=hello"])
         assert result.exit_code == 0
         assert "Started execution: exec-123" in result.stdout
         assert "Workflow completed successfully" in result.stdout
