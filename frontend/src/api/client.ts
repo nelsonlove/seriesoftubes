@@ -218,4 +218,32 @@ export const executionAPI = {
   },
 };
 
+export interface DocFile {
+  path: string;
+  title: string;
+  category: string;
+}
+
+export interface DocsListResponse {
+  success: boolean;
+  message: string;
+  data: DocFile[];
+}
+
+export const docsAPI = {
+  // List all documentation files
+  list: async () => {
+    const response = await api.get<DocsListResponse>('/docs/');
+    return response.data;
+  },
+
+  // Get documentation content
+  getContent: async (filePath: string) => {
+    const response = await api.get<string>(`/docs/${filePath}`, {
+      responseType: 'text',
+    });
+    return response.data;
+  },
+};
+
 export default api;

@@ -4,101 +4,84 @@ import { FileTextOutlined, BookOutlined, ApiOutlined, CodeOutlined } from '@ant-
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { MenuProps } from 'antd';
+import { useQuery } from '@tanstack/react-query';
 import { useThemeStore } from '../../stores/theme';
+import { docsAPI, type DocFile } from '../../api/client';
 
 const { Title } = Typography;
 const { Sider, Content } = Layout;
 
-interface DocFile {
-  path: string;
-  title: string;
-  category: string;
-}
-
-const docFiles: DocFile[] = [
-  // Quick Reference
-  {
-    path: '/docs/reference/quick-reference.md',
-    title: 'Quick Reference',
-    category: 'Getting Started',
-  },
-  {
-    path: '/docs/guides/workflow-structure.md',
-    title: 'Workflow Structure',
-    category: 'Getting Started',
-  },
-
-  // Node Types
-  { path: '/docs/reference/nodes/llm.md', title: 'LLM Node', category: 'Node Types' },
-  { path: '/docs/reference/nodes/http.md', title: 'HTTP Node', category: 'Node Types' },
-  { path: '/docs/reference/nodes/route.md', title: 'Route Node', category: 'Node Types' },
-  { path: '/docs/reference/nodes/file.md', title: 'File Node', category: 'Node Types' },
-  { path: '/docs/reference/nodes/python.md', title: 'Python Node', category: 'Node Types' },
-];
-
 const getIcon = (category: string) => {
   switch (category) {
-    case 'Getting Started':
+    case 'Guides':
       return <BookOutlined />;
     case 'Node Types':
       return <ApiOutlined />;
+    case 'Reference':
+      return <FileTextOutlined />;
+    case 'Examples':
+      return <CodeOutlined />;
     default:
       return <FileTextOutlined />;
   }
 };
 
 export const DocumentationPage: React.FC = () => {
-  const [selectedDoc, setSelectedDoc] = useState<DocFile>(docFiles[0]);
-  const [content, setContent] = useState<string>('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [selectedDoc, setSelectedDoc] = useState<DocFile | null>(null);
   const { mode: themeMode } = useThemeStore();
 
+  // Fetch list of documentation files
+  const {
+    data: docsResponse,
+    isLoading: docsLoading,
+    error: docsError,
+  } = useQuery({
+    queryKey: ['docs'],
+    queryFn: docsAPI.list,
+  });
+
+  // Fetch content for selected document
+  const {
+    data: content,
+    isLoading: contentLoading,
+    error: contentError,
+  } = useQuery({
+    queryKey: ['docs-content', selectedDoc?.path],
+    queryFn: () => docsAPI.getContent(selectedDoc!.path),
+    enabled: !!selectedDoc,
+  });
+
+  // Set default selected doc when docs list loads
   useEffect(() => {
-    const fetchDoc = async () => {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const response = await fetch(selectedDoc.path);
-        if (!response.ok) {
-          throw new Error(`Failed to load documentation: ${response.statusText}`);
-        }
-        const text = await response.text();
-        setContent(text);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load documentation');
-        setContent('');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchDoc();
-  }, [selectedDoc]);
+    if (docsResponse?.data && docsResponse.data.length > 0 && !selectedDoc) {
+      setSelectedDoc(docsResponse.data[0]);
+    }
+  }, [docsResponse, selectedDoc]);
 
   // Group documents by category
-  const menuItems: MenuProps['items'] = Object.entries(
-    docFiles.reduce(
-      (acc, doc) => {
-        if (!acc[doc.category]) {
-          acc[doc.category] = [];
-        }
-        acc[doc.category].push(doc);
-        return acc;
-      },
-      {} as Record<string, DocFile[]>
-    )
-  ).map(([category, docs]) => ({
-    key: category,
-    label: category,
-    icon: getIcon(category),
-    children: docs.map((doc) => ({
-      key: doc.path,
-      label: doc.title,
-      onClick: () => setSelectedDoc(doc),
-    })),
-  }));
+  const menuItems: MenuProps['items'] = docsResponse?.data
+    ? Object.entries(
+        docsResponse.data.reduce(
+          (acc, doc) => {
+            if (!acc[doc.category]) {
+              acc[doc.category] = [];
+            }
+            acc[doc.category].push(doc);
+            return acc;
+          },
+          {} as Record<string, DocFile[]>
+        )
+      ).map(([category, docs]) => ({
+        key: category,
+        label: category,
+        icon: getIcon(category),
+        children: docs.map((doc) => ({
+          key: doc.path,
+          label: doc.title,
+          onClick: () => setSelectedDoc(doc),
+        })),
+      }))
+    : [];
 
   return (
     <Layout style={{ height: '100%' }}>
@@ -108,8 +91,8 @@ export const DocumentationPage: React.FC = () => {
         </div>
         <Menu
           mode="inline"
-          selectedKeys={[selectedDoc.path]}
-          defaultOpenKeys={['Getting Started', 'Node Types']}
+          selectedKeys={selectedDoc ? [selectedDoc.path] : []}
+          defaultOpenKeys={['Guides', 'Node Types', 'Reference']}
           style={{ height: 'calc(100% - 64px)', borderRight: 0 }}
           items={menuItems}
         />
@@ -124,15 +107,24 @@ export const DocumentationPage: React.FC = () => {
             overflow: 'auto',
           }}
         >
-          {loading && (
+          {(docsLoading || contentLoading) && (
             <div style={{ textAlign: 'center', padding: '50px' }}>
               <Spin size="large" />
             </div>
           )}
 
-          {error && <Alert message="Error" description={error} type="error" showIcon />}
+          {(docsError || contentError) && (
+            <Alert
+              message="Error"
+              description={
+                docsError?.message || contentError?.message || 'Failed to load documentation'
+              }
+              type="error"
+              showIcon
+            />
+          )}
 
-          {!loading && !error && (
+          {!docsLoading && !contentLoading && !docsError && !contentError && content && (
             <div className="markdown-body" style={{ maxWidth: '900px', margin: '0 auto' }}>
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
