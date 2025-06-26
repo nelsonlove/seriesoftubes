@@ -45,6 +45,17 @@ class HTTPConfig(BaseModel):
     retry_attempts: int = Field(default=3, description="Number of retry attempts")
 
 
+class CacheConfig(BaseModel):
+    """Cache configuration"""
+
+    enabled: bool = Field(default=True, description="Enable caching")
+    backend: str = Field(default="memory", description="Cache backend (memory, redis)")
+    redis_url: str = Field(default="redis://localhost:6379", description="Redis URL")
+    redis_db: int = Field(default=0, description="Redis database number")
+    key_prefix: str = Field(default="s10s:", description="Cache key prefix")
+    default_ttl: int = Field(default=3600, description="Default TTL in seconds")
+
+
 class ExecutionConfig(BaseModel):
     """Workflow execution configuration"""
 
@@ -62,6 +73,7 @@ class Config(BaseModel):
     llm: LLMConfig
     http: HTTPConfig = HTTPConfig()
     execution: ExecutionConfig = ExecutionConfig()
+    cache: CacheConfig = CacheConfig()
 
     def resolve_secrets(self) -> None:
         """Resolve all secrets from environment"""

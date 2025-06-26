@@ -69,6 +69,10 @@ dev = [
     "httpx>=0.25.0",  # for testing
     "types-click>=7.1.8",
     "types-PyYAML>=6.0.12.20250516",
+    "fakeredis>=2.21.0",  # for testing Redis functionality
+]
+cache = [
+    "redis>=5.0.0",  # for production Redis caching
 ]
 all = [
     "seriesoftubes[api,dev]",

@@ -3,9 +3,12 @@
 import asyncio
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 from uuid import uuid4
 
+from seriesoftubes.cache import get_cache_backend
+from seriesoftubes.cache.manager import CACHE_SETTINGS, CacheManager
+from seriesoftubes.config import get_config
 from seriesoftubes.models import Node, NodeType, Workflow
 from seriesoftubes.nodes import (
     AggregateNodeExecutor,
@@ -72,7 +75,7 @@ class ExecutionContext:
 class WorkflowEngine:
     """Engine for executing workflows"""
 
-    def __init__(self) -> None:
+    def __init__(self, cache_manager: CacheManager | None = None) -> None:
         # Map node types to their executors
         self.executors: dict[NodeType, NodeExecutor] = {
             NodeType.LLM: LLMNodeExecutor(),
@@ -87,6 +90,26 @@ class WorkflowEngine:
             NodeType.FOREACH: ForEachNodeExecutor(),
             NodeType.CONDITIONAL: ConditionalNodeExecutor(),
         }
+
+        # Initialize cache manager
+        if cache_manager is None:
+            try:
+                config = get_config()
+                if config.cache.enabled:
+                    backend = get_cache_backend(
+                        backend_type=config.cache.backend,
+                        redis_url=config.cache.redis_url,
+                        db=config.cache.redis_db,
+                        key_prefix=config.cache.key_prefix,
+                    )
+                    self.cache_manager = CacheManager(backend, config.cache.default_ttl)
+                else:
+                    self.cache_manager = None
+            except Exception as e:
+                print(f"Failed to initialize cache: {e}")
+                self.cache_manager = None
+        else:
+            self.cache_manager = cache_manager
 
     async def execute(
         self, workflow: Workflow, inputs: dict[str, Any] | None = None
@@ -205,7 +228,7 @@ class WorkflowEngine:
         return False
 
     async def _execute_node(self, node: Node, context: ExecutionContext) -> NodeResult:
-        """Execute a single node"""
+        """Execute a single node with caching support"""
         # Get the appropriate executor
         executor = self.executors.get(node.node_type)
         if not executor:
@@ -215,8 +238,102 @@ class WorkflowEngine:
                 error=f"No executor for node type: {node.node_type}",
             )
 
-        # Execute the node
+        # Check cache if available
+        if self.cache_manager is not None:
+            node_type = (
+                node.node_type.value
+                if hasattr(node.node_type, "value")
+                else str(node.node_type)
+            )
+            cache_settings = CACHE_SETTINGS.get(node_type, {})
+
+            if cache_settings.get("enabled", False):
+                # Prepare context data for caching
+                context_data = {
+                    "inputs": context.inputs,
+                    "outputs": {k: v for k, v in context.outputs.items()},
+                }
+
+                # Get exclude keys from cache settings
+                exclude_keys = cache_settings.get("exclude_context_keys", [])
+
+                try:
+                    # Try to get cached result
+                    cached_result = await self.cache_manager.get_cached_result(
+                        node_type=node_type,
+                        node_name=node.name,
+                        config=node.config,
+                        context_data=context_data,
+                        exclude_context_keys=exclude_keys,
+                    )
+
+                    if cached_result is not None:
+                        # Return cached result
+                        result = NodeResult(
+                            output=cached_result,
+                            success=True,
+                            metadata={"cache_hit": True},
+                        )
+
+                        # Still validate cached output
+                        if result.success:
+                            validation_errors = self._validate_node_output(
+                                node, result.output, context
+                            )
+                            if validation_errors:
+                                for error in validation_errors:
+                                    context.add_validation_error(node.name, error)
+
+                        return result
+                except Exception as e:
+                    # Cache read error - continue with normal execution
+                    print(f"Cache read error for node {node.name}: {e}")
+
+        # Execute the node normally
         result = await executor.execute(node, context)
+
+        # Cache successful results
+        if (
+            self.cache_manager is not None
+            and result.success
+            and result.output is not None
+        ):
+            node_type = (
+                node.node_type.value
+                if hasattr(node.node_type, "value")
+                else str(node.node_type)
+            )
+            cache_settings = CACHE_SETTINGS.get(node_type, {})
+
+            if cache_settings.get("enabled", False):
+                try:
+                    # Prepare context data for caching
+                    context_data = {
+                        "inputs": context.inputs,
+                        "outputs": {k: v for k, v in context.outputs.items()},
+                    }
+
+                    exclude_keys = cache_settings.get("exclude_context_keys", [])
+                    cache_ttl = cache_settings.get("ttl")
+
+                    await self.cache_manager.cache_result(
+                        node_type=node_type,
+                        node_name=node.name,
+                        config=node.config,
+                        context_data=context_data,
+                        result=result.output,
+                        ttl=cache_ttl,
+                        exclude_context_keys=exclude_keys,
+                    )
+
+                    # Add cache metadata
+                    if result.metadata is None:
+                        result.metadata = {}
+                    result.metadata["cache_hit"] = False
+
+                except Exception as e:
+                    # Cache write error - don't fail the execution
+                    print(f"Cache write error for node {node.name}: {e}")
 
         # If execution was successful, validate output against downstream requirements
         if result.success:
@@ -454,6 +571,11 @@ class WorkflowEngine:
                             )
 
         return errors
+
+    async def close(self) -> None:
+        """Close the engine and cleanup resources"""
+        if self.cache_manager is not None:
+            await self.cache_manager.close()
 
 
 async def run_workflow(
