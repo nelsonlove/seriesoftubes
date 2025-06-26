@@ -72,7 +72,7 @@ async def test_http_get_request():
             method="GET",
             url="https://api.example.com/data",
             headers={"Accept": "application/json"},
-            params=None,
+            params={},
             json=None,
         )
 
@@ -118,7 +118,7 @@ async def test_http_post_request_with_body():
             method="POST",
             url="https://api.example.com/submit",
             headers={},
-            params=None,
+            params={},
             json={"data": "{'value': 'test'}"},
         )
 

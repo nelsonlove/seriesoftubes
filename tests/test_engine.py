@@ -9,8 +9,7 @@ from seriesoftubes.engine import ExecutionContext, WorkflowEngine, run_workflow
 from seriesoftubes.models import (
     Node,
     NodeType,
-    RouteConfig,
-    RouteNodeConfig,
+    PythonNodeConfig,
     Workflow,
     WorkflowInput,
 )
@@ -28,19 +27,16 @@ def simple_workflow():
             "optional": WorkflowInput(required=False, default="default_value"),
         },
         nodes={
-            "route_node": Node(
-                name="route_node",
-                type=NodeType.ROUTE,
+            "python_node": Node(
+                name="python_node",
+                type=NodeType.PYTHON,
                 depends_on=[],
-                config=RouteNodeConfig(
-                    routes=[
-                        RouteConfig(when="inputs.text == 'hello'", to="hello_path"),
-                        RouteConfig(default=True, to="default_path"),
-                    ]
+                config=PythonNodeConfig(
+                    code="return {'result': 'hello_path' if inputs['text'] == 'hello' else 'default_path'}"
                 ),
             )
         },
-        outputs={"result": "route_node"},
+        outputs={"result": "python_node"},
     )
 
 
@@ -85,7 +81,7 @@ class TestWorkflowEngine:
         engine = WorkflowEngine()
         assert NodeType.LLM in engine.executors
         assert NodeType.HTTP in engine.executors
-        assert NodeType.ROUTE in engine.executors
+        assert NodeType.PYTHON in engine.executors
         assert NodeType.FILE in engine.executors
 
     def test_validate_inputs(self, simple_workflow):
@@ -111,18 +107,18 @@ class TestWorkflowEngine:
         """Test executing a workflow"""
         engine = WorkflowEngine()
 
-        # Mock the route executor
+        # Mock the python executor
         mock_executor = AsyncMock()
         mock_executor.execute.return_value = NodeResult(
-            output="hello_path", success=True
+            output={"result": "hello_path"}, success=True
         )
-        engine.executors[NodeType.ROUTE] = mock_executor
+        engine.executors[NodeType.PYTHON] = mock_executor
 
         # Execute workflow
         context = await engine.execute(simple_workflow, {"text": "hello"})
 
         # Check results
-        assert context.outputs["route_node"] == "hello_path"
+        assert context.outputs["python_node"] == {"result": "hello_path"}
         assert len(context.errors) == 0
         mock_executor.execute.assert_called_once()
 
@@ -136,15 +132,15 @@ class TestWorkflowEngine:
         mock_executor.execute.return_value = NodeResult(
             output=None, success=False, error="Test error"
         )
-        engine.executors[NodeType.ROUTE] = mock_executor
+        engine.executors[NodeType.PYTHON] = mock_executor
 
         # Execute workflow
         context = await engine.execute(simple_workflow, {"text": "hello"})
 
         # Check error was recorded
-        assert "route_node" in context.errors
-        assert context.errors["route_node"] == "Test error"
-        assert "route_node" not in context.outputs
+        assert "python_node" in context.errors
+        assert context.errors["python_node"] == "Test error"
+        assert "python_node" not in context.outputs
 
 
 @pytest.mark.asyncio
@@ -157,9 +153,8 @@ async def test_run_workflow(simple_workflow, tmp_path):
     mock_context.errors = {}
     mock_context.validation_errors = {}
     mock_context.outputs = {
-        "route_node": {
-            "selected_route": "hello_path",
-            "condition_met": "inputs.text == 'hello'",
+        "python_node": {
+            "result": "hello_path"
         }
     }
 
@@ -174,8 +169,7 @@ async def test_run_workflow(simple_workflow, tmp_path):
         # Check results
         assert results["success"] is True
         assert results["outputs"]["result"] == {
-            "selected_route": "hello_path",
-            "condition_met": "inputs.text == 'hello'",
+            "result": "hello_path"
         }
         assert results["execution_id"] == "test-id"
 
@@ -183,15 +177,14 @@ async def test_run_workflow(simple_workflow, tmp_path):
         output_dir = tmp_path / "outputs" / "test-id"
         assert output_dir.exists()
         assert (output_dir / "execution.json").exists()
-        assert (output_dir / "route_node.json").exists()
+        assert (output_dir / "python_node.json").exists()
 
         # Verify execution.json content
         with open(output_dir / "execution.json") as f:
             saved_results = json.load(f)
             assert saved_results["success"] is True
             assert saved_results["outputs"]["result"] == {
-                "selected_route": "hello_path",
-                "condition_met": "inputs.text == 'hello'",
+                "result": "hello_path"
             }
 
 
@@ -204,9 +197,8 @@ async def test_run_workflow_no_save(simple_workflow, tmp_path):
     mock_context.errors = {}
     mock_context.validation_errors = {}
     mock_context.outputs = {
-        "route_node": {
-            "selected_route": "hello_path",
-            "condition_met": "inputs.text == 'hello'",
+        "python_node": {
+            "result": "hello_path"
         }
     }
 
@@ -224,8 +216,7 @@ async def test_run_workflow_no_save(simple_workflow, tmp_path):
         # Check results
         assert results["success"] is True
         assert results["outputs"]["result"] == {
-            "selected_route": "hello_path",
-            "condition_met": "inputs.text == 'hello'",
+            "result": "hello_path"
         }
 
         # Ensure no files were created for this execution
