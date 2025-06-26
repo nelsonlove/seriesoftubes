@@ -1,13 +1,7 @@
 """CLI interface for seriesoftubes (s10s)"""
 
 import asyncio
-import http.server
 import json
-import os
-import socketserver
-import subprocess
-import sys
-import zipfile
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -16,7 +10,10 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from seriesoftubes.cli.auth import auth_app
 from seriesoftubes.cli.client import APIClient
+from seriesoftubes.cli.docs import docs_app
+from seriesoftubes.cli.workflow import workflow_app
 from seriesoftubes.engine import run_workflow
 from seriesoftubes.models import Workflow
 from seriesoftubes.parser import WorkflowParseError, parse_workflow_yaml, validate_dag
@@ -69,87 +66,6 @@ def parse_input_args(input_list: list[str] | None) -> dict[str, Any]:
             inputs[key] = value
 
     return inputs
-
-
-# Create auth subcommand group
-auth_app = typer.Typer(
-    name="auth",
-    help="Authenticate with the SeriesOfTubes API",
-    no_args_is_help=True,
-)
-app.add_typer(auth_app, name="auth")
-
-
-@auth_app.command()
-def status() -> None:
-    """Check authentication status
-
-    Example:
-        s10s auth status
-    """
-    with APIClient() as client:
-        if client.token:
-            console.print("[green]✓ Authenticated[/green]")
-            console.print(f"API URL: {client.config.api_url}")
-        else:
-            console.print("[yellow]⚠ Not authenticated[/yellow]")
-            console.print("Run 's10s auth login' to authenticate")
-
-
-@auth_app.command()
-def login(
-    username: Annotated[str | None, typer.Option("--username", "-u")] = None,
-    password: Annotated[str | None, typer.Option("--password", "-p")] = None,
-) -> None:
-    """Login to the SeriesOfTubes API
-
-    Example:
-        s10s auth login -u myuser
-    """
-    with APIClient() as client:
-        if not username:
-            username = typer.prompt("Username")
-        if not password:
-            password = typer.prompt("Password", hide_input=True)
-
-        try:
-            _ = client.login(username, password)
-            console.print(f"[green]✓ Logged in as {username}[/green]")
-        except httpx.HTTPStatusError as e:
-            console.print(f"[red]✗ Login failed: {e.response.text}[/red]")
-            raise typer.Exit(1) from e
-
-
-@auth_app.command()
-def register(
-    username: Annotated[str | None, typer.Option("--username", "-u")] = None,
-    password: Annotated[str | None, typer.Option("--password", "-p")] = None,
-    email: Annotated[str | None, typer.Option("--email", "-e")] = None,
-) -> None:
-    """Register a new user
-
-    Example:
-        s10s auth register -u newuser -e user@example.com
-    """
-    with APIClient() as client:
-        if not username:
-            username = typer.prompt("Username")
-        if not email:
-            email = typer.prompt("Email")
-        if not password:
-            password = typer.prompt("Password", hide_input=True)
-            confirm = typer.prompt("Confirm password", hide_input=True)
-            if password != confirm:
-                console.print("[red]✗ Passwords don't match[/red]")
-                raise typer.Exit(1)
-
-        try:
-            client.register(username, email, password)
-            console.print(f"[green]✓ Registered user {username}[/green]")
-            console.print("Now run 's10s auth login' to authenticate")
-        except httpx.HTTPStatusError as e:
-            console.print(f"[red]✗ Registration failed: {e.response.text}[/red]")
-            raise typer.Exit(1) from e
 
 
 @app.command()
@@ -709,239 +625,9 @@ def test(
         raise typer.Exit(1) from None
 
 
-# Create workflow subcommand group
-workflow_app = typer.Typer(
-    name="workflow",
-    help="Manage workflows in the database",
-    no_args_is_help=True,
-)
+app.add_typer(auth_app, name="auth")
 app.add_typer(workflow_app, name="workflow")
-
-
-@workflow_app.command(name="upload-package")
-def upload_package(
-    path: Annotated[Path, typer.Argument(help="Path to workflow package (ZIP file)")],
-) -> None:
-    """Upload a workflow package (ZIP file)
-
-    Example:
-        s10s workflow upload my-workflow.zip
-    """
-    if not path.exists():
-        console.print(f"[red]✗ File not found: {path}[/red]")
-        raise typer.Exit(1)
-
-    if not path.suffix == ".zip":
-        console.print("[red]✗ File must be a ZIP archive[/red]")
-        raise typer.Exit(1)
-
-    console.print(f"[bold]Uploading workflow package:[/bold] {path}")
-
-    with APIClient() as client:
-        try:
-            result = client.upload_workflow_file(path, is_public=False)
-            console.print(
-                f"[green]✓ Uploaded workflow: "
-                f"{result['name']} v{result['version']}[/green]"
-            )
-            console.print(f"  ID: {result['id']}")
-            console.print(f"  Owner: {result['username']}")
-        except httpx.HTTPStatusError as e:
-            console.print(f"[red]✗ Upload failed: {e.response.text}[/red]")
-            raise typer.Exit(1) from e
-
-
-@workflow_app.command()
-def create(
-    path: Annotated[Path, typer.Argument(help="Path to workflow YAML file")],
-    name: Annotated[str | None, typer.Option("--name", "-n")] = None,
-    version: Annotated[str | None, typer.Option("--version", "-v")] = None,
-    description: Annotated[str | None, typer.Option("--description", "-d")] = None,
-) -> None:
-    """Create a workflow from a YAML file
-
-    Example:
-        s10s workflow create workflow.yaml
-        s10s workflow create workflow.yaml --name "My Workflow" --version "2.0.0"
-    """
-    if not path.exists():
-        console.print(f"[red]✗ File not found: {path}[/red]")
-        raise typer.Exit(1)
-
-    console.print(f"[bold]Creating workflow from:[/bold] {path}")
-
-    with APIClient() as client:
-        try:
-            # Read and parse workflow
-            yaml_content = path.read_text()
-            wf = parse_workflow_yaml(path)
-
-            # Use workflow metadata or provided values
-            name = name or wf.name
-            version = version or wf.version
-            description = description or wf.description
-
-            result = client.create_workflow(yaml_content, is_public=False)
-            console.print(
-                f"[green]✓ Created workflow: "
-                f"{result['name']} v{result['version']}[/green]"
-            )
-            console.print(f"  ID: {result['id']}")
-            console.print(f"  Owner: {result['username']}")
-        except httpx.HTTPStatusError as e:
-            console.print(f"[red]✗ Creation failed: {e.response.text}[/red]")
-            raise typer.Exit(1) from e
-
-
-@workflow_app.command()
-def package(
-    path: Annotated[Path, typer.Argument(help="Path to workflow directory")],
-    output: Annotated[Path | None, typer.Option("--output", "-o")] = None,
-    name: Annotated[str | None, typer.Option("--name", "-n")] = None,
-    version: Annotated[str | None, typer.Option("--version", "-v")] = None,
-) -> None:
-    """Package a workflow directory into a ZIP file
-
-    Example:
-        s10s workflow package ./my-workflow
-        s10s workflow package ./my-workflow -o package.zip
-        s10s workflow package ./my-workflow -n "My Workflow" -v "1.0.0"
-    """
-    if not path.exists():
-        console.print(f"[red]✗ Directory not found: {path}[/red]")
-        raise typer.Exit(1)
-
-    workflow_file = path / "workflow.yaml"
-    if not workflow_file.exists():
-        console.print(f"[red]✗ No workflow.yaml found in {path}[/red]")
-        raise typer.Exit(1)
-
-    # Parse workflow to get metadata
-    wf = parse_workflow_yaml(workflow_file)
-    name = name or wf.name
-    version = version or wf.version
-
-    # Determine output path
-    if not output:
-        output = Path(f"{name}_{version}.zip")
-
-    console.print(f"[bold]Creating workflow package:[/bold] {output}")
-
-    with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as zf:
-        # Add all files from the directory
-        file_count = 0
-        for file in path.rglob("*"):
-            if file.is_file() and not file.name.startswith("."):
-                arcname = file.relative_to(path)
-                zf.write(file, arcname)
-                console.print(f"  Added: {arcname}")
-                file_count += 1
-
-    console.print(f"[green]✓ Created package: {output}[/green]")
-    console.print(f"  Files: {file_count}")
-    console.print(f"  Size: {output.stat().st_size / 1024:.1f} KB")
-
-
-# Create docs subcommand group
-docs_app = typer.Typer(
-    name="docs",
-    help="Generate or serve workflow documentation",
-    no_args_is_help=True,
-)
 app.add_typer(docs_app, name="docs")
-
-
-@docs_app.command()
-def generate(
-    output: Annotated[  # noqa ARG001
-        Path | None, typer.Option("--output", "-o", help="Output directory")
-    ] = None,
-) -> None:
-    """Generate documentation from schema
-
-    Example:
-        s10s docs generate
-    """
-    console.print("[bold]Generating documentation from schema...[/bold]")
-
-    try:
-        # Run the documentation generator
-        script_path = (
-            Path(__file__).parent.parent.parent / "scripts" / "generate_docs.py"
-        )
-
-        if not script_path.exists():
-            console.print(
-                "[red]Error: Documentation generator script not found at "
-                f"{script_path}[/red]"
-            )
-            raise typer.Exit(1)
-
-        # Run the script
-        result = subprocess.run(  # noqa S603
-            [sys.executable, str(script_path)],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-
-        if result.returncode == 0:
-            console.print(result.stdout)
-            console.print(
-                "\n[bold green]✓ Documentation generated successfully![/bold green]"
-            )
-            console.print("\nDocumentation files created in:")
-            console.print("  • docs/reference/nodes/ - Node type reference")
-            console.print("  • docs/guides/ - Workflow guides")
-            console.print("  • .vscode/ - VS Code snippets")
-        else:
-            console.print(
-                f"[red]Error generating documentation:[/red]\n{result.stderr}"
-            )
-            raise typer.Exit(1)
-
-    except Exception as e:
-        console.print(f"[red]Failed to generate documentation:[/red] {e}")
-        raise typer.Exit(1) from e
-
-
-@docs_app.command()
-def serve(
-    port: Annotated[
-        int, typer.Option("--port", "-p", help="Port for serving docs")
-    ] = 8000,
-) -> None:
-    """Serve documentation locally (requires generated docs)
-
-    Example:
-        s10s docs serve --port 8080
-    """
-    console.print(f"[bold]Serving documentation on port {port}...[/bold]")
-
-    docs_dir = Path("docs")
-    if not docs_dir.exists():
-        console.print(
-            "[red]Error: Documentation not found. "
-            "Run 's10s docs generate' first.[/red]"
-        )
-        raise typer.Exit(1)
-
-    try:
-        os.chdir(docs_dir)
-
-        handler = http.server.SimpleHTTPRequestHandler
-        with socketserver.TCPServer(("", port), handler) as httpd:
-            console.print(
-                f"\n[green]Documentation server running at http://localhost:{port}[/green]"
-            )
-            console.print("[dim]Press Ctrl+C to stop[/dim]\n")
-            httpd.serve_forever()
-
-    except KeyboardInterrupt:
-        console.print("\n[yellow]Server stopped[/yellow]")
-    except Exception as e:
-        console.print(f"[red]Failed to start server:[/red] {e}")
-        raise typer.Exit(1) from e
 
 
 if __name__ == "__main__":
