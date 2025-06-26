@@ -99,12 +99,9 @@ class NodeExecutor(ABC):
             ValidationError: If validation fails
         """
         if self.input_schema_class and self.input_schema_class is not None:
-            try:
-                validated = self.input_schema_class(**data)
-                return validated.model_dump()
-            except ValidationError as e:
-                msg = f"Input validation failed: {e}"
-                raise ValidationError(msg) from e
+            # ValidationError will be caught by the executor
+            validated = self.input_schema_class(**data)
+            return validated.model_dump()
         return data
 
     def validate_output(self, data: Any) -> Any:
@@ -120,15 +117,11 @@ class NodeExecutor(ABC):
             ValidationError: If validation fails
         """
         if self.output_schema_class and self.output_schema_class is not None:
-            try:
-                # Handle different output formats
-                if isinstance(data, dict) and self.output_schema_class.model_fields:
-                    validated = self.output_schema_class(**data)
-                else:
-                    # Wrap non-dict outputs
-                    validated = self.output_schema_class(result=data)
-                return validated.model_dump()
-            except ValidationError as e:
-                msg = f"Output validation failed: {e}"
-                raise ValidationError(msg) from e
+            # Handle different output formats
+            if isinstance(data, dict) and self.output_schema_class.model_fields:
+                validated = self.output_schema_class(**data)
+            else:
+                # Wrap non-dict outputs
+                validated = self.output_schema_class(result=data)
+            return validated.model_dump()
         return data

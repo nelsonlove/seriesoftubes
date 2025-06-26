@@ -31,7 +31,7 @@ def test_parse_simple_workflow():
     assert len(workflow.nodes) == 6
     assert workflow.nodes["classify_company"].node_type == NodeType.LLM
     assert workflow.nodes["fetch_data"].node_type == NodeType.HTTP
-    assert workflow.nodes["decide_analysis"].node_type == NodeType.ROUTE
+    assert workflow.nodes["decide_analysis"].node_type == NodeType.CONDITIONAL
 
     # Check dependencies
     assert workflow.nodes["classify_company"].depends_on == []
@@ -129,21 +129,21 @@ nodes:
 
 
 def test_route_validation(tmp_path):
-    """Test route node validation"""
+    """Test conditional node validation"""
     bad_route_yaml = tmp_path / "bad_route.yaml"
     bad_route_yaml.write_text(
         """
 name: bad-route
 nodes:
   router:
-    type: route
-    depends_on: []
+    type: conditional
+    depends_on: [nonexistent_dependency]
     config:
-      routes:
-        - when: "true"
-          to: nonexistent_node
-        - default: true
-          to: also_nonexistent
+      conditions:
+        - condition: "{{ true }}"
+          then: node1
+        - is_default: true
+          then: node2
 """
     )
 
@@ -173,11 +173,11 @@ inputs:
     default: false
 nodes:
   dummy:
-    type: route
+    type: conditional
     config:
-      routes:
-        - default: true
-          to: dummy
+      conditions:
+        - is_default: true
+          then: done
 """
     )
 

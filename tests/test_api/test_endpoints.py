@@ -75,11 +75,11 @@ inputs:
 
 nodes:
   echo:
-    type: route
+    type: conditional
     config:
-      routes:
-        - default: true
-          to: echo
+      conditions:
+        - is_default: true
+          then: echo
 
 outputs:
   result: echo

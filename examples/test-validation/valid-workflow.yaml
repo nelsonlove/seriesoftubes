@@ -1,0 +1,74 @@
+name: valid-workflow
+version: "1.0.0"
+description: Example workflow that passes all schema validation
+
+inputs:
+  company_name:
+    type: string
+    required: true
+    description: Company name to analyze
+  
+  api_key:
+    type: string
+    required: false
+    description: API key (defaults to env var)
+
+nodes:
+  # Properly formatted HTTP request
+  fetch_data:
+    type: http
+    config:
+      url: "https://api.example.com/company/{{ inputs.company_name }}"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ inputs.api_key | default(env.API_KEY) }}"
+        Content-Type: "application/json"
+
+  # File reading with proper path
+  read_template:
+    type: file
+    config:
+      path: "./templates/analysis.txt"
+      format: txt
+
+  # LLM with valid prompt
+  analyze_company:
+    type: llm
+    depends_on: [fetch_data, read_template]
+    config:
+      prompt: |
+        Analyze this company data:
+        {{ fetch_data.body }}
+        
+        Using this template:
+        {{ read_template.data }}
+      model: "gpt-4"
+      temperature: 0.7
+      context:
+        fetch_data: fetch_data
+        read_template: read_template
+
+  # Python with JSON-serializable output
+  extract_metrics:
+    type: python
+    depends_on: [analyze_company]
+    config:
+      code: |
+        analysis = context['analysis']
+        
+        # Extract key metrics (all JSON-serializable)
+        metrics = {
+            "sentiment": 0.8,
+            "key_points": ["Growing revenue", "Strong market position"],
+            "risk_score": 0.3,
+            "summary": analysis.get('response', '')[:200]
+        }
+        
+        return metrics
+      context:
+        analysis: analyze_company
+
+outputs:
+  company_data: fetch_data.body
+  analysis: analyze_company.response
+  metrics: extract_metrics

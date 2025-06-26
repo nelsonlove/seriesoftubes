@@ -166,7 +166,7 @@ outputs:
             )
 
         # Mock API client
-        with patch("seriesoftubes.cli.main.APIClient") as MockClient:
+        with patch("seriesoftubes.cli.workflow.APIClient") as MockClient:
             mock_client = Mock()
             MockClient.return_value.__enter__.return_value = mock_client
             mock_client.upload_workflow_file.return_value = {
@@ -243,7 +243,7 @@ def test_run_workflow_api_with_mock():
 
 def test_auth_login_with_mock():
     """Test login with mocked API"""
-    with patch("seriesoftubes.cli.main.APIClient") as MockClient:
+    with patch("seriesoftubes.cli.auth.APIClient") as MockClient:
         mock_client = Mock()
         MockClient.return_value.__enter__.return_value = mock_client
         mock_client.login.return_value = {"access_token": "test-token"}

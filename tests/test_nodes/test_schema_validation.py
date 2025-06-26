@@ -352,8 +352,9 @@ async def test_file_node_validation_with_empty_path():
     result = await executor.execute(node, context)
     
     assert not result.success
-    # The file executor tries to read the empty path, which results in trying to read '.'
-    assert "Is a directory" in result.error or "No files found matching criteria" in result.error
+    # Now with proper validation, we get a clear error about empty path
+    assert "Input validation failed" in result.error
+    assert "Path cannot be empty" in result.error
 
 
 @pytest.mark.asyncio
@@ -432,4 +433,4 @@ async def test_file_node_output_validation():
             assert "metadata" in result.output
             assert result.output["metadata"]["files_read"] == 1
             assert result.output["metadata"]["format"] == "json" or result.output["metadata"]["format"] == "auto"
-            assert result.output["metadata"]["output_mode"] == "dict"
+            assert result.output["metadata"]["output_mode"] == "content"

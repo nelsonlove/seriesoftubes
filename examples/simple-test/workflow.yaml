@@ -46,19 +46,19 @@ nodes:
         Accept: "application/vnd.github.v3+json"
 
   decide_analysis:
-    type: route
+    type: conditional
     description: Route to appropriate analysis based on company size
     depends_on: [classify_company]
     config:
       context:
         company: classify_company
-      routes:
-        - when: company.size == "enterprise"
-          to: deep_analysis
-        - when: company.size == "startup"
-          to: quick_analysis
-        - default: true
-          to: standard_analysis
+      conditions:
+        - condition: "{{ company.size == 'enterprise' }}"
+          then: deep_analysis
+        - condition: "{{ company.size == 'startup' }}"
+          then: quick_analysis
+        - is_default: true
+          then: standard_analysis
 
   deep_analysis:
     type: llm

@@ -280,9 +280,17 @@ class ForEachNodeConfig(BaseNodeConfig):
 class ConditionalCondition(BaseModel):
     """A single condition in a conditional node"""
 
-    condition: str = Field(..., description="Jinja2 condition expression")
+    condition: str | None = Field(None, description="Jinja2 condition expression (omit for default)")
     then: str = Field(..., description="Target/output value if condition is true")
     is_default: bool = Field(False, description="Whether this is the default condition")
+    
+    @model_validator(mode="after")
+    def validate_condition(self) -> Self:
+        """Ensure condition is provided unless this is a default"""
+        if not self.is_default and not self.condition:
+            msg = "Condition is required unless is_default is True"
+            raise ValueError(msg)
+        return self
 
 
 class ConditionalNodeConfig(BaseNodeConfig):

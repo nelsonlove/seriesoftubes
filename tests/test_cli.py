@@ -83,12 +83,12 @@ nodes:
     config:
       prompt: "Echo: {{ text }}"
   echo:
-    type: route
+    type: conditional
     depends_on: [process]
     config:
-      routes:
-        - default: true
-          to: "process"
+      conditions:
+        - is_default: true
+          then: "process"
 outputs:
   result: process
 """
@@ -164,11 +164,11 @@ outputs:
 name: test_workflow
 nodes:
   fail:
-    type: route
+    type: conditional
     config:
-      routes:
-        - default: true
-          to: "fail"
+      conditions:
+        - is_default: true
+          then: "fail"
 """
         )
 
@@ -204,11 +204,11 @@ version: "1.0.0"
 description: Test workflow 1
 nodes:
   node1:
-    type: route
+    type: conditional
     config:
-      routes:
-        - default: true
-          to: "node1"
+      conditions:
+        - is_default: true
+          then: "node1"
 """
         )
 
@@ -220,18 +220,17 @@ name: workflow_two
 version: "2.0"
 nodes:
   node1:
-    type: route
+    type: conditional
     config:
-      routes:
-        - default: true
-          to: "node1"
+      conditions:
+        - is_default: true
+          then: "node1"
   node2:
-    type: route
-    depends_on: [node1]
+    type: conditional
     config:
-      routes:
-        - default: true
-          to: "node2"
+      conditions:
+        - is_default: true
+          then: "node2"
 """
         )
 
@@ -261,11 +260,11 @@ nodes:
 name: main_workflow
 nodes:
   node1:
-    type: route
+    type: conditional
     config:
-      routes:
-        - default: true
-          to: "node1"
+      conditions:
+        - is_default: true
+          then: "node1"
 """
         )
 
@@ -276,11 +275,11 @@ nodes:
 name: test_workflow
 nodes:
   node1:
-    type: route
+    type: conditional
     config:
-      routes:
-        - default: true
-          to: "node1"
+      conditions:
+        - is_default: true
+          then: "node1"
 """
         )
 
@@ -313,11 +312,11 @@ inputs:
     default: 5
 nodes:
   echo:
-    type: route
+    type: conditional
     config:
-      routes:
-        - default: true
-          to: "echo"
+      conditions:
+        - is_default: true
+          then: "echo"
 outputs:
   result: process
 """
@@ -349,11 +348,11 @@ inputs:
     required: true
 nodes:
   echo:
-    type: route
+    type: conditional
     config:
-      routes:
-        - default: true
-          to: "echo"
+      conditions:
+        - is_default: true
+          then: "echo"
 outputs:
   result: process
 """
@@ -386,11 +385,11 @@ inputs:
     required: true
 nodes:
   echo:
-    type: route
+    type: conditional
     config:
-      routes:
-        - default: true
-          to: "echo"
+      conditions:
+        - is_default: true
+          then: "echo"
 """
         )
 

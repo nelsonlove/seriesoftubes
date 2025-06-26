@@ -1,0 +1,58 @@
+name: validation-test
+version: "1.0.0"
+description: Test workflow to verify schema validation
+
+inputs:
+  api_url:
+    type: string
+    required: false
+    description: API endpoint URL
+  
+  invalid_url:
+    type: string
+    required: false
+    default: "not-a-valid-url"
+    description: Intentionally invalid URL for testing
+
+nodes:
+  # Test 1: Valid HTTP request
+  valid_request:
+    type: http
+    config:
+      url: "{{ inputs.api_url | default('https://httpbin.org/get') }}"
+      method: GET
+
+  # Test 2: Invalid URL format (will fail validation)
+  invalid_url_test:
+    type: http
+    depends_on: [valid_request]
+    config:
+      url: "{{ inputs.invalid_url }}"
+      method: GET
+
+  # Test 3: Empty path validation
+  empty_path_test:
+    type: file
+    config:
+      path: "{{ inputs.undefined_var }}"  # Will render to empty string
+      format: json
+
+  # Test 4: Python with valid output
+  valid_python:
+    type: python
+    config:
+      code: |
+        return {"status": "ok", "value": 42}
+
+  # Test 5: Python with non-serializable output (will fail)
+  invalid_python:
+    type: python
+    depends_on: [valid_python]
+    config:
+      code: |
+        import datetime
+        return {"timestamp": datetime.datetime.now()}  # Not JSON serializable
+
+outputs:
+  valid_result: valid_request
+  python_result: valid_python

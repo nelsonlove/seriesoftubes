@@ -175,7 +175,7 @@ class TestSchemaValidation:
             HTTPNodeExecutor,
             LLMNodeExecutor,
             PythonNodeExecutor,
-            RouteNodeExecutor,
+            ConditionalNodeExecutor,
         )
 
         # Check that each executor has schema classes assigned
@@ -185,8 +185,8 @@ class TestSchemaValidation:
         assert HTTPNodeExecutor.input_schema_class is not None
         assert HTTPNodeExecutor.output_schema_class is not None
 
-        assert RouteNodeExecutor.input_schema_class is not None
-        assert RouteNodeExecutor.output_schema_class is not None
+        assert ConditionalNodeExecutor.input_schema_class is not None
+        assert ConditionalNodeExecutor.output_schema_class is not None
 
         assert FileNodeExecutor.input_schema_class is not None
         assert FileNodeExecutor.output_schema_class is not None

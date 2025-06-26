@@ -6,10 +6,14 @@ import jinja2
 
 from seriesoftubes.models import Node, ConditionalNodeConfig
 from seriesoftubes.nodes.base import NodeContext, NodeExecutor, NodeResult
+from seriesoftubes.schemas import RouteNodeInput, RouteNodeOutput
 
 
 class ConditionalNodeExecutor(NodeExecutor):
     """Executor for conditional nodes that implement branching logic"""
+    
+    input_schema_class = RouteNodeInput
+    output_schema_class = RouteNodeOutput
 
     async def execute(self, node: Node, context: NodeContext) -> NodeResult:
         """Execute conditional node to evaluate conditions and return path
