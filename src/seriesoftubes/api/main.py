@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from seriesoftubes.api.auth_routes import router as auth_router
+from seriesoftubes.api.docs_routes import router as docs_router
 from seriesoftubes.api.execution_routes import router as execution_router
 from seriesoftubes.api.workflow_routes import router as workflow_router
 from seriesoftubes.db import init_db
@@ -42,6 +43,7 @@ app = FastAPI(
 
 # Include routers
 app.include_router(auth_router)
+app.include_router(docs_router, prefix="/api")
 app.include_router(workflow_router)
 app.include_router(execution_router)
 
@@ -144,10 +146,4 @@ async def convert_workflow(request: WorkflowConvertRequest) -> WorkflowConvertRe
         ) from e
 
 
-# Mount documentation files
-docs_path = Path(__file__).parent.parent.parent.parent / "docs"
-if docs_path.exists():
-    app.mount("/docs", StaticFiles(directory=str(docs_path)), name="docs")
-    logger.info(f"Mounted documentation at /docs from {docs_path}")
-else:
-    logger.warning(f"Documentation directory not found at {docs_path}")
+# Documentation is served via /api/docs/ endpoints (see docs_routes.py)
