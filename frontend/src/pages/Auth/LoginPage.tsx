@@ -54,70 +54,53 @@ export const LoginPage: React.FC = () => {
   }, [error, clearError]);
 
   return (
-    <div style={{ 
-      minHeight: '100vh', 
-      display: 'flex', 
-      alignItems: 'center', 
-      justifyContent: 'center',
-      background: '#f0f2f5'
-    }}>
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#f0f2f5',
+      }}
+    >
       <Card style={{ width: 400, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <Title level={2} style={{ marginBottom: 8 }}>SeriesOfTubes</Title>
-          <Typography.Text type="secondary">
-            LLM Workflow Orchestration Platform
-          </Typography.Text>
+          <Title level={2} style={{ marginBottom: 8 }}>
+            SeriesOfTubes
+          </Title>
+          <Typography.Text type="secondary">LLM Workflow Orchestration Platform</Typography.Text>
         </div>
 
-        <Tabs 
-          activeKey={activeTab} 
+        <Tabs
+          activeKey={activeTab}
           onChange={(key) => setActiveTab(key as 'login' | 'register')}
           items={[
             {
               key: 'login',
               label: 'Login',
               children: (
-                <Form
-                  name="login"
-                  onFinish={handleLogin}
-                  autoComplete="off"
-                  layout="vertical"
-                >
+                <Form name="login" onFinish={handleLogin} autoComplete="off" layout="vertical">
                   <Form.Item
                     name="username"
                     rules={[{ required: true, message: 'Please input your username!' }]}
                   >
-                    <Input 
-                      prefix={<UserOutlined />} 
-                      placeholder="Username" 
-                      size="large"
-                    />
+                    <Input prefix={<UserOutlined />} placeholder="Username" size="large" />
                   </Form.Item>
 
                   <Form.Item
                     name="password"
                     rules={[{ required: true, message: 'Please input your password!' }]}
                   >
-                    <Input.Password
-                      prefix={<LockOutlined />}
-                      placeholder="Password"
-                      size="large"
-                    />
+                    <Input.Password prefix={<LockOutlined />} placeholder="Password" size="large" />
                   </Form.Item>
 
                   <Form.Item>
-                    <Button 
-                      type="primary" 
-                      htmlType="submit" 
-                      loading={isLoading}
-                      size="large"
-                      block
-                    >
+                    <Button type="primary" htmlType="submit" loading={isLoading} size="large" block>
                       Log in
                     </Button>
                   </Form.Item>
                 </Form>
-              )
+              ),
             },
             {
               key: 'register',
@@ -133,42 +116,30 @@ export const LoginPage: React.FC = () => {
                     name="username"
                     rules={[
                       { required: true, message: 'Please input your username!' },
-                      { min: 3, message: 'Username must be at least 3 characters!' }
+                      { min: 3, message: 'Username must be at least 3 characters!' },
                     ]}
                   >
-                    <Input 
-                      prefix={<UserOutlined />} 
-                      placeholder="Username" 
-                      size="large"
-                    />
+                    <Input prefix={<UserOutlined />} placeholder="Username" size="large" />
                   </Form.Item>
 
                   <Form.Item
                     name="email"
                     rules={[
                       { required: true, message: 'Please input your email!' },
-                      { type: 'email', message: 'Please enter a valid email!' }
+                      { type: 'email', message: 'Please enter a valid email!' },
                     ]}
                   >
-                    <Input 
-                      prefix={<MailOutlined />} 
-                      placeholder="Email" 
-                      size="large"
-                    />
+                    <Input prefix={<MailOutlined />} placeholder="Email" size="large" />
                   </Form.Item>
 
                   <Form.Item
                     name="password"
                     rules={[
                       { required: true, message: 'Please input your password!' },
-                      { min: 8, message: 'Password must be at least 8 characters!' }
+                      { min: 8, message: 'Password must be at least 8 characters!' },
                     ]}
                   >
-                    <Input.Password
-                      prefix={<LockOutlined />}
-                      placeholder="Password"
-                      size="large"
-                    />
+                    <Input.Password prefix={<LockOutlined />} placeholder="Password" size="large" />
                   </Form.Item>
 
                   <Form.Item
@@ -194,22 +165,17 @@ export const LoginPage: React.FC = () => {
                   </Form.Item>
 
                   <Form.Item>
-                    <Button 
-                      type="primary" 
-                      htmlType="submit" 
-                      loading={isLoading}
-                      size="large"
-                      block
-                    >
+                    <Button type="primary" htmlType="submit" loading={isLoading} size="large" block>
                       Register
                     </Button>
                   </Form.Item>
                 </Form>
-              )
-            }
+              ),
+            },
           ]}
         />
       </Card>
     </div>
   );
 };
+

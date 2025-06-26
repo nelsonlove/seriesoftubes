@@ -1,6 +1,13 @@
 // Testing pre-commit hooks
 import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+  useNavigate,
+  useLocation,
+} from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConfigProvider, Layout, Menu, Button, Dropdown, Space } from 'antd';
 import {
@@ -90,10 +97,15 @@ function AppContent() {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#001529' }}>
-        <div style={{ color: 'white', fontSize: '20px', fontWeight: 'bold' }}>
-          SeriesOfTubes
-        </div>
+      <Header
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          background: '#001529',
+        }}
+      >
+        <div style={{ color: 'white', fontSize: '20px', fontWeight: 'bold' }}>SeriesOfTubes</div>
         {isAuthenticated && user && (
           <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
             <Button type="text" style={{ color: 'white' }}>
@@ -130,31 +142,46 @@ function AppContent() {
             }}
           >
             <Routes>
-              <Route path="/workflows" element={
-                <ProtectedRoute>
-                  <WorkflowsPage />
-                </ProtectedRoute>
-              } />
-              <Route path="/executions" element={
-                <ProtectedRoute>
-                  <ExecutionsPage />
-                </ProtectedRoute>
-              } />
-              <Route path="/executions/:id" element={
-                <ProtectedRoute>
-                  <ExecutionDetail />
-                </ProtectedRoute>
-              } />
-              <Route path="/testing" element={
-                <ProtectedRoute>
-                  <TestingPage />
-                </ProtectedRoute>
-              } />
-              <Route path="/documentation" element={
-                <ProtectedRoute>
-                  <DocumentationPage />
-                </ProtectedRoute>
-              } />
+              <Route
+                path="/workflows"
+                element={
+                  <ProtectedRoute>
+                    <WorkflowsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/executions"
+                element={
+                  <ProtectedRoute>
+                    <ExecutionsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/executions/:id"
+                element={
+                  <ProtectedRoute>
+                    <ExecutionDetail />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/testing"
+                element={
+                  <ProtectedRoute>
+                    <TestingPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/documentation"
+                element={
+                  <ProtectedRoute>
+                    <DocumentationPage />
+                  </ProtectedRoute>
+                }
+              />
               <Route path="/" element={<Navigate to="/workflows" replace />} />
             </Routes>
           </Content>

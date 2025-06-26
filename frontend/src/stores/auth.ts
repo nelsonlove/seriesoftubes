@@ -16,7 +16,7 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
-  
+
   // Actions
   login: (username: string, password: string) => Promise<void>;
   register: (username: string, email: string, password: string) => Promise<void>;
@@ -48,20 +48,14 @@ export const useAuthStore = create<AuthState>()(
         try {
           const response = await axios.post('/auth/login', { username, password });
           const { access_token } = response.data;
-          
+
           // Set token in axios defaults
           setupAxiosInterceptors(access_token);
-          
-          // Get user info (we'll need to add a /auth/me endpoint)
-          // For now, decode the username from the login
-          const user: User = {
-            id: 'temp-id', // This should come from a /me endpoint
-            username,
-            email: null,
-            is_active: true,
-            is_admin: false,
-          };
-          
+
+          // Get user info from /auth/me endpoint
+          const userResponse = await axios.get('/auth/me');
+          const user: User = userResponse.data;
+
           set({
             token: access_token,
             user,
@@ -86,14 +80,14 @@ export const useAuthStore = create<AuthState>()(
             email,
             password,
           });
-          
+
           const user: User = response.data;
-          
+
           set({
             isLoading: false,
             error: null,
           });
-          
+
           // After registration, user needs to login
           // Return the user data for UI feedback
           return user;
@@ -154,3 +148,4 @@ axios.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+

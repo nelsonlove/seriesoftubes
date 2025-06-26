@@ -15,12 +15,14 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   // This handles the case where the page is refreshed
   if (token && !isAuthenticated) {
     return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        minHeight: '100vh' 
-      }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '100vh',
+        }}
+      >
         <Spin size="large" />
       </div>
     );
@@ -33,3 +35,4 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
   return <>{children}</>;
 };
+
