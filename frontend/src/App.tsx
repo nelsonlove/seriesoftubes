@@ -15,7 +15,7 @@ import {
   PlayCircleOutlined,
   ExperimentOutlined,
   BookOutlined,
-  UserOutlined,
+  // UserOutlined,
   LogoutOutlined,
   MoonOutlined,
   SunOutlined,

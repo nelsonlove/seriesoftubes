@@ -7,7 +7,7 @@ inputs:
     type: string
     required: false
     description: API endpoint URL
-  
+
   invalid_url:
     type: string
     required: false

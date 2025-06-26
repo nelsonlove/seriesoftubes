@@ -4,7 +4,7 @@ import os
 from abc import ABC, abstractmethod
 from typing import Any, Protocol
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
 from seriesoftubes.models import Node
 
@@ -76,10 +76,10 @@ class NodeExecutor(ABC):
         data["env"] = dict(os.environ)
 
         # Add split item data if available (for parallel execution contexts)
-        if hasattr(context, 'outputs'):
+        if hasattr(context, "outputs"):
             for key, value in context.outputs.items():
                 # Only add single values, not complex split metadata
-                if not isinstance(value, dict) or not value.get('parallel_data'):
+                if not isinstance(value, dict) or not value.get("parallel_data"):
                     data[key] = value
 
         # Return raw data - users should use bracket notation or filters in templates

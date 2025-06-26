@@ -63,15 +63,15 @@ nodes:
     config:
       code: |
         companies = context['companies']
-        
+
         if not companies:
           return {"message": "No companies found after filtering"}
-        
+
         # Calculate statistics
         total_companies = len(companies)
         total_revenue = sum(float(c['revenue_millions']) for c in companies)
         avg_revenue = total_revenue / total_companies if total_companies > 0 else 0
-        
+
         # Group by industry
         by_industry = {}
         for company in companies:
@@ -79,7 +79,7 @@ nodes:
           if industry not in by_industry:
             by_industry[industry] = []
           by_industry[industry].append(company)
-        
+
         # Group by size
         by_size = {}
         for company in companies:
@@ -87,7 +87,7 @@ nodes:
           if size not in by_size:
             by_size[size] = 0
           by_size[size] += 1
-        
+
         return {
           'total_companies_processed': total_companies,
           'total_revenue_millions': round(total_revenue, 2),

@@ -1,7 +1,5 @@
 """Split node executor for parallel processing of arrays"""
 
-from typing import Any
-
 from seriesoftubes.models import Node, SplitNodeConfig
 from seriesoftubes.nodes.base import NodeContext, NodeExecutor, NodeResult
 from seriesoftubes.schemas import SplitNodeInput, SplitNodeOutput
@@ -9,17 +7,17 @@ from seriesoftubes.schemas import SplitNodeInput, SplitNodeOutput
 
 class SplitNodeExecutor(NodeExecutor):
     """Executor for split nodes that divide arrays into parallel processing streams"""
-    
+
     input_schema_class = SplitNodeInput
     output_schema_class = SplitNodeOutput
 
     async def execute(self, node: Node, context: NodeContext) -> NodeResult:
         """Execute split node to create parallel processing streams
-        
+
         Args:
             node: The split node to execute
             context: Execution context
-            
+
         Returns:
             NodeResult with split items marked for parallel processing
         """
@@ -34,23 +32,23 @@ class SplitNodeExecutor(NodeExecutor):
 
             # Get context data for template rendering
             template_data = self.prepare_context_data(node, context)
-            
+
             # Get the array data to split
             # Handle different field reference formats
-            if config.field.startswith('inputs.'):
+            if config.field.startswith("inputs."):
                 # Direct input reference like "inputs.companies"
                 input_name = config.field[7:]  # Remove "inputs." prefix
-                if input_name in template_data.get('inputs', {}):
-                    array_data = template_data['inputs'][input_name]
+                if input_name in template_data.get("inputs", {}):
+                    array_data = template_data["inputs"][input_name]
                 else:
                     return NodeResult(
                         output=None,
                         success=False,
                         error=f"Input '{input_name}' not found",
                     )
-            elif '.' in config.field:
+            elif "." in config.field:
                 # Node output reference like "node_name.field_name"
-                field_parts = config.field.split('.', 1)
+                field_parts = config.field.split(".", 1)
                 node_name, field_name = field_parts
                 node_output = context.get_output(node_name)
                 if isinstance(node_output, dict) and field_name in node_output:
@@ -92,12 +90,12 @@ class SplitNodeExecutor(NodeExecutor):
                     "node_type": "split",
                     "parallel_execution": True,
                     "split_count": len(array_data),
-                }
+                },
             )
 
         except Exception as e:
             return NodeResult(
                 output=None,
                 success=False,
-                error=f"Split node execution failed: {str(e)}",
+                error=f"Split node execution failed: {e!s}",
             )

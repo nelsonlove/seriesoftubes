@@ -99,7 +99,7 @@ export const ExecutionDetail: React.FC = () => {
     return () => {
       es.close();
     };
-  }, [id, execution, updateProgress]);
+  }, [id, execution, updateProgress, setExecution]);
 
   if (isLoading) {
     return (

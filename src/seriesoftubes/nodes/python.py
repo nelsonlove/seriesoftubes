@@ -248,7 +248,7 @@ class PythonNodeExecutor(NodeExecutor):
 
             # Always validate input when schema is defined
             input_data = {"context": context_data}
-            
+
             try:
                 validated_input = self.validate_input(input_data)
                 context_data = validated_input["context"]
@@ -258,11 +258,12 @@ class PythonNodeExecutor(NodeExecutor):
                 for error in e.errors():
                     field = ".".join(str(x) for x in error["loc"])
                     error_details.append(f"  - {field}: {error['msg']}")
-                
+
                 return NodeResult(
                     output=None,
                     success=False,
-                    error=f"Input validation failed for node '{node.name}':\n" + "\n".join(error_details),
+                    error=f"Input validation failed for node '{node.name}':\n"
+                    + "\n".join(error_details),
                 )
 
             # Get the code to execute
@@ -321,11 +322,12 @@ class PythonNodeExecutor(NodeExecutor):
                 for error in e.errors():
                     field = ".".join(str(x) for x in error["loc"])
                     error_details.append(f"  - {field}: {error['msg']}")
-                
+
                 return NodeResult(
                     output=None,
                     success=False,
-                    error=f"Output validation failed for node '{node.name}':\n" + "\n".join(error_details),
+                    error=f"Output validation failed for node '{node.name}':\n"
+                    + "\n".join(error_details),
                 )
 
             return NodeResult(output=output, success=True)

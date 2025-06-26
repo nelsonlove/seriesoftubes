@@ -47,7 +47,7 @@ const parseWorkflowInputs = (yamlContent: string): Record<string, any> => {
     // This is a basic implementation - in production you'd use a proper YAML parser
     const inputsMatch = yamlContent.match(/inputs:\s*\n((?:\s{2,}.*\n)*)/);
     if (!inputsMatch) return {};
-    
+
     // For now, return empty object - the backend should ideally parse this
     return {};
   } catch {
@@ -60,7 +60,7 @@ export const workflowAPI = {
   list: async (params?: { tag?: string; search?: string }) => {
     const response = await api.get<any[]>('/workflows', { params });
     // Transform the response to match our WorkflowSummary type
-    return response.data.map(wf => ({
+    return response.data.map((wf) => ({
       ...wf,
       path: wf.id, // Use ID as path for now
       inputs: parseWorkflowInputs(wf.yaml_content),
@@ -96,7 +96,7 @@ export const workflowAPI = {
   uploadFile: async (file: File, isPublic: boolean = false) => {
     const formData = new FormData();
     formData.append('file', file);
-    
+
     const response = await api.post<{
       id: string;
       name: string;

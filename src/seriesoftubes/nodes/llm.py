@@ -6,10 +6,9 @@ from typing import Any
 
 import httpx
 from jinja2 import Template
-
-from seriesoftubes.config import get_config
 from pydantic import ValidationError
 
+from seriesoftubes.config import get_config
 from seriesoftubes.models import LLMNodeConfig, Node
 from seriesoftubes.nodes.base import NodeContext, NodeExecutor, NodeResult
 from seriesoftubes.schemas import LLMNodeInput, LLMNodeOutput
@@ -51,11 +50,12 @@ class LLMNodeExecutor(NodeExecutor):
                 for error in e.errors():
                     field = ".".join(str(x) for x in error["loc"])
                     error_details.append(f"  - {field}: {error['msg']}")
-                
+
                 return NodeResult(
                     output=None,
                     success=False,
-                    error=f"Input validation failed for node '{node.name}':\n" + "\n".join(error_details),
+                    error=f"Input validation failed for node '{node.name}':\n"
+                    + "\n".join(error_details),
                 )
 
             # Get model and temperature
@@ -105,11 +105,12 @@ class LLMNodeExecutor(NodeExecutor):
                 for error in e.errors():
                     field = ".".join(str(x) for x in error["loc"])
                     error_details.append(f"  - {field}: {error['msg']}")
-                
+
                 return NodeResult(
                     output=None,
                     success=False,
-                    error=f"Output validation failed for node '{node.name}':\n" + "\n".join(error_details),
+                    error=f"Output validation failed for node '{node.name}':\n"
+                    + "\n".join(error_details),
                 )
 
             return NodeResult(output=output, success=True)

@@ -4,7 +4,7 @@ from abc import ABC
 from pathlib import Path
 from typing import Any, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 SCHEMA_DIR = Path(__file__).parent
 WORKFLOW_SCHEMA_PATH = SCHEMA_DIR / "workflow-schema.yaml"
@@ -74,7 +74,6 @@ class LLMNodeOutput(NodeOutputSchema):
 
 
 # HTTP Node Schemas
-from pydantic import HttpUrl, field_validator
 
 
 class HTTPNodeInput(NodeInputSchema):
@@ -91,12 +90,14 @@ class HTTPNodeInput(NodeInputSchema):
     def validate_url(cls, v: str) -> str:
         """Validate that the URL is properly formatted"""
         if not v or not v.strip():
-            raise ValueError("URL cannot be empty")
-        
+            msg = "URL cannot be empty"
+            raise ValueError(msg)
+
         # Basic URL validation - must start with http:// or https://
         if not v.startswith(("http://", "https://")):
-            raise ValueError("URL must start with http:// or https://")
-        
+            msg = "URL must start with http:// or https://"
+            raise ValueError(msg)
+
         # Could use HttpUrl for stricter validation, but that would require
         # converting back to string for the actual request
         return v
@@ -124,7 +125,9 @@ class RouteNodeOutput(NodeOutputSchema):
     """Output schema for route nodes"""
 
     selected_route: str = Field(..., description="The node that was routed to")
-    condition_met: str = Field(..., description="The condition that was met or 'default'")
+    condition_met: str = Field(
+        ..., description="The condition that was met or 'default'"
+    )
 
 
 # File Node Schemas
@@ -133,21 +136,23 @@ class FileNodeInput(NodeInputSchema):
 
     path: str | None = Field(None, description="File path to read")
     pattern: str | None = Field(None, description="Glob pattern for multiple files")
-    
+
     @field_validator("path")
     @classmethod
     def validate_path(cls, v: str | None) -> str | None:
         """Validate that the path is not empty if provided"""
         if v is not None and not v.strip():
-            raise ValueError("Path cannot be empty")
+            msg = "Path cannot be empty"
+            raise ValueError(msg)
         return v
-    
+
     @field_validator("pattern")
     @classmethod
     def validate_pattern(cls, v: str | None) -> str | None:
         """Validate that the pattern is not empty if provided"""
         if v is not None and not v.strip():
-            raise ValueError("Pattern cannot be empty")
+            msg = "Pattern cannot be empty"
+            raise ValueError(msg)
         return v
 
 
@@ -248,15 +253,15 @@ class SchemaValidator:
 # Split Node Schemas
 class SplitNodeInput(NodeInputSchema):
     """Input schema for split nodes"""
-    
+
     array_data: list[Any] = Field(
         ..., description="Array to split into individual items"
     )
-    
-    
+
+
 class SplitNodeOutput(NodeOutputSchema):
     """Output schema for split nodes"""
-    
+
     # Split nodes don't have a traditional output - they create parallel executions
     # This output is returned for each item
     item: Any = Field(..., description="Individual item from the split array")
@@ -264,10 +269,10 @@ class SplitNodeOutput(NodeOutputSchema):
     total: int = Field(..., description="Total number of items in the array")
 
 
-# Aggregate Node Schemas  
+# Aggregate Node Schemas
 class AggregateNodeInput(NodeInputSchema):
     """Input schema for aggregate nodes"""
-    
+
     items: list[Any] = Field(
         ..., description="Items to aggregate from parallel executions"
     )
@@ -275,77 +280,61 @@ class AggregateNodeInput(NodeInputSchema):
 
 class AggregateNodeOutput(NodeOutputSchema):
     """Output schema for aggregate nodes"""
-    
+
     # Output structure depends on aggregation mode
     result: Any = Field(
         ..., description="Aggregated result (array, object, or merged data)"
     )
     count: int = Field(..., description="Number of items aggregated")
-    
+
 
 # Filter Node Schemas
 class FilterNodeInput(NodeInputSchema):
     """Input schema for filter nodes"""
-    
-    items: list[Any] = Field(
-        ..., description="Array of items to filter"
-    )
+
+    items: list[Any] = Field(..., description="Array of items to filter")
     filter_context: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Additional context for filter conditions"
+        default_factory=dict, description="Additional context for filter conditions"
     )
 
 
 class FilterNodeOutput(NodeOutputSchema):
     """Output schema for filter nodes"""
-    
+
     filtered: list[Any] = Field(
         ..., description="Items that passed the filter condition"
     )
-    removed_count: int = Field(
-        ..., description="Number of items filtered out"
-    )
+    removed_count: int = Field(..., description="Number of items filtered out")
 
 
 # Transform Node Schemas
 class TransformNodeInput(NodeInputSchema):
     """Input schema for transform nodes"""
-    
-    items: list[Any] = Field(
-        ..., description="Array of items to transform"
-    )
+
+    items: list[Any] = Field(..., description="Array of items to transform")
     transform_context: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Additional context for transformations"
+        default_factory=dict, description="Additional context for transformations"
     )
 
 
 class TransformNodeOutput(NodeOutputSchema):
     """Output schema for transform nodes"""
-    
-    transformed: list[Any] = Field(
-        ..., description="Transformed items"
-    )
-    transform_count: int = Field(
-        ..., description="Number of items transformed"
-    )
+
+    transformed: list[Any] = Field(..., description="Transformed items")
+    transform_count: int = Field(..., description="Number of items transformed")
 
 
 # Join Node Schemas
 class JoinNodeInput(NodeInputSchema):
     """Input schema for join nodes"""
-    
-    sources: dict[str, Any] = Field(
-        ..., description="Named data sources to join"
-    )
+
+    sources: dict[str, Any] = Field(..., description="Named data sources to join")
 
 
 class JoinNodeOutput(NodeOutputSchema):
     """Output schema for join nodes"""
-    
-    joined: Any = Field(
-        ..., description="Joined data (structure depends on join type)"
-    )
+
+    joined: Any = Field(..., description="Joined data (structure depends on join type)")
     source_counts: dict[str, int] = Field(
         ..., description="Number of items from each source"
     )
@@ -354,31 +343,24 @@ class JoinNodeOutput(NodeOutputSchema):
 # Foreach Node Schemas
 class ForeachNodeInput(NodeInputSchema):
     """Input schema for foreach nodes"""
-    
-    items: list[Any] = Field(
-        ..., description="Array of items to iterate over"
-    )
+
+    items: list[Any] = Field(..., description="Array of items to iterate over")
     foreach_context: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Additional context available to subgraph"
+        default_factory=dict, description="Additional context available to subgraph"
     )
 
 
 class ForeachNodeOutput(NodeOutputSchema):
     """Output schema for foreach nodes"""
-    
-    results: list[Any] = Field(
-        ..., description="Collected results from all iterations"
-    )
-    execution_count: int = Field(
-        ..., description="Number of iterations executed"
-    )
+
+    results: list[Any] = Field(..., description="Collected results from all iterations")
+    execution_count: int = Field(..., description="Number of iterations executed")
 
 
 # Conditional Node Schemas (rename from RouteNode)
 class ConditionalNodeInput(NodeInputSchema):
     """Input schema for conditional nodes"""
-    
+
     context_data: dict[str, Any] = Field(
         ..., description="Data to evaluate conditions against"
     )
@@ -386,9 +368,11 @@ class ConditionalNodeInput(NodeInputSchema):
 
 class ConditionalNodeOutput(NodeOutputSchema):
     """Output schema for conditional nodes"""
-    
+
     selected_route: str = Field(..., description="The value from 'then' clause")
-    condition_met: str = Field(..., description="The condition that was met or 'default'")
+    condition_met: str = Field(
+        ..., description="The condition that was met or 'default'"
+    )
     evaluated_conditions: list[str] = Field(
         ..., description="List of conditions that were evaluated"
     )

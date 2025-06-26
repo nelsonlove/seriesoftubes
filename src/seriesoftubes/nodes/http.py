@@ -54,7 +54,7 @@ class HTTPNodeExecutor(NodeExecutor):
                     params[key] = self._render_template_value(value, context_data)
 
             # Prepare body
-            body = None
+            body: dict[str, Any] | str | None = None
             if config.body:
                 # Render each value in the dict body
                 body = {}
@@ -69,7 +69,7 @@ class HTTPNodeExecutor(NodeExecutor):
                 "params": params or {},
                 "body": body,
             }
-            
+
             try:
                 validated_input = self.validate_input(input_data)
                 url = validated_input["url"]
@@ -82,11 +82,12 @@ class HTTPNodeExecutor(NodeExecutor):
                 for error in e.errors():
                     field = ".".join(str(x) for x in error["loc"])
                     error_details.append(f"  - {field}: {error['msg']}")
-                
+
                 return NodeResult(
                     output=None,
                     success=False,
-                    error=f"Input validation failed for node '{node.name}':\n" + "\n".join(error_details),
+                    error=f"Input validation failed for node '{node.name}':\n"
+                    + "\n".join(error_details),
                 )
 
             # Set timeout
@@ -134,11 +135,12 @@ class HTTPNodeExecutor(NodeExecutor):
                     for error in e.errors():
                         field = ".".join(str(x) for x in error["loc"])
                         error_details.append(f"  - {field}: {error['msg']}")
-                    
+
                     return NodeResult(
                         output=None,
                         success=False,
-                        error=f"Output validation failed for node '{node.name}':\n" + "\n".join(error_details),
+                        error=f"Output validation failed for node '{node.name}':\n"
+                        + "\n".join(error_details),
                     )
 
                 return NodeResult(

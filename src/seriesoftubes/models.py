@@ -91,8 +91,6 @@ class HTTPNodeConfig(BaseNodeConfig):
     timeout: int | None = Field(None, description="Request timeout in seconds")
 
 
-
-
 class FileNodeConfig(BaseNodeConfig):
     """Configuration for file ingestion nodes"""
 
@@ -234,7 +232,8 @@ class TransformNodeConfig(BaseNodeConfig):
         ..., description="Jinja2 template for transforming each item"
     )
     field: str | None = Field(
-        None, description="Array field to transform (if not provided, transforms root array)"
+        None,
+        description="Array field to transform (if not provided, transforms root array)",
     )
 
 
@@ -252,10 +251,13 @@ class JoinType(str, Enum):
 class JoinNodeConfig(BaseNodeConfig):
     """Configuration for join nodes"""
 
-    sources: dict[str, str] = Field(..., description="Named data sources to join (name -> node.field)")
+    sources: dict[str, str] = Field(
+        ..., description="Named data sources to join (name -> node.field)"
+    )
     join_type: JoinType = Field(JoinType.MERGE, description="Type of join to perform")
     join_keys: dict[str, str] | None = Field(
-        None, description="Join key mappings for inner/left joins (source1_key -> source2_key)"
+        None,
+        description="Join key mappings for inner/left joins (source1_key -> source2_key)",
     )
 
 
@@ -263,14 +265,13 @@ class ForEachNodeConfig(BaseNodeConfig):
     """Configuration for foreach nodes"""
 
     array_field: str = Field(..., description="Field containing array to iterate over")
-    item_name: str = Field(
-        "item", description="Name for each item in subgraph context"
-    )
+    item_name: str = Field("item", description="Name for each item in subgraph context")
     subgraph_nodes: list[str] = Field(
         ..., description="List of node names to execute for each item"
     )
     parallel: bool = Field(
-        True, description="Execute iterations in parallel (default) or sequentially"
+        default=True,
+        description="Execute iterations in parallel (default) or sequentially",
     )
     collect_output: str | None = Field(
         None, description="Output field name to collect from each iteration"
@@ -280,10 +281,14 @@ class ForEachNodeConfig(BaseNodeConfig):
 class ConditionalCondition(BaseModel):
     """A single condition in a conditional node"""
 
-    condition: str | None = Field(None, description="Jinja2 condition expression (omit for default)")
+    condition: str | None = Field(
+        None, description="Jinja2 condition expression (omit for default)"
+    )
     then: str = Field(..., description="Target/output value if condition is true")
-    is_default: bool = Field(False, description="Whether this is the default condition")
-    
+    is_default: bool = Field(
+        default=False, description="Whether this is the default condition"
+    )
+
     @model_validator(mode="after")
     def validate_condition(self) -> Self:
         """Ensure condition is provided unless this is a default"""
@@ -351,7 +356,7 @@ class Node(BaseModel):
         elif node_type == NodeType.JOIN:
             return JoinNodeConfig(**v)
         elif node_type == NodeType.FOREACH:
-            return ForeachNodeConfig(**v)
+            return ForEachNodeConfig(**v)
         elif node_type == NodeType.CONDITIONAL:
             return ConditionalNodeConfig(**v)
         else:

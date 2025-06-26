@@ -1,25 +1,23 @@
 """ForEach node executor for subgraph iteration"""
 
-from typing import Any
-
-from seriesoftubes.models import Node, ForEachNodeConfig
+from seriesoftubes.models import ForEachNodeConfig, Node
 from seriesoftubes.nodes.base import NodeContext, NodeExecutor, NodeResult
 from seriesoftubes.schemas import ForeachNodeInput, ForeachNodeOutput
 
 
 class ForEachNodeExecutor(NodeExecutor):
     """Executor for foreach nodes that execute subgraphs for each item in an array"""
-    
+
     input_schema_class = ForeachNodeInput
     output_schema_class = ForeachNodeOutput
 
     async def execute(self, node: Node, context: NodeContext) -> NodeResult:
         """Execute foreach node to iterate over array items
-        
+
         Args:
             node: The foreach node to execute
             context: Execution context
-            
+
         Returns:
             NodeResult with iteration results
         """
@@ -34,7 +32,7 @@ class ForEachNodeExecutor(NodeExecutor):
 
             # Get context data for template rendering
             template_data = self.prepare_context_data(node, context)
-            
+
             # Get the array data to iterate over
             if config.array_field.startswith("inputs."):
                 # Reference to workflow input
@@ -82,7 +80,7 @@ class ForEachNodeExecutor(NodeExecutor):
             # For now, foreach will prepare iteration data for the execution engine
             # The actual subgraph execution would be handled by the engine
             iteration_results = []
-            
+
             for i, item in enumerate(array_data):
                 # Create iteration context
                 iteration_context = {
@@ -93,7 +91,7 @@ class ForEachNodeExecutor(NodeExecutor):
                     "is_last": i == len(array_data) - 1,
                     "total_count": len(array_data),
                 }
-                
+
                 # For now, just collect the items and context
                 # In a full implementation, this would execute the subgraph
                 iteration_result = {
@@ -102,7 +100,7 @@ class ForEachNodeExecutor(NodeExecutor):
                     "context": iteration_context,
                     "subgraph_nodes": config.subgraph_nodes,
                 }
-                
+
                 iteration_results.append(iteration_result)
 
             # Return the iteration plan
@@ -121,12 +119,12 @@ class ForEachNodeExecutor(NodeExecutor):
                     "node_type": "foreach",
                     "iterations": len(array_data),
                     "subgraph_size": len(config.subgraph_nodes),
-                }
+                },
             )
 
         except Exception as e:
             return NodeResult(
                 output=None,
                 success=False,
-                error=f"ForEach node execution failed: {str(e)}",
+                error=f"ForEach node execution failed: {e!s}",
             )

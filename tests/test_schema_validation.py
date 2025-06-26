@@ -171,11 +171,11 @@ class TestSchemaValidation:
     def test_schema_class_assignment(self):
         """Test that schema classes are properly assigned to executors"""
         from seriesoftubes.nodes import (  # noqa: PLC0415
+            ConditionalNodeExecutor,
             FileNodeExecutor,
             HTTPNodeExecutor,
             LLMNodeExecutor,
             PythonNodeExecutor,
-            ConditionalNodeExecutor,
         )
 
         # Check that each executor has schema classes assigned

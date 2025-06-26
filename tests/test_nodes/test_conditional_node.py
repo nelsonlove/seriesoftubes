@@ -52,7 +52,7 @@ if score > 0.5:
     selected_route = "high_score_path"
     condition_met = "score > 0.5"
 elif score <= 0.5:
-    selected_route = "low_score_path" 
+    selected_route = "low_score_path"
     condition_met = "score <= 0.5"
 else:
     selected_route = "default_path"
@@ -64,22 +64,25 @@ return {
     'score_value': score
 }
 """,
-            context={"previous_node": "previous_node"}
+            context={"previous_node": "previous_node"},
         ),
     )
 
     # Test high score path
     context = MockContext(outputs={"previous_node": {"score": 0.8}})
-    
+
     # Mock the execution
+    # ruff: noqa: PLC0415
+    # ruff: noqa: PLC0415
     from unittest.mock import patch
+
     with patch("seriesoftubes.nodes.python._execute_in_process") as mock_execute:
         mock_execute.return_value = {
-            'selected_route': 'high_score_path',
-            'condition_met': 'score > 0.5', 
-            'score_value': 0.8
+            "selected_route": "high_score_path",
+            "condition_met": "score > 0.5",
+            "score_value": 0.8,
         }
-        
+
         result = await executor.execute(node, context)
 
         assert result.success
@@ -89,14 +92,14 @@ return {
 
     # Test low score path
     context = MockContext(outputs={"previous_node": {"score": 0.3}})
-    
+
     with patch("seriesoftubes.nodes.python._execute_in_process") as mock_execute:
         mock_execute.return_value = {
-            'selected_route': 'low_score_path',
-            'condition_met': 'score <= 0.5',
-            'score_value': 0.3
+            "selected_route": "low_score_path",
+            "condition_met": "score <= 0.5",
+            "score_value": 0.3,
         }
-        
+
         result = await executor.execute(node, context)
 
         assert result.success
@@ -131,23 +134,25 @@ return {'path': result, 'input_was': input_value}
 
     # Test true case
     context = MockContext(inputs={"test_flag": True})
-    
+
+    # ruff: noqa: PLC0415
     from unittest.mock import patch
+
     with patch("seriesoftubes.nodes.python._execute_in_process") as mock_execute:
-        mock_execute.return_value = {'path': 'true_path', 'input_was': True}
-        
+        mock_execute.return_value = {"path": "true_path", "input_was": True}
+
         result = await executor.execute(node, context)
 
         assert result.success
         assert result.output["result"]["path"] == "true_path"
         assert result.output["result"]["input_was"] is True
 
-    # Test false case  
+    # Test false case
     context = MockContext(inputs={"test_flag": False})
-    
+
     with patch("seriesoftubes.nodes.python._execute_in_process") as mock_execute:
-        mock_execute.return_value = {'path': 'false_path', 'input_was': False}
-        
+        mock_execute.return_value = {"path": "false_path", "input_was": False}
+
         result = await executor.execute(node, context)
 
         assert result.success
@@ -190,15 +195,17 @@ return {
 
     # Test critical path
     context = MockContext(inputs={"category": "urgent", "priority": 9})
-    
+
+    # ruff: noqa: PLC0415
     from unittest.mock import patch
+
     with patch("seriesoftubes.nodes.python._execute_in_process") as mock_execute:
         mock_execute.return_value = {
-            'selected_path': 'critical_path',
-            'category': 'urgent',
-            'priority': 9
+            "selected_path": "critical_path",
+            "category": "urgent",
+            "priority": 9,
         }
-        
+
         result = await executor.execute(node, context)
 
         assert result.success
@@ -206,14 +213,14 @@ return {
 
     # Test normal path
     context = MockContext(inputs={"category": "normal", "priority": 3})
-    
+
     with patch("seriesoftubes.nodes.python._execute_in_process") as mock_execute:
         mock_execute.return_value = {
-            'selected_path': 'normal_path',
-            'category': 'normal', 
-            'priority': 3
+            "selected_path": "normal_path",
+            "category": "normal",
+            "priority": 3,
         }
-        
+
         result = await executor.execute(node, context)
 
         assert result.success

@@ -31,7 +31,7 @@ export const LoginPage: React.FC = () => {
       await login(values.username, values.password);
       message.success('Login successful!');
       navigate(from, { replace: true });
-    } catch (err) {
+    } catch {
       // Error is handled in the store
     }
   };
@@ -41,7 +41,7 @@ export const LoginPage: React.FC = () => {
       await register(values.username, values.email, values.password);
       message.success('Registration successful! Please login.');
       setActiveTab('login');
-    } catch (err) {
+    } catch {
       // Error is handled in the store
     }
   };

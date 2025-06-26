@@ -62,7 +62,9 @@ async def test_llm_node_input_validation_error():
 
         # Patch the validate_input method to simulate validation error
         with patch.object(executor, "validate_input") as mock_validate:
+            # ruff: noqa: PLC0415
             from pydantic import ValidationError
+
             mock_validate.side_effect = ValidationError.from_exception_data(
                 "LLMNodeInput",
                 [
@@ -101,7 +103,9 @@ async def test_http_node_output_validation():
     context = MockContext()
 
     with patch("httpx.AsyncClient") as mock_client_class:
+        # ruff: noqa: PLC0415
         from unittest.mock import MagicMock
+
         mock_client = mock_client_class.return_value.__aenter__.return_value
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -130,16 +134,12 @@ async def test_python_node_simple_execution():
         name="simple_calc",
         type=NodeType.PYTHON,
         depends_on=[],
-        config=PythonNodeConfig(
-            code="return {'result': 42}"
-        ),
+        config=PythonNodeConfig(code="return {'result': 42}"),
     )
 
     context = MockContext()
 
-    with patch(
-        "seriesoftubes.nodes.python._execute_in_process"
-    ) as mock_execute:
+    with patch("seriesoftubes.nodes.python._execute_in_process") as mock_execute:
         mock_execute.return_value = {"result": 42}
 
         result = await executor.execute(node, context)
@@ -167,9 +167,7 @@ async def test_python_node_context_validation():
     # Context with valid data
     context = MockContext(outputs={"data_node": [1, 2, 3, 4, 5]})
 
-    with patch(
-        "seriesoftubes.nodes.python._execute_in_process"
-    ) as mock_execute:
+    with patch("seriesoftubes.nodes.python._execute_in_process") as mock_execute:
         mock_execute.return_value = 5
 
         result = await executor.execute(node, context)
@@ -193,7 +191,10 @@ async def test_llm_node_structured_output_validation():
         depends_on=[],
         config=LLMNodeConfig(
             prompt="Extract data",
-            schema_definition={"type": "object", "properties": {"name": {"type": "string"}}},
+            schema_definition={
+                "type": "object",
+                "properties": {"name": {"type": "string"}},
+            },
         ),
     )
 
@@ -269,7 +270,7 @@ async def test_url_validation_error():
     assert "URL cannot be empty" in result.error
 
 
-@pytest.mark.asyncio 
+@pytest.mark.asyncio
 async def test_invalid_url_format():
     """Test that URLs must start with http:// or https://"""
     executor = HTTPNodeExecutor()
@@ -298,31 +299,34 @@ async def test_file_node_validation_with_path():
     """Test file node validation with path parameter"""
     from seriesoftubes.models import FileNodeConfig
     from seriesoftubes.nodes.file import FileNodeExecutor
-    
+
     executor = FileNodeExecutor()
-    
+
     # Test with valid path
     node = Node(
         name="read_file",
         type=NodeType.FILE,
         depends_on=[],
         config=FileNodeConfig(
-            path="/tmp/test.json",
+            path="/tmp/test.json",  # noqa: S108
             format_type="json",
         ),
     )
-    
+
     context = MockContext()
-    
+
     # Mock the file reading
     with patch("pathlib.Path.exists") as mock_exists:
         mock_exists.return_value = True
         with patch("builtins.open", create=True) as mock_open:
             import io
-            mock_open.return_value.__enter__.return_value = io.StringIO('{"data": "test"}')
-            
+
+            mock_open.return_value.__enter__.return_value = io.StringIO(
+                '{"data": "test"}'
+            )
+
             result = await executor.execute(node, context)
-            
+
             assert result.success
             assert result.output["data"] == {"data": "test"}
             assert result.output["metadata"]["files_read"] == 1
@@ -333,9 +337,9 @@ async def test_file_node_validation_with_empty_path():
     """Test file node validation with empty path"""
     from seriesoftubes.models import FileNodeConfig
     from seriesoftubes.nodes.file import FileNodeExecutor
-    
+
     executor = FileNodeExecutor()
-    
+
     # Test with template that renders to empty string
     node = Node(
         name="read_file",
@@ -346,11 +350,11 @@ async def test_file_node_validation_with_empty_path():
             format_type="json",
         ),
     )
-    
+
     context = MockContext()
-    
+
     result = await executor.execute(node, context)
-    
+
     assert not result.success
     # Now with proper validation, we get a clear error about empty path
     assert "Input validation failed" in result.error
@@ -362,9 +366,9 @@ async def test_file_node_validation_with_pattern():
     """Test file node validation with pattern parameter"""
     from seriesoftubes.models import FileNodeConfig
     from seriesoftubes.nodes.file import FileNodeExecutor
-    
+
     executor = FileNodeExecutor()
-    
+
     # Test with valid pattern
     node = Node(
         name="read_files",
@@ -376,9 +380,9 @@ async def test_file_node_validation_with_pattern():
             merge=True,
         ),
     )
-    
+
     context = MockContext()
-    
+
     # Mock glob
     with patch("glob.glob") as mock_glob:
         mock_glob.return_value = ["test1.json", "test2.json"]
@@ -386,13 +390,14 @@ async def test_file_node_validation_with_pattern():
             mock_is_file.return_value = True
             with patch("builtins.open", create=True) as mock_open:
                 import io
+
                 mock_open.side_effect = [
                     io.StringIO('{"id": 1}'),
                     io.StringIO('{"id": 2}'),
                 ]
-                
+
                 result = await executor.execute(node, context)
-                
+
                 assert result.success
                 assert result.output["data"] == [{"id": 1}, {"id": 2}]
                 assert result.output["metadata"]["files_read"] == 2
@@ -403,9 +408,9 @@ async def test_file_node_output_validation():
     """Test file node output validation structure"""
     from seriesoftubes.models import FileNodeConfig
     from seriesoftubes.nodes.file import FileNodeExecutor
-    
+
     executor = FileNodeExecutor()
-    
+
     node = Node(
         name="read_json",
         type=NodeType.FILE,
@@ -415,22 +420,28 @@ async def test_file_node_output_validation():
             format_type="json",
         ),
     )
-    
+
     context = MockContext()
-    
+
     # Mock file reading
     with patch("pathlib.Path.exists") as mock_exists:
         mock_exists.return_value = True
         with patch("builtins.open", create=True) as mock_open:
             import io
-            mock_open.return_value.__enter__.return_value = io.StringIO('{"name": "test", "value": 42}')
-            
+
+            mock_open.return_value.__enter__.return_value = io.StringIO(
+                '{"name": "test", "value": 42}'
+            )
+
             result = await executor.execute(node, context)
-            
+
             assert result.success
             # Check output structure matches schema
             assert "data" in result.output
             assert "metadata" in result.output
             assert result.output["metadata"]["files_read"] == 1
-            assert result.output["metadata"]["format"] == "json" or result.output["metadata"]["format"] == "auto"
+            assert (
+                result.output["metadata"]["format"] == "json"
+                or result.output["metadata"]["format"] == "auto"
+            )
             assert result.output["metadata"]["output_mode"] == "content"

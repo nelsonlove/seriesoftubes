@@ -25,7 +25,7 @@ nodes:
     config:
       prompt: |
         Please analyze the following text and provide a summary:
-        
+
         {{ inputs.text }}
       model: gpt-4
       temperature: 0.7
@@ -59,7 +59,7 @@ nodes:
         q: "{{ inputs.query }}"
       headers:
         Accept: "application/json"
-  
+
   analyze:
     type: llm
     depends_on: [fetch_data]
@@ -67,7 +67,7 @@ nodes:
     config:
       prompt: |
         Analyze this API response and extract key information:
-        
+
         {{ fetch_data }}
       model: gpt-4
       temperature: 0.3
@@ -97,9 +97,9 @@ nodes:
     config:
       code: |
         import statistics
-        
+
         numbers = context['numbers']
-        
+
         return {
           'count': len(numbers),
           'sum': sum(numbers),
@@ -141,7 +141,7 @@ nodes:
       code: |
         value = context['value']
         threshold = context['threshold']
-        
+
         return {
           'is_high': value > threshold,
           'difference': value - threshold,
@@ -150,7 +150,7 @@ nodes:
       context:
         value: inputs.value
         threshold: inputs.threshold
-  
+
   route:
     type: route
     depends_on: [evaluate]
@@ -159,7 +159,7 @@ nodes:
       condition: "{{ evaluate.is_high }}"
       true_next: high_value_process
       false_next: low_value_process
-  
+
   high_value_process:
     type: llm
     depends_on: [route]
@@ -168,10 +168,10 @@ nodes:
       prompt: |
         The value {{ inputs.value }} exceeds the threshold of {{ inputs.threshold }}.
         Difference: {{ evaluate.difference }}
-        
+
         Provide recommendations for handling this high value.
       model: gpt-3.5-turbo
-  
+
   low_value_process:
     type: llm
     depends_on: [route]
@@ -180,7 +180,7 @@ nodes:
       prompt: |
         The value {{ inputs.value }} is below the threshold of {{ inputs.threshold }}.
         It is at {{ evaluate.percentage }}% of the threshold.
-        
+
         Suggest ways to improve this value.
       model: gpt-3.5-turbo
 
@@ -210,7 +210,7 @@ nodes:
       operation: read
       path: "{{ inputs.file_path }}"
       encoding: utf-8
-  
+
   analyze_content:
     type: llm
     depends_on: [read_file]
@@ -221,7 +221,7 @@ nodes:
         1. A summary of the content
         2. Key topics or themes
         3. Any notable patterns or insights
-        
+
         File content:
         {{ read_file }}
       model: gpt-4

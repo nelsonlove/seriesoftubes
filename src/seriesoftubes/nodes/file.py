@@ -74,15 +74,13 @@ class FileNodeExecutor(NodeExecutor):
             if config.path:
                 rendered_path = self._render_template(config.path, context_data)
             elif config.pattern:
-                rendered_pattern = self._render_template(
-                    config.pattern, context_data
-                )
+                rendered_pattern = self._render_template(config.pattern, context_data)
 
             input_data = {
                 "path": rendered_path,
                 "pattern": rendered_pattern,
             }
-            
+
             try:
                 validated_input = self.validate_input(input_data)
                 # Update config with validated values
@@ -96,11 +94,12 @@ class FileNodeExecutor(NodeExecutor):
                 for error in e.errors():
                     field = ".".join(str(x) for x in error["loc"])
                     error_details.append(f"  - {field}: {error['msg']}")
-                
+
                 return NodeResult(
                     output=None,
                     success=False,
-                    error=f"Input validation failed for node '{node.name}':\n" + "\n".join(error_details),
+                    error=f"Input validation failed for node '{node.name}':\n"
+                    + "\n".join(error_details),
                 )
 
             # Get file paths
@@ -140,11 +139,12 @@ class FileNodeExecutor(NodeExecutor):
                 for error in e.errors():
                     field = ".".join(str(x) for x in error["loc"])
                     error_details.append(f"  - {field}: {error['msg']}")
-                
+
                 return NodeResult(
                     output=None,
                     success=False,
-                    error=f"Output validation failed for node '{node.name}':\n" + "\n".join(error_details),
+                    error=f"Output validation failed for node '{node.name}':\n"
+                    + "\n".join(error_details),
                 )
 
             return NodeResult(

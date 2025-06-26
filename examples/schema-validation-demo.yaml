@@ -24,14 +24,14 @@ nodes:
     config:
       field: "inputs.companies"
       item_name: "company"
-  
+
   # Filter companies based on revenue
   filter_high_revenue:
     type: filter
     depends_on: [split_companies]
     config:
       condition: "{{ company.revenue > 1000000 }}"
-  
+
   # Transform company data structure
   transform_company:
     type: transform
@@ -43,14 +43,14 @@ nodes:
         revenue_millions: "{{ (company.revenue / 1000000) | round(2) }}"
         size_category: "{% if company.employees > 50 %}large{% else %}small{% endif %}"
         analysis_needed: "true"
-  
+
   # Aggregate transformed results
   aggregate_companies:
     type: aggregate
     depends_on: [transform_company]
     config:
       mode: "array"
-  
+
   # Join with additional data
   join_with_analysis:
     type: join
@@ -60,7 +60,7 @@ nodes:
         companies: "aggregate_companies"
         metadata: "inputs.companies"  # Original data
       join_type: "merge"
-  
+
   # Conditional routing based on results
   check_results:
     type: conditional
@@ -71,7 +71,7 @@ nodes:
           then: "has_companies"
         - is_default: true
           then: "no_companies"
-  
+
   # Process each company with foreach
   process_each:
     type: foreach

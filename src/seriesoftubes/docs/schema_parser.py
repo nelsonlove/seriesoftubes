@@ -19,8 +19,8 @@ class PropertyDoc:
         self.examples = schema.get("examples", [])
         self.enum = schema.get("enum", [])
         self.constraints = self._get_constraints()
-        self.nested_properties: list['PropertyDoc'] = []
-        self.array_item_properties: list['PropertyDoc'] = []
+        self.nested_properties: list[PropertyDoc] = []
+        self.array_item_properties: list[PropertyDoc] = []
 
     def _get_type(self) -> str:
         """Extract property type."""
@@ -69,17 +69,19 @@ class NodeTypeDoc:
         required = self.config_schema.get("required", [])
 
         for prop_name, prop_schema in props.items():
-            prop_doc = PropertyDoc(prop_name, prop_schema, required=prop_name in required)
+            prop_doc = PropertyDoc(
+                prop_name, prop_schema, required=prop_name in required
+            )
             properties.append(prop_doc)
-            
+
             # Parse nested properties for objects
             if prop_schema.get("type") == "object" and "properties" in prop_schema:
                 prop_doc.nested_properties = self._parse_nested_properties(
                     prop_schema["properties"],
                     prop_schema.get("required", []),
-                    prefix=f"{prop_name}."
+                    prefix=f"{prop_name}.",
                 )
-            
+
             # Parse array item properties
             elif prop_schema.get("type") == "array" and "items" in prop_schema:
                 items_schema = prop_schema["items"]
@@ -87,19 +89,19 @@ class NodeTypeDoc:
                     prop_doc.array_item_properties = self._parse_nested_properties(
                         items_schema["properties"],
                         items_schema.get("required", []),
-                        prefix=f"{prop_name}[]."
+                        prefix=f"{prop_name}[].",
                     )
 
         return properties
-    
-    def _parse_nested_properties(self, props: dict[str, Any], required: list[str], prefix: str = "") -> list['PropertyDoc']:
+
+    def _parse_nested_properties(
+        self, props: dict[str, Any], required: list[str], prefix: str = ""
+    ) -> list["PropertyDoc"]:
         """Parse nested properties."""
         nested = []
         for prop_name, prop_schema in props.items():
             nested_prop = PropertyDoc(
-                f"{prefix}{prop_name}", 
-                prop_schema, 
-                required=prop_name in required
+                f"{prefix}{prop_name}", prop_schema, required=prop_name in required
             )
             nested.append(nested_prop)
         return nested
@@ -291,10 +293,12 @@ class SchemaDocGenerator:
         # Nested properties for objects
         if prop.nested_properties:
             lines.extend(["**Properties:**", ""])
-            lines.extend([
-                "| Property | Type | Required | Description |",
-                "|----------|------|----------|-------------|"
-            ])
+            lines.extend(
+                [
+                    "| Property | Type | Required | Description |",
+                    "|----------|------|----------|-------------|",
+                ]
+            )
             for nested in prop.nested_properties:
                 req = "Yes" if nested.required else "No"
                 desc = nested.description.replace("\n", " ")
@@ -304,14 +308,18 @@ class SchemaDocGenerator:
         # Array item properties
         if prop.array_item_properties:
             lines.extend(["**Array Item Properties:**", ""])
-            lines.extend([
-                "| Property | Type | Required | Description |",
-                "|----------|------|----------|-------------|"
-            ])
+            lines.extend(
+                [
+                    "| Property | Type | Required | Description |",
+                    "|----------|------|----------|-------------|",
+                ]
+            )
             for item_prop in prop.array_item_properties:
                 req = "Yes" if item_prop.required else "No"
                 desc = item_prop.description.replace("\n", " ")
-                lines.append(f"| `{item_prop.name}` | `{item_prop.type}` | {req} | {desc} |")
+                lines.append(
+                    f"| `{item_prop.name}` | `{item_prop.type}` | {req} | {desc} |"
+                )
             lines.append("")
 
         # Examples

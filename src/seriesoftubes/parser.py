@@ -1,5 +1,6 @@
 """YAML workflow parser and validator"""
 
+import tempfile
 from pathlib import Path
 from typing import Any, cast
 
@@ -22,8 +23,8 @@ class WorkflowParseError(Exception):
 
 
 def parse_node_config(
-    node_type: NodeType, config_data: dict[str, Any]
-) -> BaseNodeConfig:
+    _node_type: NodeType, config_data: dict[str, Any]
+) -> dict[str, Any]:
     """Parse node configuration based on the node type"""
     # The Node model will handle the config validation automatically
     # based on the node type, so we just return the raw config data
@@ -71,7 +72,7 @@ def parse_workflow_yaml(yaml_path: Path) -> Workflow:
                 type=node_type,
                 description=node_data.get("description"),
                 depends_on=node_data.get("depends_on", []),
-                config=config,
+                config=cast(BaseNodeConfig, config),
             )
 
         # Create workflow
@@ -168,17 +169,17 @@ def validate_dag(workflow: Workflow) -> None:
 
 class WorkflowParser:
     """Parser for workflow YAML files"""
-    
+
     def parse_file(self, file_path: str | Path) -> Workflow:
         """Parse a workflow from a YAML file"""
         if isinstance(file_path, str):
             file_path = Path(file_path)
         return parse_workflow_yaml(file_path)
-    
+
     def parse_string(self, yaml_content: str) -> Workflow:
         """Parse a workflow from a YAML string"""
-        import tempfile
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_content)
             f.flush()
             return self.parse_file(f.name)

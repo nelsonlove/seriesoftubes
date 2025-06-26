@@ -4,7 +4,7 @@ import {
   SearchOutlined,
   FileTextOutlined,
   PlusOutlined,
-  UploadOutlined,
+  // UploadOutlined,
   ReloadOutlined,
 } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
@@ -79,8 +79,8 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({ onSelectWorkflow }) 
     return <Empty description={`Failed to load workflows: ${error.message}`} />;
   }
 
-  const handleWorkflowCreated = (workflowId: string) => {
-    // TODO: Select the newly created workflow
+  const handleWorkflowCreated = () => {
+    // TODO: Select the newly created workflow when workflowId is implemented
     refetch();
   };
 

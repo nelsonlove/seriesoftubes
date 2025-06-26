@@ -2,24 +2,24 @@
 
 from typing import Any
 
-from seriesoftubes.models import Node, AggregateNodeConfig
+from seriesoftubes.models import AggregateNodeConfig, Node
 from seriesoftubes.nodes.base import NodeContext, NodeExecutor, NodeResult
 from seriesoftubes.schemas import AggregateNodeInput, AggregateNodeOutput
 
 
 class AggregateNodeExecutor(NodeExecutor):
     """Executor for aggregate nodes that collect results from parallel processing"""
-    
+
     input_schema_class = AggregateNodeInput
     output_schema_class = AggregateNodeOutput
 
     async def execute(self, node: Node, context: NodeContext) -> NodeResult:
         """Execute aggregate node to collect parallel processing results
-        
+
         Args:
             node: The aggregate node to execute
             context: Execution context with parallel results
-            
+
         Returns:
             NodeResult with aggregated data
         """
@@ -35,9 +35,9 @@ class AggregateNodeExecutor(NodeExecutor):
             # Get the parallel results from context
             # The execution engine should have populated these
             parallel_results = []
-            
+
             # Check if we have parallel execution results
-            if hasattr(context, 'parallel_results'):
+            if hasattr(context, "parallel_results"):
                 parallel_results = context.parallel_results
             else:
                 # Look for results from dependent nodes that were split
@@ -60,16 +60,17 @@ class AggregateNodeExecutor(NodeExecutor):
                 parallel_results = extracted_results
 
             # Aggregate based on mode
+            aggregated_output: Any
             if config.mode == "array":
                 # Simple array of results
                 aggregated_output = parallel_results
-                
+
             elif config.mode == "object":
                 # Convert to object with indices as keys
                 aggregated_output = {
                     str(i): result for i, result in enumerate(parallel_results)
                 }
-                
+
             elif config.mode == "merge":
                 # Merge all dict results into single dict
                 aggregated_output = {}
@@ -94,12 +95,12 @@ class AggregateNodeExecutor(NodeExecutor):
                     "node_type": "aggregate",
                     "aggregation_mode": config.mode,
                     "item_count": len(parallel_results),
-                }
+                },
             )
 
         except Exception as e:
             return NodeResult(
                 output=None,
                 success=False,
-                error=f"Aggregate node execution failed: {str(e)}",
+                error=f"Aggregate node execution failed: {e!s}",
             )

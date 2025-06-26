@@ -18,17 +18,17 @@ def generate_node_schema(node_type: str, config_class: type) -> Dict[str, Any]:
     """Generate schema for a specific node type"""
     # Get the config schema
     config_schema = config_class.model_json_schema()
-    
+
     # Get input/output schemas if available
     input_schema = None
     output_schema = None
-    
+
     if node_type in NODE_SCHEMAS:
         if "input" in NODE_SCHEMAS[node_type]:
             input_schema = NODE_SCHEMAS[node_type]["input"].model_json_schema()
         if "output" in NODE_SCHEMAS[node_type]:
             output_schema = NODE_SCHEMAS[node_type]["output"].model_json_schema()
-    
+
     # Build the complete node schema
     node_schema = {
         "type": "object",
@@ -44,7 +44,7 @@ def generate_node_schema(node_type: str, config_class: type) -> Dict[str, Any]:
         "required": ["type", "config"],
         "additionalProperties": False
     }
-    
+
     # Add input/output documentation
     if input_schema:
         node_schema["properties"]["__input_schema"] = {
@@ -52,20 +52,20 @@ def generate_node_schema(node_type: str, config_class: type) -> Dict[str, Any]:
             "readOnly": True,
             **input_schema
         }
-    
+
     if output_schema:
         node_schema["properties"]["__output_schema"] = {
             "description": "Output data structure",
             "readOnly": True,
             **output_schema
         }
-    
+
     return node_schema
 
 
 def generate_workflow_schema() -> Dict[str, Any]:
     """Generate complete workflow JSON schema"""
-    
+
     # Node type to config class mapping
     node_configs = {
         NodeType.LLM: LLMNodeConfig,
@@ -80,12 +80,12 @@ def generate_workflow_schema() -> Dict[str, Any]:
         NodeType.FOREACH: ForEachNodeConfig,
         NodeType.CONDITIONAL: ConditionalNodeConfig,
     }
-    
+
     # Generate schema for each node type
     node_schemas = {}
     for node_type, config_class in node_configs.items():
         node_schemas[node_type.value] = generate_node_schema(node_type.value, config_class)
-    
+
     # Build the complete workflow schema
     workflow_schema = {
         "$schema": "http://json-schema.org/draft-07/schema#",
@@ -151,7 +151,7 @@ def generate_workflow_schema() -> Dict[str, Any]:
         "required": ["name", "version", "nodes"],
         "additionalProperties": False
     }
-    
+
     return workflow_schema
 
 
@@ -171,21 +171,21 @@ def main():
     """Generate JSON schema files"""
     # Generate workflow schema
     workflow_schema = generate_workflow_schema()
-    
+
     # Output directory
     output_dir = Path(__file__).parent.parent / "schemas"
     output_dir.mkdir(exist_ok=True)
-    
+
     # Write workflow schema
     schema_path = output_dir / "workflow-schema.json"
     with open(schema_path, "w") as f:
         json.dump(workflow_schema, f, indent=2)
     print(f"Generated workflow schema: {schema_path}")
-    
+
     # Generate individual node schemas for reference
     node_schemas_dir = output_dir / "nodes"
     node_schemas_dir.mkdir(exist_ok=True)
-    
+
     node_configs = {
         NodeType.LLM: LLMNodeConfig,
         NodeType.HTTP: HTTPNodeConfig,
@@ -199,21 +199,21 @@ def main():
         NodeType.FOREACH: ForEachNodeConfig,
         NodeType.CONDITIONAL: ConditionalNodeConfig,
     }
-    
+
     for node_type, config_class in node_configs.items():
         node_schema = generate_node_schema(node_type.value, config_class)
         schema_path = node_schemas_dir / f"{node_type.value}-node.json"
         with open(schema_path, "w") as f:
             json.dump(node_schema, f, indent=2)
         print(f"Generated {node_type.value} node schema: {schema_path}")
-    
+
     # Generate VS Code settings recommendation
     vscode_settings = generate_vscode_settings()
     vscode_path = output_dir / "vscode-settings.json"
     with open(vscode_path, "w") as f:
         json.dump(vscode_settings, f, indent=2)
     print(f"Generated VS Code settings: {vscode_path}")
-    
+
     print("\nTo enable YAML autocomplete in VS Code:")
     print("1. Install the 'YAML' extension by Red Hat")
     print("2. Add the contents of vscode-settings.json to your .vscode/settings.json")

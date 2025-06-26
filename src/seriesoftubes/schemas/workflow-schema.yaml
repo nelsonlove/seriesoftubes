@@ -368,12 +368,12 @@ definitions:
       field:
         type: string
         description: Field containing array to split
-      
+
       item_name:
         type: string
         default: item
         description: Name for each item in downstream context
-      
+
       context:
         type: object
         description: Map context variables from other nodes
@@ -388,11 +388,11 @@ definitions:
         enum: [ array, object, merge ]
         default: array
         description: "Aggregation mode: array (collect into array), object (merge into object), merge (deep merge)"
-      
+
       field:
         type: string
         description: Optional - extract specific field from each result
-      
+
       context:
         type: object
         description: Map context variables from other nodes
@@ -410,11 +410,11 @@ definitions:
         examples:
           - "{{ item.score > 0.8 }}"
           - "{{ item.type == 'company' }}"
-      
+
       field:
         type: string
         description: Array field to filter (if not provided, filters root array)
-      
+
       context:
         type: object
         description: Map context variables from other nodes
@@ -437,11 +437,11 @@ definitions:
         examples:
           - "{{ item | upper }}"
           - { name: "{{ item.name }}", score: "{{ item.score * 100 }}" }
-      
+
       field:
         type: string
         description: Array field to transform (if not provided, transforms root array)
-      
+
       context:
         type: object
         description: Map context variables from other nodes
@@ -461,13 +461,13 @@ definitions:
         examples:
           - left: companies_data
             right: revenue_data.companies
-      
+
       join_type:
         type: string
         enum: [ inner, left, right, outer, cross, merge ]
         default: merge
         description: Type of join to perform
-      
+
       join_keys:
         type: object
         description: Join key mappings for inner/left joins (source1_key -> source2_key)
@@ -476,7 +476,7 @@ definitions:
         examples:
           - company_id: id
             name: company_name
-      
+
       context:
         type: object
         description: Map context variables from other nodes
@@ -492,27 +492,27 @@ definitions:
       array_field:
         type: string
         description: Field containing array to iterate over
-      
+
       item_name:
         type: string
         default: item
         description: Name for each item in subgraph context
-      
+
       subgraph_nodes:
         type: array
         items:
           type: string
         description: List of node names to execute for each item
-      
+
       parallel:
         type: boolean
         default: true
         description: Execute iterations in parallel (default) or sequentially
-      
+
       collect_output:
         type: string
         description: Output field name to collect from each iteration
-      
+
       context:
         type: object
         description: Map context variables from other nodes
@@ -542,11 +542,11 @@ definitions:
               type: boolean
               default: false
               description: Whether this is the default condition
-      
+
       fallback:
         type: string
         description: Fallback value if no conditions match and no default
-      
+
       context:
         type: object
         description: Map context variables from other nodes

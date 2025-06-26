@@ -7,7 +7,7 @@ inputs:
     type: string
     required: true
     description: Company name to analyze
-  
+
   api_key:
     type: string
     required: false
@@ -39,7 +39,7 @@ nodes:
       prompt: |
         Analyze this company data:
         {{ fetch_data.body }}
-        
+
         Using this template:
         {{ read_template.data }}
       model: "gpt-4"
@@ -55,7 +55,7 @@ nodes:
     config:
       code: |
         analysis = context['analysis']
-        
+
         # Extract key metrics (all JSON-serializable)
         metrics = {
             "sentiment": 0.8,
@@ -63,7 +63,7 @@ nodes:
             "risk_score": 0.3,
             "summary": analysis.get('response', '')[:200]
         }
-        
+
         return metrics
       context:
         analysis: analyze_company
