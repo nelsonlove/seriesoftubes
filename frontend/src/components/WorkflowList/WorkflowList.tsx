@@ -270,11 +270,10 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({ onSelectWorkflow }) 
                         style={{
                           fontSize: '14px',
                           lineHeight: '1.5',
-                          display: 'block',
+                          display: '-webkit-box',
                           marginBottom: '12px',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
-                          display: '-webkit-box',
                           WebkitLineClamp: 2,
                           WebkitBoxOrient: 'vertical',
                         }}
