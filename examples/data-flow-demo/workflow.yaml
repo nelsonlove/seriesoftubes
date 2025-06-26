@@ -1,0 +1,105 @@
+name: Data Flow Primitives Demo
+version: "1.0.0"
+description: >
+  Demonstration of the new data flow primitives: split, filter, transform, and aggregate.
+  This workflow shows how to process arrays of data in parallel with SeriesOfTubes.
+
+inputs:
+  companies:
+    type: array
+    default: [
+      {"name": "Acme Corp", "revenue": 2000000, "industry": "Technology", "employees": 50},
+      {"name": "Beta Industries", "revenue": 500000, "industry": "Manufacturing", "employees": 25},
+      {"name": "Gamma Tech", "revenue": 5000000, "industry": "Technology", "employees": 100},
+      {"name": "Delta Services", "revenue": 800000, "industry": "Services", "employees": 30},
+      {"name": "Epsilon Inc", "revenue": 1200000, "industry": "Technology", "employees": 40}
+    ]
+    description: Array of company data to process
+
+nodes:
+  # Step 1: Split the company array for parallel processing
+  split_companies:
+    type: split
+    description: "Split company array into individual items for parallel processing"
+    config:
+      field: inputs.companies
+      item_name: company
+
+  # Step 2: Filter to only high-value companies (parallel processing)
+  filter_high_value:
+    type: filter
+    description: "Filter companies with revenue > $1M"
+    depends_on: [split_companies]
+    config:
+      condition: "{{ company.revenue > 1000000 }}"
+
+  # Step 3: Transform company data structure (parallel processing)
+  transform_company_data:
+    type: transform
+    description: "Transform company data to standardized format"
+    depends_on: [filter_high_value]
+    config:
+      template:
+        company_id: "{{ item.name | replace(' ', '_') | lower }}"
+        display_name: "{{ item.name }}"
+        revenue_millions: "{{ (item.revenue / 1000000) | round(2) }}"
+        industry_category: "{{ item.industry }}"
+        size_category: "{% if item.employees > 75 %}large{% elif item.employees > 40 %}medium{% else %}small{% endif %}"
+        risk_score: "{% if item.revenue > 3000000 %}low{% elif item.revenue > 1500000 %}medium{% else %}high{% endif %}"
+
+  # Step 4: Aggregate results back to single array
+  aggregate_companies:
+    type: aggregate
+    description: "Collect all transformed companies into final array"
+    depends_on: [transform_company_data]
+    config:
+      mode: array
+
+  # Step 5: Generate summary statistics
+  generate_summary:
+    type: python
+    description: "Generate summary statistics from processed companies"
+    depends_on: [aggregate_companies]
+    config:
+      code: |
+        companies = context['companies']
+        
+        if not companies:
+          return {"message": "No companies found after filtering"}
+        
+        # Calculate statistics
+        total_companies = len(companies)
+        total_revenue = sum(float(c['revenue_millions']) for c in companies)
+        avg_revenue = total_revenue / total_companies if total_companies > 0 else 0
+        
+        # Group by industry
+        by_industry = {}
+        for company in companies:
+          industry = company['industry_category']
+          if industry not in by_industry:
+            by_industry[industry] = []
+          by_industry[industry].append(company)
+        
+        # Group by size
+        by_size = {}
+        for company in companies:
+          size = company['size_category']
+          if size not in by_size:
+            by_size[size] = 0
+          by_size[size] += 1
+        
+        return {
+          'total_companies_processed': total_companies,
+          'total_revenue_millions': round(total_revenue, 2),
+          'average_revenue_millions': round(avg_revenue, 2),
+          'companies_by_industry': {k: len(v) for k, v in by_industry.items()},
+          'companies_by_size': by_size,
+          'sample_companies': companies[:3],  # First 3 for preview
+          'processing_timestamp': '2024-01-01T12:00:00Z'
+        }
+      context:
+        companies: aggregate_companies
+
+outputs:
+  processed_companies: aggregate_companies
+  summary: generate_summary
