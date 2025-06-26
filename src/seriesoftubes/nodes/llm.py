@@ -74,9 +74,9 @@ class LLMNodeExecutor(NodeExecutor):
 
             # Structure the output
             output = {
-                "response": content
-                if isinstance(content, str)
-                else json.dumps(content),
+                "response": (
+                    content if isinstance(content, str) else json.dumps(content)
+                ),
                 "structured_output": content if isinstance(content, dict) else None,
                 "model_used": model,
                 "token_usage": None,  # TODO: Extract from API responses

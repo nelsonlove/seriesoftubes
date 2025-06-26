@@ -105,11 +105,10 @@ class TestSchemaValidation:
         engine = WorkflowEngine()
 
         # Mock the node executors to return specific outputs
-        with patch.object(
-            engine.executors[NodeType.HTTP], "execute"
-        ) as mock_http, patch.object(
-            engine.executors[NodeType.LLM], "execute"
-        ) as mock_llm:
+        with (
+            patch.object(engine.executors[NodeType.HTTP], "execute") as mock_http,
+            patch.object(engine.executors[NodeType.LLM], "execute") as mock_llm,
+        ):
             # Return None output which should trigger validation error
             mock_http.return_value = NodeResult(
                 output=None,
@@ -136,11 +135,10 @@ class TestSchemaValidation:
         """Test that valid outputs pass validation"""
         engine = WorkflowEngine()
 
-        with patch.object(
-            engine.executors[NodeType.HTTP], "execute"
-        ) as mock_http, patch.object(
-            engine.executors[NodeType.LLM], "execute"
-        ) as mock_llm:
+        with (
+            patch.object(engine.executors[NodeType.HTTP], "execute") as mock_http,
+            patch.object(engine.executors[NodeType.LLM], "execute") as mock_llm,
+        ):
             # Return valid output that matches schema
             mock_http.return_value = NodeResult(
                 output={

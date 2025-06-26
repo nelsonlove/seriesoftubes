@@ -110,69 +110,53 @@ class APIClient:
         return cast(dict[str, Any], data)
 
     # Workflow methods
-    def list_workflows(
-        self, directory: str = ".", *, use_db: bool = False
-    ) -> list[dict[str, Any]]:
-        """List workflows"""
-        if use_db:
-            # List from database
-            response = self.client.get("/api/workflows")
-        else:
-            # List from filesystem
-            response = self.client.get("/workflows", params={"directory": directory})
-
+    def list_workflows(self) -> list[dict[str, Any]]:
+        """List workflows from API"""
+        response = self.client.get("/api/workflows")
         response.raise_for_status()
         return cast(list[dict[str, Any]], response.json())
 
-    def get_workflow(self, workflow_path: str) -> dict[str, Any]:
+    def get_workflow(self, workflow_id: str) -> dict[str, Any]:
         """Get workflow details"""
-        response = self.client.get(f"/workflows/{workflow_path}")
+        response = self.client.get(f"/api/workflows/{workflow_id}")
         response.raise_for_status()
         return cast(dict[str, Any], response.json())
 
     def create_workflow(
-        self, name: str, version: str, yaml_content: str, description: str | None = None
+        self, yaml_content: str, is_public: bool = False
     ) -> dict[str, Any]:
         """Create a new workflow in the database"""
         response = self.client.post(
             "/api/workflows",
             json={
-                "name": name,
-                "version": version,
                 "yaml_content": yaml_content,
-                "description": description,
-                "is_public": False,
+                "is_public": is_public,
             },
         )
         response.raise_for_status()
         return cast(dict[str, Any], response.json())
 
-    def upload_workflow_package(self, zip_path: Path) -> dict[str, Any]:
-        """Upload a workflow package"""
-        with open(zip_path, "rb") as f:
-            files = {"file": (zip_path.name, f, "application/zip")}
-            response = self.client.post("/api/workflows/upload", files=files)
+    def upload_workflow_file(
+        self, yaml_path: Path, is_public: bool = False
+    ) -> dict[str, Any]:
+        """Upload a workflow YAML file"""
+        with open(yaml_path, "rb") as f:
+            files = {"file": (yaml_path.name, f, "application/x-yaml")}
+            response = self.client.post(
+                "/api/workflows/upload",
+                files=files,
+                params={"is_public": is_public},
+            )
 
         response.raise_for_status()
         return cast(dict[str, Any], response.json())
 
-    def run_workflow(
-        self, workflow_path: str, inputs: dict[str, Any], *, use_db: bool = False
-    ) -> dict[str, Any]:
+    def run_workflow(self, workflow_id: str, inputs: dict[str, Any]) -> dict[str, Any]:
         """Run a workflow"""
-        if use_db:
-            # Run from database
-            response = self.client.post(
-                f"/api/executions/workflows/{workflow_path}/run",
-                json={"inputs": inputs},
-            )
-        else:
-            # Run from filesystem
-            response = self.client.post(
-                f"/workflows/{workflow_path}/run",
-                json={"inputs": inputs},
-            )
-
+        response = self.client.post(
+            f"/api/workflows/{workflow_id}/run",
+            json={"inputs": inputs},
+        )
         response.raise_for_status()
         return cast(dict[str, Any], response.json())
 
@@ -182,28 +166,52 @@ class APIClient:
         response.raise_for_status()
         return cast(list[dict[str, Any]], response.json())
 
-    def get_execution(
-        self, execution_id: str, *, use_db: bool = False
-    ) -> dict[str, Any]:
+    def get_execution(self, execution_id: str) -> dict[str, Any]:
         """Get execution details"""
-        if use_db:
-            response = self.client.get(f"/api/executions/{execution_id}")
-        else:
-            response = self.client.get(f"/executions/{execution_id}")
-
+        response = self.client.get(f"/api/executions/{execution_id}")
         response.raise_for_status()
         return cast(dict[str, Any], response.json())
 
-    def stream_execution(self, execution_id: str, *, use_db: bool = False) -> Any:
-        """Stream execution updates"""
-        if use_db:
-            url = f"/api/executions/{execution_id}/stream"
-        else:
-            url = f"/executions/{execution_id}/stream"
+    def stream_execution(self, execution_id: str) -> Any:
+        """Stream execution updates via SSE"""
+        url = f"/api/executions/{execution_id}/stream"
 
-        # Use streaming
+        # Parse SSE events
         with self.client.stream("GET", url) as response:
             response.raise_for_status()
+            event_data = {}
             for line in response.iter_lines():
-                if line:
-                    yield line
+                if line.startswith("event:"):
+                    event_data["event"] = line[6:].strip()
+                elif line.startswith("data:"):
+                    event_data["data"] = line[5:].strip()
+                elif not line and event_data:
+                    # Empty line signals end of event
+                    yield event_data
+                    event_data = {}
+
+    def validate_workflow(
+        self, workflow_id: str, yaml_content: str | None = None
+    ) -> dict[str, Any]:
+        """Validate a workflow"""
+        response = self.client.post(
+            f"/api/workflows/{workflow_id}/validate",
+            json={"yaml_content": yaml_content} if yaml_content else {},
+        )
+        response.raise_for_status()
+        return cast(dict[str, Any], response.json())
+
+    def download_workflow(
+        self, workflow_id: str, format: str = "yaml"  # noqa: A002
+    ) -> str | bytes:
+        """Download a workflow"""
+        response = self.client.get(
+            f"/api/workflows/{workflow_id}/download",
+            params={"format": format},
+        )
+        response.raise_for_status()
+
+        if format == "yaml":
+            return response.text
+        else:
+            return response.content

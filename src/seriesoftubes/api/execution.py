@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from seriesoftubes.engine import WorkflowEngine
+from seriesoftubes.engine import WorkflowEngine, run_workflow
 from seriesoftubes.models import Workflow
 from seriesoftubes.parser import parse_workflow_yaml
 
@@ -90,8 +90,6 @@ class ExecutionManager:
             )
 
             # Save outputs to disk
-            from seriesoftubes.engine import run_workflow
-
             await run_workflow(workflow, inputs, output_dir=Path("outputs"))
 
         except Exception as e:

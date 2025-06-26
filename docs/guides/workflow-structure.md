@@ -84,14 +84,14 @@ Workflow inputs support the following types:
 inputs:
   # Simple string input (shorthand)
   company_name: string
-  
+
   # Detailed input with constraints
   threshold:
     type: number
     required: false
     default: 100
     description: Revenue threshold
-  
+
   # Object input
   config:
     type: object
@@ -108,7 +108,7 @@ nodes:
     type: http
     config:
       url: https://api.example.com/data
-  
+
   process_data:
     type: python
     depends_on: [fetch_data]  # Waits for fetch_data to complete

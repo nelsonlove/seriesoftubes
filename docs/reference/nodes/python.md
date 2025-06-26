@@ -90,7 +90,7 @@ transform_data:
   config:
     code: |
       data = context['data']
-      
+
       # Transform and filter
       result = {
           'total': len(data),
@@ -99,7 +99,7 @@ transform_data:
               'avg_revenue': sum(d.get('revenue', 0) for d in data) / len(data)
           }
       }
-      
+
       return result
     context:
       data: load_data

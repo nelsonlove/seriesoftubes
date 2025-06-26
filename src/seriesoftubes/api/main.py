@@ -1,10 +1,7 @@
 """FastAPI application for seriesoftubes"""
 
-import asyncio
 import json
 import logging
-import shutil
-import tempfile
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -13,23 +10,12 @@ from typing import Any
 import yaml
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
-from sse_starlette.sse import EventSourceResponse
+from pydantic import BaseModel
 
 from seriesoftubes.api.auth_routes import router as auth_router
-from seriesoftubes.api.execution import execution_manager
 from seriesoftubes.api.execution_routes import router as execution_router
-from seriesoftubes.api.models import (
-    ExecutionStatus,
-    RawWorkflowResponse,
-    RawWorkflowUpdate,
-    WorkflowDetail,
-    WorkflowInfo,
-    WorkflowRunRequest,
-    WorkflowRunResponse,
-)
 from seriesoftubes.api.workflow_routes import router as workflow_router
 from seriesoftubes.db import init_db
-from seriesoftubes.parser import WorkflowParseError, parse_workflow_yaml
 
 logger = logging.getLogger(__name__)
 
@@ -72,306 +58,90 @@ async def health() -> dict[str, str]:
     return {"status": "healthy"}
 
 
-@app.get("/workflows", response_model=list[WorkflowInfo])
-async def list_workflows(directory: str = ".") -> list[WorkflowInfo]:
-    """List available workflows in a directory"""
-    workflows = []
-    base_path = Path(directory)
-
-    if not base_path.exists():
-        raise HTTPException(status_code=404, detail="Directory not found")
-
-    # Find all YAML files
-    yaml_files = list(base_path.rglob("*.yaml")) + list(base_path.rglob("*.yml"))
-
-    for yaml_file in yaml_files:
-        try:
-            workflow = parse_workflow_yaml(yaml_file)
-            # Only include files that have nodes (actual workflows)
-            if workflow.nodes:
-                workflows.append(
-                    WorkflowInfo(
-                        name=workflow.name,
-                        version=workflow.version,
-                        description=workflow.description,
-                        path=str(yaml_file.relative_to(base_path)),
-                        inputs={
-                            name: {
-                                "type": input_def.input_type,
-                                "required": input_def.required,
-                                "default": input_def.default,
-                            }
-                            for name, input_def in workflow.inputs.items()
-                        },
-                    )
-                )
-        except Exception as e:
-            # Skip invalid workflow files
-            logger.debug(f"Skipping invalid workflow file {yaml_file}: {e}")
-            continue
-
-    return workflows
-
-
-@app.get("/workflows/{workflow_path:path}/raw", response_model=RawWorkflowResponse)
-async def get_workflow_raw(workflow_path: str) -> RawWorkflowResponse:
-    """Get raw YAML content of a workflow"""
-    # Handle both absolute and relative paths
-    path = Path(workflow_path)
-    if not path.is_absolute():
-        # If relative, resolve from current working directory
-        path = Path.cwd() / path
-
-    if not path.exists():
-        raise HTTPException(status_code=404, detail="Workflow not found")
+@app.get("/api/schema")
+async def get_workflow_schema() -> dict[str, Any]:
+    """Get the workflow schema for validation"""
+    # Load the workflow schema
+    schema_path = Path(__file__).parent.parent / "schemas" / "workflow-schema.yaml"
+    if not schema_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="Workflow schema not found",
+        )
 
     try:
-        content = path.read_text()
-        stat = path.stat()
-        return RawWorkflowResponse(
-            content=content,
-            path=str(path),
-            modified=stat.st_mtime,
-        )
+        with open(schema_path) as f:
+            schema = yaml.safe_load(f)
+        return schema
     except Exception as e:
-        logger.error(f"Failed to read workflow file {path}: {e}")
+        logger.error(f"Failed to load workflow schema: {e}")
         raise HTTPException(
-            status_code=500, detail="Failed to read workflow file"
+            status_code=500,
+            detail="Failed to load workflow schema",
         ) from e
 
 
-@app.put("/workflows/{workflow_path:path}/raw", response_model=dict[str, Any])
-async def update_workflow_raw(
-    workflow_path: str, request: RawWorkflowUpdate
-) -> dict[str, Any]:
-    """Update raw YAML content of a workflow"""
-    path = Path(workflow_path)
+class WorkflowConvertRequest(BaseModel):
+    """Convert workflow request"""
 
-    if not path.exists():
-        raise HTTPException(status_code=404, detail="Workflow not found")
+    content: str
+    from_format: str = "yaml"  # yaml, json
+    to_format: str = "json"  # yaml, json
 
-    # Check for conflicts if expected_modified is provided
-    if request.expected_modified is not None:
-        current_modified = path.stat().st_mtime
-        if (
-            abs(current_modified - request.expected_modified) > 0.01
-        ):  # Small tolerance for float comparison
+
+class WorkflowConvertResponse(BaseModel):
+    """Convert workflow response"""
+
+    content: str
+    format: str
+
+
+@app.post("/api/convert", response_model=WorkflowConvertResponse)
+async def convert_workflow(request: WorkflowConvertRequest) -> WorkflowConvertResponse:
+    """Convert workflow between formats (YAML/JSON)"""
+    try:
+        # Parse from source format
+        if request.from_format == "yaml":
+            data = yaml.safe_load(request.content)
+        elif request.from_format == "json":
+            data = json.loads(request.content)
+        else:
             raise HTTPException(
-                status_code=409,
-                detail="File has been modified since it was loaded. Please reload and try again.",
+                status_code=400,
+                detail=f"Unsupported source format: {request.from_format}",
             )
 
-    # Validate the YAML content
-    try:
-        # First validate YAML syntax
-        yaml.safe_load(request.content)
+        # Convert to target format
+        if request.to_format == "yaml":
+            output = yaml.dump(data, default_flow_style=False, sort_keys=False)
+        elif request.to_format == "json":
+            output = json.dumps(data, indent=2)
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported target format: {request.to_format}",
+            )
 
-        # Then validate workflow structure by parsing
-        # We need to save to a temp file to use parse_workflow_yaml
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as tmp:
-            tmp.write(request.content)
-            tmp_path = Path(tmp.name)
-
-        try:
-            workflow = parse_workflow_yaml(tmp_path)
-        finally:
-            tmp_path.unlink()  # Clean up temp file
+        return WorkflowConvertResponse(
+            content=output,
+            format=request.to_format,
+        )
 
     except yaml.YAMLError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid YAML syntax: {e}") from e
-    except WorkflowParseError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid workflow: {e}") from e
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Validation error: {e}") from e
-
-    # Create backup
-    backup_path = path.with_suffix(path.suffix + ".bak")
-    try:
-        shutil.copy2(path, backup_path)
-    except Exception as e:
-        logger.warning(f"Failed to create backup: {e}")
-
-    # Save the new content
-    try:
-        path.write_text(request.content)
-        new_stat = path.stat()
-        return {
-            "success": True,
-            "path": str(path),
-            "modified": new_stat.st_mtime,
-            "workflow": {
-                "name": workflow.name,
-                "version": workflow.version,
-            },
-        }
-    except Exception as e:
-        # Try to restore from backup
-        if backup_path.exists():
-            try:
-                shutil.copy2(backup_path, path)
-            except Exception:  # noqa: S110
-                pass
         raise HTTPException(
-            status_code=500, detail=f"Failed to save workflow: {e}"
+            status_code=400,
+            detail=f"Invalid YAML: {e}",
         ) from e
-
-
-@app.post("/workflows/{workflow_path:path}/run", response_model=WorkflowRunResponse)
-async def run_workflow(
-    workflow_path: str, request: WorkflowRunRequest
-) -> WorkflowRunResponse:
-    """Run a workflow with the provided inputs"""
-    path = Path(workflow_path)
-
-    if not path.exists():
-        raise HTTPException(status_code=404, detail="Workflow not found")
-
-    # Start execution
-    execution_id = await execution_manager.run_workflow(path, request.inputs)
-
-    return WorkflowRunResponse(
-        execution_id=execution_id,
-        status="started",
-        message=f"Workflow execution started with ID: {execution_id}",
-    )
-
-
-@app.get("/workflows/{workflow_path:path}", response_model=WorkflowDetail)
-async def get_workflow(workflow_path: str) -> WorkflowDetail:
-    """Get details about a specific workflow"""
-    path = Path(workflow_path)
-
-    if not path.exists():
-        raise HTTPException(status_code=404, detail="Workflow not found")
-
-    try:
-        workflow = parse_workflow_yaml(path)
-        return WorkflowDetail(
-            path=str(path),
-            workflow={
-                "name": workflow.name,
-                "version": workflow.version,
-                "description": workflow.description,
-                "inputs": {
-                    name: {
-                        "type": input_def.input_type,
-                        "required": input_def.required,
-                        "default": input_def.default,
-                    }
-                    for name, input_def in workflow.inputs.items()
-                },
-                "nodes": {
-                    name: {
-                        "type": node.node_type.value,
-                        "description": node.description,
-                        "depends_on": node.depends_on,
-                        "config": node.config.model_dump() if node.config else {},
-                    }
-                    for name, node in workflow.nodes.items()
-                },
-                "outputs": workflow.outputs,
-            },
-        )
-    except WorkflowParseError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-
-
-@app.get("/executions", response_model=list[ExecutionStatus])
-async def list_executions() -> list[ExecutionStatus]:
-    """List all workflow executions"""
-    executions = execution_manager.list_executions()
-    return [
-        ExecutionStatus(
-            execution_id=exec_data["id"],
-            status=exec_data["status"],
-            workflow_name=exec_data["workflow_name"],
-            start_time=exec_data["start_time"],
-            end_time=exec_data.get("end_time"),
-            outputs=exec_data.get("outputs"),
-            errors=exec_data.get("errors"),
-            progress=exec_data.get("progress"),
-        )
-        for exec_data in executions
-    ]
-
-
-@app.get("/executions/{execution_id}", response_model=ExecutionStatus)
-async def get_execution(execution_id: str) -> ExecutionStatus:
-    """Get details about a specific execution"""
-    exec_data = execution_manager.get_status(execution_id)
-
-    if not exec_data:
-        raise HTTPException(status_code=404, detail="Execution not found")
-
-    return ExecutionStatus(
-        execution_id=exec_data["id"],
-        status=exec_data["status"],
-        workflow_name=exec_data["workflow_name"],
-        start_time=exec_data["start_time"],
-        end_time=exec_data.get("end_time"),
-        outputs=exec_data.get("outputs"),
-        errors=exec_data.get("errors"),
-        progress=exec_data.get("progress"),
-    )
-
-
-@app.get("/executions/{execution_id}/stream")
-async def stream_execution(execution_id: str) -> EventSourceResponse:
-    """Stream execution updates via Server-Sent Events"""
-    exec_data = execution_manager.get_status(execution_id)
-
-    if not exec_data:
-        raise HTTPException(status_code=404, detail="Execution not found")
-
-    async def event_generator() -> Any:
-        """Generate SSE events for execution updates"""
-        last_status = None
-        last_progress = None
-
-        while True:
-            exec_data = execution_manager.get_status(execution_id)
-            if not exec_data:
-                break
-
-            # Check for status changes
-            current_status = exec_data["status"]
-            current_progress = exec_data.get("progress", {})
-
-            if current_status != last_status or current_progress != last_progress:
-                yield {
-                    "event": "update",
-                    "data": json.dumps(
-                        {
-                            "execution_id": execution_id,
-                            "status": current_status,
-                            "progress": current_progress,
-                            "outputs": exec_data.get("outputs"),
-                            "errors": exec_data.get("errors"),
-                        }
-                    ),
-                }
-                last_status = current_status
-                last_progress = current_progress
-
-            # If execution is complete, send final event and close
-            if current_status in ["completed", "failed"]:
-                yield {
-                    "event": "complete",
-                    "data": json.dumps(
-                        {
-                            "execution_id": execution_id,
-                            "status": current_status,
-                            "outputs": exec_data.get("outputs"),
-                            "errors": exec_data.get("errors"),
-                        }
-                    ),
-                }
-                break
-
-            # Wait before checking again
-            await asyncio.sleep(0.5)
-
-    return EventSourceResponse(event_generator())
+    except json.JSONDecodeError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid JSON: {e}",
+        ) from e
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Conversion error: {e}",
+        ) from e
 
 
 # Mount documentation files

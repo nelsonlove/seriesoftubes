@@ -94,7 +94,7 @@ outputs:
 """
         )
 
-        result = runner.invoke(app, ["validate", str(workflow_file)])
+        result = runner.invoke(app, ["validate", str(workflow_file), "--local"])
         assert result.exit_code == 0
         assert "✓ Parsed workflow: test_workflow" in result.stdout
         assert "✓ No cycles detected" in result.stdout
@@ -106,7 +106,7 @@ outputs:
         workflow_file = tmp_path / "invalid.yaml"
         workflow_file.write_text("invalid: yaml: content:")
 
-        result = runner.invoke(app, ["validate", str(workflow_file)])
+        result = runner.invoke(app, ["validate", str(workflow_file), "--local"])
         assert result.exit_code == 1
         assert "✗ Validation failed:" in result.stdout
 
@@ -146,7 +146,7 @@ outputs:
         }
 
         result = runner.invoke(
-            app, ["run", str(workflow_file), "-i", "text=Hello", "--no-save"]
+            app, ["run", str(workflow_file), "-i", "text=Hello", "--no-save", "--local"]
         )
         assert result.exit_code == 0
         assert "✓ Loaded workflow: test_workflow v1.0" in result.stdout
@@ -182,14 +182,14 @@ nodes:
             "errors": {"fail": "Test error"},
         }
 
-        result = runner.invoke(app, ["run", str(workflow_file), "--no-save"])
+        result = runner.invoke(app, ["run", str(workflow_file), "--no-save", "--local"])
         assert result.exit_code == 1
         assert "✗ Workflow failed!" in result.stdout
         assert "fail: Test error" in result.stdout
 
     def test_run_missing_file(self):
         """Test run command with missing file"""
-        result = runner.invoke(app, ["run", "nonexistent.yaml"])
+        result = runner.invoke(app, ["run", "nonexistent.yaml", "--local"])
         assert result.exit_code == 1
         assert "✗" in result.stdout
 
@@ -238,7 +238,7 @@ nodes:
         # Also create a non-workflow YAML (empty workflow with no nodes)
         (tmp_path / "not-workflow.yaml").write_text("name: empty\nversion: '1.0'")
 
-        result = runner.invoke(app, ["list", "-d", str(tmp_path)])
+        result = runner.invoke(app, ["list", "-d", str(tmp_path), "--local"])
         assert result.exit_code == 0
         assert "Found 2 workflow(s)" in result.stdout
         assert "workflow_one" in result.stdout
@@ -249,7 +249,7 @@ nodes:
 
     def test_list_command_no_workflows(self, tmp_path):
         """Test list command with no workflows"""
-        result = runner.invoke(app, ["list", "-d", str(tmp_path)])
+        result = runner.invoke(app, ["list", "-d", str(tmp_path), "--local"])
         assert result.exit_code == 0
         assert "No YAML files found" in result.stdout
 
@@ -285,11 +285,13 @@ nodes:
         )
 
         # List without exclude
-        result = runner.invoke(app, ["list", "-d", str(tmp_path)])
+        result = runner.invoke(app, ["list", "-d", str(tmp_path), "--local"])
         assert "Found 2 workflow(s)" in result.stdout
 
         # List with exclude
-        result = runner.invoke(app, ["list", "-d", str(tmp_path), "-e", "test/*"])
+        result = runner.invoke(
+            app, ["list", "-d", str(tmp_path), "-e", "test/*", "--local"]
+        )
         assert "Found 1 workflow(s)" in result.stdout
         assert "main_workflow" in result.stdout
         assert "test_workflow" not in result.stdout

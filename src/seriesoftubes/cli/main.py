@@ -12,9 +12,7 @@ from pathlib import Path
 from typing import Annotated, Any
 
 import httpx
-import jsonschema
 import typer
-import yaml
 from rich.console import Console
 from rich.table import Table
 
@@ -138,35 +136,35 @@ def auth(
 @app.command()
 def run(
     workflow: Annotated[
-        str, typer.Argument(help="Path to workflow YAML file or workflow ID")
+        str, typer.Argument(help="Workflow ID (from API) or path to local YAML file")
     ],
     inputs: Annotated[list[str] | None, typer.Option("--inputs", "-i")] = None,
     output_dir: Annotated[Path | None, typer.Option("--output-dir", "-o")] = None,
     no_save: Annotated[bool, typer.Option("--no-save")] = False,
-    api: Annotated[
-        bool, typer.Option("--api", help="Run via API instead of locally")
+    local: Annotated[
+        bool, typer.Option("--local", help="Run locally instead of via API")
     ] = False,
 ) -> None:
-    """Run a workflow from a YAML file or via API
+    """Run a workflow from API (default) or locally
 
     Examples:
-        s10s run workflow.yaml
-        s10s run workflow.yaml -i text="Hello world" -i count=5
-        s10s run workflow.yaml --no-save
-        s10s run workflow.yaml -o ./my-outputs
-        s10s run workflow-id --api -i company="Acme Corp"
+        s10s run workflow-id -i company="Acme Corp"  # Run from API
+        s10s run workflow.yaml --local  # Run local file
+        s10s run workflow.yaml --local -i text="Hello world" -i count=5
+        s10s run workflow.yaml --local --no-save
+        s10s run workflow.yaml --local -o ./my-outputs
     """
     # Parse inputs
     parsed_inputs = parse_input_args(inputs)
 
-    if api:
-        # Run via API
+    if not local:
+        # Run via API (default)
         console.print(f"[bold]Running workflow via API:[/bold] {workflow}")
 
         with APIClient() as client:
             try:
-                # Run the workflow
-                result = client.run_workflow(workflow, parsed_inputs, use_db=True)
+                # Run the workflow by ID
+                result = client.run_workflow(workflow, parsed_inputs)
                 console.print(
                     f"✓ Started execution: [green]{result['execution_id']}[/green]"
                 )
@@ -174,32 +172,34 @@ def run(
                 # Stream updates
                 console.print("\n[bold]Execution progress:[/bold]")
 
-                for line in client.stream_execution(
-                    result["execution_id"], use_db=True
-                ):
-                    if line.startswith("data:"):
-                        data = json.loads(line[5:])
+                for event in client.stream_execution(result["execution_id"]):
+                    if event["event"] == "update":
+                        data = json.loads(event["data"])
+                        console.print(f"  Status: {data.get('status')}")
+                        if data.get("progress"):
+                            for node, status in data["progress"].items():
+                                console.print(f"    • {node}: {status}")
+                    elif event["event"] == "complete":
+                        data = json.loads(event["data"])
                         if data.get("status") == "completed":
                             console.print(
-                                "\n[bold green]✓ Workflow completed "
-                                "successfully![/bold green]"
+                                "\n[bold green]✓ Workflow completed successfully![/bold green]"
                             )
                             if data.get("outputs"):
                                 console.print("\n[bold]Outputs:[/bold]")
                                 console.print(json.dumps(data["outputs"], indent=2))
-                        elif data.get("status") == "failed":
+                        else:
                             console.print("\n[bold red]✗ Workflow failed![/bold red]")
                             if data.get("errors"):
                                 console.print("\n[bold]Errors:[/bold]")
                                 console.print(json.dumps(data["errors"], indent=2))
-                        else:
-                            console.print(f"Status: {data.get('status')}")
 
             except httpx.HTTPStatusError as e:
-                console.print(f"[red]✗ API error: {e.response.text}[/red]")
+                error_detail = e.response.json().get("detail", e.response.text)
+                console.print(f"[red]✗ API error: {error_detail}[/red]")
                 raise typer.Exit(1) from e
     else:
-        # Run locally
+        # Run locally from file
         console.print(f"[bold]Running workflow locally:[/bold] {workflow}")
 
         try:
@@ -262,96 +262,219 @@ def run(
 
 
 @app.command()
-def validate(
+def upload(
     workflow: Annotated[Path, typer.Argument(help="Path to workflow YAML file")],
+    public: Annotated[
+        bool, typer.Option("--public", help="Make workflow public")
+    ] = False,
 ) -> None:
-    """Validate a workflow YAML file against schema and DAG rules"""
-    console.print(f"[bold]Validating workflow:[/bold] {workflow}")
+    """Upload a workflow YAML file to the API
+
+    Examples:
+        s10s upload workflow.yaml
+        s10s upload workflow.yaml --public
+    """
+    console.print(f"[bold]Uploading workflow:[/bold] {workflow}")
 
     try:
-        # First, validate against JSON schema
-        console.print("• Checking schema compliance...")
-        schema_path = Path(__file__).parent / "schemas" / "workflow-schema.yaml"
+        # Read the workflow file
+        with open(workflow) as f:
+            yaml_content = f.read()
 
-        if schema_path.exists():
-            with open(schema_path) as f:
-                schema = yaml.safe_load(f)
-
-            with open(workflow) as f:
-                workflow_data = yaml.safe_load(f)
-
+        # Upload via API
+        with APIClient() as client:
             try:
-                jsonschema.validate(workflow_data, schema)
-                console.print("  ✓ [green]Schema validation passed[/green]")
-            except jsonschema.ValidationError as e:
-                console.print(f"  ✗ [red]Schema validation failed:[/red] {e.message}")
-                if e.path:
-                    console.print(f"    Path: {'.'.join(str(p) for p in e.path)}")
-                raise typer.Exit(1) from None
-        else:
-            console.print(
-                "  [yellow]⚠ Schema file not found, skipping schema validation[/yellow]"
-            )
+                result = client.create_workflow(yaml_content, is_public=public)
+                console.print(
+                    f"✓ Uploaded workflow: [green]{result['name']} v{result['version']}[/green]"
+                )
+                console.print(f"  ID: [cyan]{result['id']}[/cyan]")
+                console.print(f"  Public: {'✓' if result['is_public'] else '✗'}")
 
-        # Parse the workflow with Pydantic
-        console.print("• Parsing workflow structure...")
-        wf = parse_workflow_yaml(workflow)
-        console.print(f"  ✓ Parsed workflow: [green]{wf.name} v{wf.version}[/green]")
+            except httpx.HTTPStatusError as e:
+                error_detail = e.response.json().get("detail", e.response.text)
+                console.print(f"[red]✗ Upload failed: {error_detail}[/red]")
+                raise typer.Exit(1) from e
 
-        # Validate DAG
-        console.print("• Validating DAG structure...")
-        validate_dag(wf)
-        console.print("  ✓ [green]No cycles detected[/green]")
-        console.print("  ✓ [green]All dependencies exist[/green]")
-
-        # Show summary
-        console.print("\n[bold]Workflow Summary:[/bold]")
-        console.print(f"  • Inputs: {len(wf.inputs)}")
-        console.print(f"  • Nodes: {len(wf.nodes)}")
-        for node_type in ["llm", "http", "route", "file"]:
-            count = sum(1 for n in wf.nodes.values() if n.node_type.value == node_type)
-            if count > 0:
-                console.print(f"    - {node_type}: {count}")
-        console.print(f"  • Outputs: {len(wf.outputs)}")
-
-        console.print("\n[bold green]✓ Workflow is valid![/bold green]")
-
-    except WorkflowParseError as e:
-        console.print(f"\n[bold red]✗ Validation failed:[/bold red] {e}")
+    except FileNotFoundError:
+        console.print(f"[red]✗ File not found: {workflow}[/red]")
         raise typer.Exit(1) from None
     except Exception as e:
-        console.print(f"\n[bold red]✗ Unexpected error:[/bold red] {e}")
+        console.print(f"[red]✗ Error: {e}[/red]")
         raise typer.Exit(1) from None
+
+
+@app.command()
+def download(
+    workflow_id: Annotated[str, typer.Argument(help="Workflow ID to download")],
+    output: Annotated[
+        Path | None, typer.Option("--output", "-o", help="Output file path")
+    ] = None,
+    format: Annotated[  # noqa: A002
+        str, typer.Option("--format", "-f", help="Download format (yaml or tubes)")
+    ] = "yaml",
+) -> None:
+    """Download a workflow from the API
+
+    Examples:
+        s10s download workflow-id
+        s10s download workflow-id -o my-workflow.yaml
+        s10s download workflow-id --format tubes -o workflow.tubes
+    """
+    console.print(f"[bold]Downloading workflow:[/bold] {workflow_id}")
+
+    with APIClient() as client:
+        try:
+            # Get workflow details first
+            workflow = client.get_workflow(workflow_id)
+
+            # Download the workflow
+            content = client.download_workflow(workflow_id, format=format)
+
+            # Determine output filename
+            if output is None:
+                if format == "yaml":
+                    output = Path(f"{workflow['name']}_v{workflow['version']}.yaml")
+                else:
+                    output = Path(f"{workflow['name']}_v{workflow['version']}.tubes")
+
+            # Save to file
+            if format == "yaml":
+                output.write_text(content)
+            else:
+                output.write_bytes(content)
+
+            console.print(f"✓ Downloaded to: [green]{output}[/green]")
+
+        except httpx.HTTPStatusError as e:
+            error_detail = e.response.json().get("detail", e.response.text)
+            console.print(f"[red]✗ Download failed: {error_detail}[/red]")
+            raise typer.Exit(1) from e
+
+
+@app.command()
+def validate(
+    workflow: Annotated[str, typer.Argument(help="Workflow ID or path to YAML file")],
+    local: Annotated[bool, typer.Option("--local", help="Validate local file")] = False,
+) -> None:
+    """Validate a workflow from API or local file"""
+
+    if not local:
+        # Validate via API
+        console.print(f"[bold]Validating workflow from API:[/bold] {workflow}")
+
+        with APIClient() as client:
+            try:
+                result = client.validate_workflow(workflow)
+
+                if result["valid"]:
+                    console.print("✓ [green]Workflow is valid![/green]")
+
+                    if result.get("parsed_structure"):
+                        structure = result["parsed_structure"]
+                        console.print("\n[bold]Workflow Summary:[/bold]")
+                        console.print(
+                            f"  • Name: {structure['name']} v{structure['version']}"
+                        )
+                        if structure.get("description"):
+                            console.print(
+                                f"  • Description: {structure['description']}"
+                            )
+                        console.print(f"  • Inputs: {len(structure.get('inputs', {}))}")
+                        console.print(f"  • Nodes: {len(structure.get('nodes', {}))}")
+                        console.print(
+                            f"  • Outputs: {len(structure.get('outputs', {}))}"
+                        )
+                else:
+                    console.print("✗ [red]Workflow validation failed![/red]")
+
+                if result.get("errors"):
+                    console.print("\n[bold red]Errors:[/bold red]")
+                    for error in result["errors"]:
+                        console.print(f"  • {error}")
+
+                if result.get("warnings"):
+                    console.print("\n[bold yellow]Warnings:[/bold yellow]")
+                    for warning in result["warnings"]:
+                        console.print(f"  • {warning}")
+
+                if not result["valid"]:
+                    raise typer.Exit(1)
+
+            except httpx.HTTPStatusError as e:
+                error_detail = e.response.json().get("detail", e.response.text)
+                console.print(f"[red]✗ API error: {error_detail}[/red]")
+                raise typer.Exit(1) from e
+    else:
+        # Validate local file
+        console.print(f"[bold]Validating local workflow:[/bold] {workflow}")
+
+        try:
+            # Parse the workflow with Pydantic
+            console.print("• Parsing workflow structure...")
+            wf = parse_workflow_yaml(Path(workflow))
+            console.print(
+                f"  ✓ Parsed workflow: [green]{wf.name} v{wf.version}[/green]"
+            )
+
+            # Validate DAG
+            console.print("• Validating DAG structure...")
+            validate_dag(wf)
+            console.print("  ✓ [green]No cycles detected[/green]")
+            console.print("  ✓ [green]All dependencies exist[/green]")
+
+            # Show summary
+            console.print("\n[bold]Workflow Summary:[/bold]")
+            console.print(f"  • Inputs: {len(wf.inputs)}")
+            console.print(f"  • Nodes: {len(wf.nodes)}")
+            for node_type in ["llm", "http", "route", "file", "python"]:
+                count = sum(
+                    1 for n in wf.nodes.values() if n.node_type.value == node_type
+                )
+                if count > 0:
+                    console.print(f"    - {node_type}: {count}")
+            console.print(f"  • Outputs: {len(wf.outputs)}")
+
+            console.print("\n[bold green]✓ Workflow is valid![/bold green]")
+
+        except WorkflowParseError as e:
+            console.print(f"\n[bold red]✗ Validation failed:[/bold red] {e}")
+            raise typer.Exit(1) from None
+        except Exception as e:
+            console.print(f"\n[bold red]✗ Unexpected error:[/bold red] {e}")
+            raise typer.Exit(1) from None
 
 
 @app.command(name="list")
 def list_workflows(
     directory: Annotated[
-        Path, typer.Option("--directory", "-d", help="Directory to search")
-    ] = Path("."),
+        Path | None, typer.Option("--directory", "-d", help="Directory to search")
+    ] = None,
     exclude: Annotated[
         list[str] | None,
         typer.Option(
             "--exclude", "-e", help="Patterns to exclude (e.g., '.*', 'test/*')"
         ),
     ] = None,
-    api: Annotated[bool, typer.Option("--api", help="List workflows from API")] = False,
+    local: Annotated[
+        bool, typer.Option("--local", help="List local files instead of API")
+    ] = False,
 ) -> None:
-    """List available workflows in the current directory or from API
+    """List workflows from API (default) or local directory
 
     Examples:
-        s10s list
-        s10s list -d ./workflows
-        s10s list -e ".*" -e "test/*"  # Exclude hidden files and test directory
-        s10s list --api  # List from API/database
+        s10s list  # List from API
+        s10s list --local  # List local files in current directory
+        s10s list --local -d ./workflows
+        s10s list --local -e ".*" -e "test/*"  # Exclude patterns
     """
-    if api:
-        # List from API
-        console.print("[bold]Listing workflows from API:[/bold]")
+    if not local:
+        # List from API (default)
+        console.print("[bold]Your workflows:[/bold]")
 
         with APIClient() as client:
             try:
-                workflows = client.list_workflows(use_db=True)
+                workflows = client.list_workflows()
 
                 if not workflows:
                     console.print("\n[yellow]No workflows found in database[/yellow]")
@@ -360,17 +483,17 @@ def list_workflows(
 
                 # Create table
                 table = Table(show_header=True, header_style="bold magenta")
-                table.add_column("Name", style="cyan")
-                table.add_column("Version", style="green")
-                table.add_column("Owner", style="yellow")
+                table.add_column("ID", style="cyan", no_wrap=True)
+                table.add_column("Name", style="green")
+                table.add_column("Version", style="yellow")
                 table.add_column("Public", style="blue")
                 table.add_column("Description", style="dim")
 
                 for wf_data in workflows:
                     table.add_row(
+                        wf_data["id"][:8],  # Show first 8 chars of ID
                         wf_data["name"],
                         wf_data["version"],
-                        wf_data["username"],
                         "✓" if wf_data["is_public"] else "✗",
                         _truncate_description(
                             wf_data.get("description", ""), max_length=50
@@ -386,6 +509,8 @@ def list_workflows(
         return
 
     # List from filesystem
+    if directory is None:
+        directory = Path(".")
     console.print(f"[bold]Searching for workflows in:[/bold] {directory}")
 
     # Find all YAML files
@@ -393,7 +518,7 @@ def list_workflows(
 
     # Apply exclusion patterns
     if exclude:
-        import fnmatch  # noqa: PLC0415
+        import fnmatch
 
         excluded_files = []
         for yaml_file in yaml_files:
@@ -568,8 +693,8 @@ workflow_app = typer.Typer(
 app.add_typer(workflow_app, name="workflow")
 
 
-@workflow_app.command()
-def upload(
+@workflow_app.command(name="upload-package")
+def upload_package(
     path: Annotated[Path, typer.Argument(help="Path to workflow package (ZIP file)")],
 ) -> None:
     """Upload a workflow package (ZIP file)
@@ -589,7 +714,7 @@ def upload(
 
     with APIClient() as client:
         try:
-            result = client.upload_workflow_package(path)
+            result = client.upload_workflow_file(path, is_public=False)
             console.print(
                 f"[green]✓ Uploaded workflow: "
                 f"{result['name']} v{result['version']}[/green]"
