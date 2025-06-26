@@ -12,16 +12,12 @@ import {
   Space,
   Typography,
 } from 'antd';
-import {
-  FileAddOutlined,
-  UploadOutlined,
-  InboxOutlined,
-  CodeOutlined,
-} from '@ant-design/icons';
+import { FileAddOutlined, UploadOutlined, InboxOutlined, CodeOutlined } from '@ant-design/icons';
 import Editor from '@monaco-editor/react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { workflowAPI } from '../../api/client';
 import { workflowTemplates } from '../../templates/workflows';
+import { useThemeStore } from '../../stores/theme';
 import type { UploadFile, UploadProps } from 'antd';
 
 const { Text } = Typography;
@@ -39,6 +35,7 @@ export const NewWorkflowModal: React.FC<NewWorkflowModalProps> = ({
   onSuccess,
 }) => {
   const queryClient = useQueryClient();
+  const { mode: themeMode } = useThemeStore();
   const [activeTab, setActiveTab] = useState<'create' | 'upload'>('create');
   const [yamlContent, setYamlContent] = useState<string>('');
   const [isPublic, setIsPublic] = useState(false);
@@ -113,7 +110,7 @@ export const NewWorkflowModal: React.FC<NewWorkflowModalProps> = ({
         file.name.endsWith('.yml') ||
         file.name.endsWith('.tubes') ||
         file.name.endsWith('.zip');
-      
+
       if (!isValidType) {
         message.error('Please upload a .yaml, .yml, .tubes, or .zip file');
         return Upload.LIST_IGNORE;
@@ -145,7 +142,7 @@ export const NewWorkflowModal: React.FC<NewWorkflowModalProps> = ({
       onCancel={onClose}
       width={800}
       footer={null}
-      destroyOnClose
+      destroyOnHidden
     >
       <Tabs
         activeKey={activeTab}
@@ -179,9 +176,7 @@ export const NewWorkflowModal: React.FC<NewWorkflowModalProps> = ({
                         <Select.Option key={index} value={template.yaml}>
                           <div>
                             <div style={{ fontWeight: 'bold' }}>{template.name}</div>
-                            <div style={{ fontSize: '12px', color: '#666' }}>
-                              {template.description}
-                            </div>
+                            <div style={{ fontSize: '12px' }}>{template.description}</div>
                           </div>
                         </Select.Option>
                       ))}
@@ -207,7 +202,7 @@ export const NewWorkflowModal: React.FC<NewWorkflowModalProps> = ({
                           scrollBeyondLastLine: false,
                           automaticLayout: true,
                         }}
-                        theme="vs-dark"
+                        theme={themeMode === 'dark' ? 'vs-dark' : 'vs-light'}
                       />
                     </div>
                   </Form.Item>
@@ -263,9 +258,7 @@ export const NewWorkflowModal: React.FC<NewWorkflowModalProps> = ({
                       <p className="ant-upload-drag-icon">
                         <InboxOutlined />
                       </p>
-                      <p className="ant-upload-text">
-                        Click or drag file to this area to upload
-                      </p>
+                      <p className="ant-upload-text">Click or drag file to this area to upload</p>
                       <p className="ant-upload-hint">
                         Support for YAML workflow files or .tubes packages
                       </p>

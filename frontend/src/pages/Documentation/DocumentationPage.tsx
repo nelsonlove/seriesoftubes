@@ -4,6 +4,7 @@ import { FileTextOutlined, BookOutlined, ApiOutlined, CodeOutlined } from '@ant-
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { MenuProps } from 'antd';
+import { useThemeStore } from '../../stores/theme';
 
 const { Title } = Typography;
 const { Sider, Content } = Layout;
@@ -51,6 +52,7 @@ export const DocumentationPage: React.FC = () => {
   const [content, setContent] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { mode: themeMode } = useThemeStore();
 
   useEffect(() => {
     const fetchDoc = async () => {
@@ -100,7 +102,7 @@ export const DocumentationPage: React.FC = () => {
 
   return (
     <Layout style={{ height: '100%' }}>
-      <Sider width={250} style={{ background: '#fff' }}>
+      <Sider width={250}>
         <div style={{ padding: '16px' }}>
           <Title level={4}>Documentation</Title>
         </div>
@@ -118,7 +120,6 @@ export const DocumentationPage: React.FC = () => {
             padding: 24,
             margin: 0,
             minHeight: 280,
-            background: '#fff',
             borderRadius: 8,
             overflow: 'auto',
           }}
@@ -150,11 +151,11 @@ export const DocumentationPage: React.FC = () => {
                         <div
                           style={{
                             fontSize: '12px',
-                            color: '#666',
                             marginBottom: '8px',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '4px',
+                            opacity: 0.7,
                           }}
                         >
                           <CodeOutlined />
@@ -168,11 +169,14 @@ export const DocumentationPage: React.FC = () => {
                       <code
                         {...props}
                         style={{
-                          backgroundColor: '#f0f0f0',
-                          padding: '2px 4px',
-                          borderRadius: '3px',
-                          fontFamily: 'Monaco, Consolas, "Courier New", monospace',
-                          fontSize: '0.9em',
+                          backgroundColor: themeMode === 'dark' ? '#374151' : '#f1f5f9',
+                          color: themeMode === 'dark' ? '#f3f4f6' : '#374151',
+                          padding: '3px 6px',
+                          borderRadius: '4px',
+                          fontFamily: 'JetBrains Mono, Monaco, Consolas, "Courier New", monospace',
+                          fontSize: '0.85em',
+                          fontWeight: '500',
+                          border: themeMode === 'dark' ? '1px solid #4b5563' : '1px solid #e2e8f0',
                         }}
                       >
                         {children}
@@ -187,7 +191,7 @@ export const DocumentationPage: React.FC = () => {
                           style={{
                             width: '100%',
                             borderCollapse: 'collapse',
-                            border: '1px solid #e8e8e8',
+                            border: `1px solid ${themeMode === 'dark' ? '#4b5563' : '#e2e8f0'}`,
                           }}
                         >
                           {children}
@@ -199,11 +203,14 @@ export const DocumentationPage: React.FC = () => {
                     return (
                       <th
                         style={{
-                          padding: '12px',
+                          padding: '12px 16px',
                           textAlign: 'left',
-                          backgroundColor: '#fafafa',
-                          borderBottom: '2px solid #e8e8e8',
+                          backgroundColor: themeMode === 'dark' ? '#374151' : '#f8fafc',
+                          borderBottom: `2px solid ${themeMode === 'dark' ? '#4b5563' : '#e2e8f0'}`,
+                          borderRight: `1px solid ${themeMode === 'dark' ? '#4b5563' : '#e2e8f0'}`,
                           fontWeight: 600,
+                          fontSize: '14px',
+                          color: themeMode === 'dark' ? '#f9fafb' : '#374151',
                         }}
                       >
                         {children}
@@ -214,8 +221,11 @@ export const DocumentationPage: React.FC = () => {
                     return (
                       <td
                         style={{
-                          padding: '12px',
-                          borderBottom: '1px solid #e8e8e8',
+                          padding: '12px 16px',
+                          borderBottom: `1px solid ${themeMode === 'dark' ? '#4b5563' : '#e2e8f0'}`,
+                          borderRight: `1px solid ${themeMode === 'dark' ? '#4b5563' : '#e2e8f0'}`,
+                          fontSize: '14px',
+                          lineHeight: '1.5',
                         }}
                       >
                         {children}
@@ -231,6 +241,44 @@ export const DocumentationPage: React.FC = () => {
                   },
                   h3({ children }) {
                     return <Title level={3}>{children}</Title>;
+                  },
+                  // Custom list styling
+                  ul({ children }) {
+                    return (
+                      <ul
+                        style={{
+                          paddingLeft: '24px',
+                          marginBottom: '16px',
+                        }}
+                      >
+                        {children}
+                      </ul>
+                    );
+                  },
+                  ol({ children }) {
+                    return (
+                      <ol
+                        style={{
+                          paddingLeft: '24px',
+                          marginBottom: '16px',
+                        }}
+                      >
+                        {children}
+                      </ol>
+                    );
+                  },
+                  li({ children }) {
+                    return (
+                      <li
+                        style={{
+                          marginBottom: '8px',
+                          lineHeight: '1.6',
+                          fontSize: '14px',
+                        }}
+                      >
+                        {children}
+                      </li>
+                    );
                   },
                 }}
               >

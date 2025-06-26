@@ -3,6 +3,7 @@ import { Modal, Button, Space, Alert, message, Spin, Tag } from 'antd';
 import { SaveOutlined, ReloadOutlined, ExpandOutlined, CompressOutlined } from '@ant-design/icons';
 import Editor from '@monaco-editor/react';
 import { workflowAPI } from '../../api/client';
+import { useThemeStore } from '../../stores/theme';
 
 interface YamlEditorModalProps {
   workflowPath: string;
@@ -25,6 +26,7 @@ export const YamlEditorModal: React.FC<YamlEditorModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [fullScreen, setFullScreen] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const { mode: themeMode } = useThemeStore();
 
   // Load workflow content when modal opens
   useEffect(() => {
@@ -194,7 +196,7 @@ export const YamlEditorModal: React.FC<YamlEditorModalProps> = ({
           language="yaml"
           value={content}
           onChange={(value) => setContent(value || '')}
-          theme="vs-light"
+          theme={themeMode === 'dark' ? 'vs-dark' : 'vs-light'}
           options={{
             fontSize: 14,
             minimap: { enabled: !fullScreen },

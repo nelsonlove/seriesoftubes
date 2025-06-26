@@ -60,7 +60,7 @@ export const LoginPage: React.FC = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: '#f0f2f5',
+        /* Background will be handled by theme */
       }}
     >
       <Card style={{ width: 400, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
@@ -178,4 +178,3 @@ export const LoginPage: React.FC = () => {
     </div>
   );
 };
-

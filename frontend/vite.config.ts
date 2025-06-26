@@ -7,6 +7,7 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
+      // Proxy API calls to backend
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
@@ -15,14 +16,10 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
       },
-      '/workflows': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-      },
-      '/docs': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-      },
     },
+  },
+  // Ensure all non-API routes serve the React app
+  preview: {
+    port: 3000,
   },
 });
