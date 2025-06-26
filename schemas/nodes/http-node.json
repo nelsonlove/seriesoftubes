@@ -1,0 +1,246 @@
+{
+  "type": "object",
+  "properties": {
+    "type": {
+      "const": "http"
+    },
+    "config": {
+      "$defs": {
+        "HTTPMethod": {
+          "description": "HTTP methods",
+          "enum": [
+            "GET",
+            "POST",
+            "PUT",
+            "DELETE",
+            "PATCH"
+          ],
+          "title": "HTTPMethod",
+          "type": "string"
+        }
+      },
+      "description": "Configuration for HTTP nodes",
+      "properties": {
+        "context": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Map of variable names to node names for context",
+          "title": "Context"
+        },
+        "input_schema": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Expected input schema for validation",
+          "title": "Input Schema"
+        },
+        "output_schema": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Expected output schema for validation",
+          "title": "Output Schema"
+        },
+        "url": {
+          "description": "URL to call (supports Jinja2 templates)",
+          "title": "Url",
+          "type": "string"
+        },
+        "method": {
+          "$ref": "#/$defs/HTTPMethod",
+          "default": "GET",
+          "description": "HTTP method"
+        },
+        "headers": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "HTTP headers",
+          "title": "Headers"
+        },
+        "params": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Query parameters",
+          "title": "Params"
+        },
+        "body": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Request body (for POST/PUT)",
+          "title": "Body"
+        },
+        "timeout": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Request timeout in seconds",
+          "title": "Timeout"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "title": "HTTPNodeConfig",
+      "type": "object"
+    },
+    "depends_on": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of node names this node depends on"
+    },
+    "__input_schema": {
+      "description": "Input schema for HTTP nodes",
+      "readOnly": true,
+      "additionalProperties": true,
+      "properties": {
+        "url": {
+          "description": "The URL to request",
+          "title": "Url",
+          "type": "string"
+        },
+        "method": {
+          "default": "GET",
+          "description": "HTTP method",
+          "title": "Method",
+          "type": "string"
+        },
+        "headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "HTTP headers",
+          "title": "Headers",
+          "type": "object"
+        },
+        "params": {
+          "additionalProperties": true,
+          "description": "Query parameters",
+          "title": "Params",
+          "type": "object"
+        },
+        "body": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Request body",
+          "title": "Body"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "title": "HTTPNodeInput",
+      "type": "object"
+    },
+    "__output_schema": {
+      "description": "Output schema for HTTP nodes",
+      "readOnly": true,
+      "additionalProperties": true,
+      "properties": {
+        "status_code": {
+          "description": "HTTP status code",
+          "title": "Status Code",
+          "type": "integer"
+        },
+        "headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Response headers",
+          "title": "Headers",
+          "type": "object"
+        },
+        "body": {
+          "description": "Response body",
+          "title": "Body"
+        },
+        "url": {
+          "description": "The final URL (after redirects)",
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status_code",
+        "headers",
+        "body",
+        "url"
+      ],
+      "title": "HTTPNodeOutput",
+      "type": "object"
+    }
+  },
+  "required": [
+    "type",
+    "config"
+  ],
+  "additionalProperties": false
+}

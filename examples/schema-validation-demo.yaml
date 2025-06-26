@@ -1,0 +1,87 @@
+name: schema-validation-demo
+version: "1.0.0"
+description: Demonstrates comprehensive schema validation for data flow primitives
+
+inputs:
+  companies:
+    type: array
+    description: List of companies to analyze
+    required: true
+    example:
+      - name: "Acme Corp"
+        revenue: 5000000
+        employees: 50
+        industry: "tech"
+      - name: "SmallCo"
+        revenue: 100000
+        employees: 5
+        industry: "retail"
+
+nodes:
+  # Split companies array for parallel processing
+  split_companies:
+    type: split
+    config:
+      field: "inputs.companies"
+      item_name: "company"
+  
+  # Filter companies based on revenue
+  filter_high_revenue:
+    type: filter
+    depends_on: [split_companies]
+    config:
+      condition: "{{ company.revenue > 1000000 }}"
+  
+  # Transform company data structure
+  transform_company:
+    type: transform
+    depends_on: [filter_high_revenue]
+    config:
+      template:
+        id: "{{ company.name | replace(' ', '_') | lower }}"
+        display_name: "{{ company.name }}"
+        revenue_millions: "{{ (company.revenue / 1000000) | round(2) }}"
+        size_category: "{% if company.employees > 50 %}large{% else %}small{% endif %}"
+        analysis_needed: "true"
+  
+  # Aggregate transformed results
+  aggregate_companies:
+    type: aggregate
+    depends_on: [transform_company]
+    config:
+      mode: "array"
+  
+  # Join with additional data
+  join_with_analysis:
+    type: join
+    depends_on: [aggregate_companies]
+    config:
+      sources:
+        companies: "aggregate_companies"
+        metadata: "inputs.companies"  # Original data
+      join_type: "merge"
+  
+  # Conditional routing based on results
+  check_results:
+    type: conditional
+    depends_on: [join_with_analysis]
+    config:
+      conditions:
+        - condition: "{{ join_with_analysis.companies | length > 0 }}"
+          then: "has_companies"
+        - is_default: true
+          then: "no_companies"
+  
+  # Process each company with foreach
+  process_each:
+    type: foreach
+    depends_on: [aggregate_companies]
+    config:
+      array_field: "aggregate_companies"
+      item_name: "company_item"
+      subgraph_nodes: ["enrich_company", "score_company"]
+
+outputs:
+  filtered_companies: aggregate_companies
+  analysis_route: check_results.selected_route
+  joined_data: join_with_analysis

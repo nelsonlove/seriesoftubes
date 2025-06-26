@@ -1,0 +1,213 @@
+{
+  "type": "object",
+  "properties": {
+    "type": {
+      "const": "llm"
+    },
+    "config": {
+      "description": "Configuration for LLM nodes",
+      "properties": {
+        "context": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Map of variable names to node names for context",
+          "title": "Context"
+        },
+        "input_schema": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Expected input schema for validation",
+          "title": "Input Schema"
+        },
+        "output_schema": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Expected output schema for validation",
+          "title": "Output Schema"
+        },
+        "prompt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Direct prompt text",
+          "title": "Prompt"
+        },
+        "prompt_template": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Path to Jinja2 prompt template",
+          "title": "Prompt Template"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Override default model",
+          "title": "Model"
+        },
+        "temperature": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Override default temperature",
+          "title": "Temperature"
+        },
+        "schema": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Schema for structured extraction",
+          "title": "Schema"
+        }
+      },
+      "title": "LLMNodeConfig",
+      "type": "object"
+    },
+    "depends_on": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of node names this node depends on"
+    },
+    "__input_schema": {
+      "description": "Input schema for LLM nodes",
+      "readOnly": true,
+      "additionalProperties": true,
+      "properties": {
+        "prompt": {
+          "description": "The prompt to send to the LLM",
+          "title": "Prompt",
+          "type": "string"
+        },
+        "context_data": {
+          "additionalProperties": true,
+          "description": "Additional context data for template rendering",
+          "title": "Context Data",
+          "type": "object"
+        }
+      },
+      "required": [
+        "prompt"
+      ],
+      "title": "LLMNodeInput",
+      "type": "object"
+    },
+    "__output_schema": {
+      "description": "Output schema for LLM nodes",
+      "readOnly": true,
+      "additionalProperties": true,
+      "properties": {
+        "response": {
+          "description": "The LLM's text response",
+          "title": "Response",
+          "type": "string"
+        },
+        "structured_output": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Structured data if schema extraction was used",
+          "title": "Structured Output"
+        },
+        "model_used": {
+          "description": "The model that was used",
+          "title": "Model Used",
+          "type": "string"
+        },
+        "token_usage": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Token usage statistics",
+          "title": "Token Usage"
+        }
+      },
+      "required": [
+        "response",
+        "model_used"
+      ],
+      "title": "LLMNodeOutput",
+      "type": "object"
+    }
+  },
+  "required": [
+    "type",
+    "config"
+  ],
+  "additionalProperties": false
+}

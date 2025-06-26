@@ -1,0 +1,131 @@
+{
+  "type": "object",
+  "properties": {
+    "type": {
+      "const": "split"
+    },
+    "config": {
+      "description": "Configuration for split nodes",
+      "properties": {
+        "context": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Map of variable names to node names for context",
+          "title": "Context"
+        },
+        "input_schema": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Expected input schema for validation",
+          "title": "Input Schema"
+        },
+        "output_schema": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Expected output schema for validation",
+          "title": "Output Schema"
+        },
+        "field": {
+          "description": "Field containing array to split",
+          "title": "Field",
+          "type": "string"
+        },
+        "item_name": {
+          "default": "item",
+          "description": "Name for each item in downstream context",
+          "title": "Item Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "field"
+      ],
+      "title": "SplitNodeConfig",
+      "type": "object"
+    },
+    "depends_on": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of node names this node depends on"
+    },
+    "__input_schema": {
+      "description": "Input schema for split nodes",
+      "readOnly": true,
+      "additionalProperties": true,
+      "properties": {
+        "array_data": {
+          "description": "Array to split into individual items",
+          "items": {},
+          "title": "Array Data",
+          "type": "array"
+        }
+      },
+      "required": [
+        "array_data"
+      ],
+      "title": "SplitNodeInput",
+      "type": "object"
+    },
+    "__output_schema": {
+      "description": "Output schema for split nodes",
+      "readOnly": true,
+      "additionalProperties": true,
+      "properties": {
+        "item": {
+          "description": "Individual item from the split array",
+          "title": "Item"
+        },
+        "index": {
+          "description": "Index of this item in the original array",
+          "title": "Index",
+          "type": "integer"
+        },
+        "total": {
+          "description": "Total number of items in the array",
+          "title": "Total",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "item",
+        "index",
+        "total"
+      ],
+      "title": "SplitNodeOutput",
+      "type": "object"
+    }
+  },
+  "required": [
+    "type",
+    "config"
+  ],
+  "additionalProperties": false
+}

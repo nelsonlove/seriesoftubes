@@ -4,10 +4,14 @@ from typing import Any
 
 from seriesoftubes.models import Node, AggregateNodeConfig
 from seriesoftubes.nodes.base import NodeContext, NodeExecutor, NodeResult
+from seriesoftubes.schemas import AggregateNodeInput, AggregateNodeOutput
 
 
 class AggregateNodeExecutor(NodeExecutor):
     """Executor for aggregate nodes that collect results from parallel processing"""
+    
+    input_schema_class = AggregateNodeInput
+    output_schema_class = AggregateNodeOutput
 
     async def execute(self, node: Node, context: NodeContext) -> NodeResult:
         """Execute aggregate node to collect parallel processing results

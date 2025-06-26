@@ -1,0 +1,161 @@
+{
+  "type": "object",
+  "properties": {
+    "type": {
+      "const": "join"
+    },
+    "config": {
+      "$defs": {
+        "JoinType": {
+          "description": "Join types",
+          "enum": [
+            "inner",
+            "left",
+            "right",
+            "outer",
+            "cross",
+            "merge"
+          ],
+          "title": "JoinType",
+          "type": "string"
+        }
+      },
+      "description": "Configuration for join nodes",
+      "properties": {
+        "context": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Map of variable names to node names for context",
+          "title": "Context"
+        },
+        "input_schema": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Expected input schema for validation",
+          "title": "Input Schema"
+        },
+        "output_schema": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Expected output schema for validation",
+          "title": "Output Schema"
+        },
+        "sources": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Named data sources to join (name -> node.field)",
+          "title": "Sources",
+          "type": "object"
+        },
+        "join_type": {
+          "$ref": "#/$defs/JoinType",
+          "default": "merge",
+          "description": "Type of join to perform"
+        },
+        "join_keys": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Join key mappings for inner/left joins (source1_key -> source2_key)",
+          "title": "Join Keys"
+        }
+      },
+      "required": [
+        "sources"
+      ],
+      "title": "JoinNodeConfig",
+      "type": "object"
+    },
+    "depends_on": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of node names this node depends on"
+    },
+    "__input_schema": {
+      "description": "Input schema for join nodes",
+      "readOnly": true,
+      "additionalProperties": true,
+      "properties": {
+        "sources": {
+          "additionalProperties": true,
+          "description": "Named data sources to join",
+          "title": "Sources",
+          "type": "object"
+        }
+      },
+      "required": [
+        "sources"
+      ],
+      "title": "JoinNodeInput",
+      "type": "object"
+    },
+    "__output_schema": {
+      "description": "Output schema for join nodes",
+      "readOnly": true,
+      "additionalProperties": true,
+      "properties": {
+        "joined": {
+          "description": "Joined data (structure depends on join type)",
+          "title": "Joined"
+        },
+        "source_counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "description": "Number of items from each source",
+          "title": "Source Counts",
+          "type": "object"
+        }
+      },
+      "required": [
+        "joined",
+        "source_counts"
+      ],
+      "title": "JoinNodeOutput",
+      "type": "object"
+    }
+  },
+  "required": [
+    "type",
+    "config"
+  ],
+  "additionalProperties": false
+}

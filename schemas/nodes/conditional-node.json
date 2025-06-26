@@ -1,0 +1,181 @@
+{
+  "type": "object",
+  "properties": {
+    "type": {
+      "const": "conditional"
+    },
+    "config": {
+      "$defs": {
+        "ConditionalCondition": {
+          "description": "A single condition in a conditional node",
+          "properties": {
+            "condition": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Jinja2 condition expression (omit for default)",
+              "title": "Condition"
+            },
+            "then": {
+              "description": "Target/output value if condition is true",
+              "title": "Then",
+              "type": "string"
+            },
+            "is_default": {
+              "default": false,
+              "description": "Whether this is the default condition",
+              "title": "Is Default",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "then"
+          ],
+          "title": "ConditionalCondition",
+          "type": "object"
+        }
+      },
+      "description": "Configuration for conditional nodes - replaces old ROUTE functionality",
+      "properties": {
+        "context": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Map of variable names to node names for context",
+          "title": "Context"
+        },
+        "input_schema": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Expected input schema for validation",
+          "title": "Input Schema"
+        },
+        "output_schema": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Expected output schema for validation",
+          "title": "Output Schema"
+        },
+        "conditions": {
+          "description": "List of conditions to evaluate in order",
+          "items": {
+            "$ref": "#/$defs/ConditionalCondition"
+          },
+          "title": "Conditions",
+          "type": "array"
+        },
+        "fallback": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Fallback value if no conditions match and no default",
+          "title": "Fallback"
+        }
+      },
+      "required": [
+        "conditions"
+      ],
+      "title": "ConditionalNodeConfig",
+      "type": "object"
+    },
+    "depends_on": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of node names this node depends on"
+    },
+    "__input_schema": {
+      "description": "Input schema for conditional nodes",
+      "readOnly": true,
+      "additionalProperties": true,
+      "properties": {
+        "context_data": {
+          "additionalProperties": true,
+          "description": "Data to evaluate conditions against",
+          "title": "Context Data",
+          "type": "object"
+        }
+      },
+      "required": [
+        "context_data"
+      ],
+      "title": "ConditionalNodeInput",
+      "type": "object"
+    },
+    "__output_schema": {
+      "description": "Output schema for conditional nodes",
+      "readOnly": true,
+      "additionalProperties": true,
+      "properties": {
+        "selected_route": {
+          "description": "The value from 'then' clause",
+          "title": "Selected Route",
+          "type": "string"
+        },
+        "condition_met": {
+          "description": "The condition that was met or 'default'",
+          "title": "Condition Met",
+          "type": "string"
+        },
+        "evaluated_conditions": {
+          "description": "List of conditions that were evaluated",
+          "items": {
+            "type": "string"
+          },
+          "title": "Evaluated Conditions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "selected_route",
+        "condition_met",
+        "evaluated_conditions"
+      ],
+      "title": "ConditionalNodeOutput",
+      "type": "object"
+    }
+  },
+  "required": [
+    "type",
+    "config"
+  ],
+  "additionalProperties": false
+}

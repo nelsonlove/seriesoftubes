@@ -7,10 +7,14 @@ import jinja2
 
 from seriesoftubes.models import Node, TransformNodeConfig
 from seriesoftubes.nodes.base import NodeContext, NodeExecutor, NodeResult
+from seriesoftubes.schemas import TransformNodeInput, TransformNodeOutput
 
 
 class TransformNodeExecutor(NodeExecutor):
     """Executor for transform nodes that map/transform data structures"""
+    
+    input_schema_class = TransformNodeInput
+    output_schema_class = TransformNodeOutput
 
     async def execute(self, node: Node, context: NodeContext) -> NodeResult:
         """Execute transform node to map data structures

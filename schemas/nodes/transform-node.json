@@ -1,0 +1,148 @@
+{
+  "type": "object",
+  "properties": {
+    "type": {
+      "const": "transform"
+    },
+    "config": {
+      "description": "Configuration for transform nodes",
+      "properties": {
+        "context": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Map of variable names to node names for context",
+          "title": "Context"
+        },
+        "input_schema": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Expected input schema for validation",
+          "title": "Input Schema"
+        },
+        "output_schema": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Expected output schema for validation",
+          "title": "Output Schema"
+        },
+        "template": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "description": "Jinja2 template for transforming each item",
+          "title": "Template"
+        },
+        "field": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Array field to transform (if not provided, transforms root array)",
+          "title": "Field"
+        }
+      },
+      "required": [
+        "template"
+      ],
+      "title": "TransformNodeConfig",
+      "type": "object"
+    },
+    "depends_on": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of node names this node depends on"
+    },
+    "__input_schema": {
+      "description": "Input schema for transform nodes",
+      "readOnly": true,
+      "additionalProperties": true,
+      "properties": {
+        "items": {
+          "description": "Array of items to transform",
+          "items": {},
+          "title": "Items",
+          "type": "array"
+        },
+        "transform_context": {
+          "additionalProperties": true,
+          "description": "Additional context for transformations",
+          "title": "Transform Context",
+          "type": "object"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "title": "TransformNodeInput",
+      "type": "object"
+    },
+    "__output_schema": {
+      "description": "Output schema for transform nodes",
+      "readOnly": true,
+      "additionalProperties": true,
+      "properties": {
+        "transformed": {
+          "description": "Transformed items",
+          "items": {},
+          "title": "Transformed",
+          "type": "array"
+        },
+        "transform_count": {
+          "description": "Number of items transformed",
+          "title": "Transform Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "transformed",
+        "transform_count"
+      ],
+      "title": "TransformNodeOutput",
+      "type": "object"
+    }
+  },
+  "required": [
+    "type",
+    "config"
+  ],
+  "additionalProperties": false
+}

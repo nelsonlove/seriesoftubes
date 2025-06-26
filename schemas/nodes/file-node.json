@@ -1,0 +1,240 @@
+{
+  "type": "object",
+  "properties": {
+    "type": {
+      "const": "file"
+    },
+    "config": {
+      "description": "Configuration for file ingestion nodes",
+      "properties": {
+        "context": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Map of variable names to node names for context",
+          "title": "Context"
+        },
+        "input_schema": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Expected input schema for validation",
+          "title": "Input Schema"
+        },
+        "output_schema": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Expected output schema for validation",
+          "title": "Output Schema"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Single file path (supports Jinja2)",
+          "title": "Path"
+        },
+        "pattern": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Glob pattern for multiple files",
+          "title": "Pattern"
+        },
+        "format": {
+          "default": "auto",
+          "description": "File format: auto, json, jsonl, csv, txt, yaml, pdf, docx, xlsx, html",
+          "title": "Format",
+          "type": "string"
+        },
+        "encoding": {
+          "default": "utf-8",
+          "description": "File encoding",
+          "title": "Encoding",
+          "type": "string"
+        },
+        "extract_text": {
+          "default": true,
+          "description": "Extract text from documents (PDF, DOCX, HTML)",
+          "title": "Extract Text",
+          "type": "boolean"
+        },
+        "output_mode": {
+          "default": "content",
+          "description": "Output mode: content (single), list (records), dict (collection)",
+          "title": "Output Mode",
+          "type": "string"
+        },
+        "merge": {
+          "default": false,
+          "description": "Merge multiple files into single output",
+          "title": "Merge",
+          "type": "boolean"
+        },
+        "stream": {
+          "default": false,
+          "description": "Stream large files in chunks",
+          "title": "Stream",
+          "type": "boolean"
+        },
+        "chunk_size": {
+          "default": 1000,
+          "description": "Rows per chunk for streaming",
+          "title": "Chunk Size",
+          "type": "integer"
+        },
+        "sample": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Sample fraction (0.0-1.0)",
+          "title": "Sample"
+        },
+        "limit": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Limit number of records",
+          "title": "Limit"
+        },
+        "delimiter": {
+          "default": ",",
+          "description": "CSV delimiter",
+          "title": "Delimiter",
+          "type": "string"
+        },
+        "has_header": {
+          "default": true,
+          "description": "CSV has header row",
+          "title": "Has Header",
+          "type": "boolean"
+        },
+        "skip_errors": {
+          "default": false,
+          "description": "Skip files/rows with errors",
+          "title": "Skip Errors",
+          "type": "boolean"
+        }
+      },
+      "title": "FileNodeConfig",
+      "type": "object"
+    },
+    "depends_on": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of node names this node depends on"
+    },
+    "__input_schema": {
+      "description": "Input schema for file nodes",
+      "readOnly": true,
+      "additionalProperties": true,
+      "properties": {
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "File path to read",
+          "title": "Path"
+        },
+        "pattern": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Glob pattern for multiple files",
+          "title": "Pattern"
+        }
+      },
+      "title": "FileNodeInput",
+      "type": "object"
+    },
+    "__output_schema": {
+      "description": "Output schema for file nodes - varies based on format and mode",
+      "readOnly": true,
+      "additionalProperties": true,
+      "properties": {
+        "data": {
+          "description": "The loaded file data",
+          "title": "Data"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "description": "File metadata (size, type, count, etc.)",
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "data"
+      ],
+      "title": "FileNodeOutput",
+      "type": "object"
+    }
+  },
+  "required": [
+    "type",
+    "config"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,140 @@
+{
+  "type": "object",
+  "properties": {
+    "type": {
+      "const": "filter"
+    },
+    "config": {
+      "description": "Configuration for filter nodes",
+      "properties": {
+        "context": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Map of variable names to node names for context",
+          "title": "Context"
+        },
+        "input_schema": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Expected input schema for validation",
+          "title": "Input Schema"
+        },
+        "output_schema": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Expected output schema for validation",
+          "title": "Output Schema"
+        },
+        "condition": {
+          "description": "Jinja2 condition expression",
+          "title": "Condition",
+          "type": "string"
+        },
+        "field": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Array field to filter (if not provided, filters root array)",
+          "title": "Field"
+        }
+      },
+      "required": [
+        "condition"
+      ],
+      "title": "FilterNodeConfig",
+      "type": "object"
+    },
+    "depends_on": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of node names this node depends on"
+    },
+    "__input_schema": {
+      "description": "Input schema for filter nodes",
+      "readOnly": true,
+      "additionalProperties": true,
+      "properties": {
+        "items": {
+          "description": "Array of items to filter",
+          "items": {},
+          "title": "Items",
+          "type": "array"
+        },
+        "filter_context": {
+          "additionalProperties": true,
+          "description": "Additional context for filter conditions",
+          "title": "Filter Context",
+          "type": "object"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "title": "FilterNodeInput",
+      "type": "object"
+    },
+    "__output_schema": {
+      "description": "Output schema for filter nodes",
+      "readOnly": true,
+      "additionalProperties": true,
+      "properties": {
+        "filtered": {
+          "description": "Items that passed the filter condition",
+          "items": {},
+          "title": "Filtered",
+          "type": "array"
+        },
+        "removed_count": {
+          "description": "Number of items filtered out",
+          "title": "Removed Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "filtered",
+        "removed_count"
+      ],
+      "title": "FilterNodeOutput",
+      "type": "object"
+    }
+  },
+  "required": [
+    "type",
+    "config"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,13 @@
+{
+  "yaml.schemas": {
+    "./workflow-schema.json": [
+      "*.workflow.yaml",
+      "*.workflow.yml",
+      "workflow.yaml",
+      "workflow.yml"
+    ]
+  },
+  "yaml.validate": true,
+  "yaml.hover": true,
+  "yaml.completion": true
+}

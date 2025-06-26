@@ -1,0 +1,170 @@
+{
+  "type": "object",
+  "properties": {
+    "type": {
+      "const": "python"
+    },
+    "config": {
+      "description": "Configuration for Python execution nodes",
+      "properties": {
+        "context": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Map of variable names to node names for context",
+          "title": "Context"
+        },
+        "input_schema": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Expected input schema for validation",
+          "title": "Input Schema"
+        },
+        "output_schema": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Expected output schema for validation",
+          "title": "Output Schema"
+        },
+        "code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Inline Python code to execute",
+          "title": "Code"
+        },
+        "file": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Path to Python file (supports Jinja2)",
+          "title": "File"
+        },
+        "function": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Function name to call if using file",
+          "title": "Function"
+        },
+        "timeout": {
+          "default": 30,
+          "description": "Execution timeout in seconds",
+          "title": "Timeout",
+          "type": "integer"
+        },
+        "memory_limit": {
+          "default": "100MB",
+          "description": "Memory limit (e.g., '100MB', '1GB')",
+          "title": "Memory Limit",
+          "type": "string"
+        },
+        "allowed_imports": {
+          "description": "List of allowed module imports (empty = no imports allowed)",
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Imports",
+          "type": "array"
+        },
+        "max_output_size": {
+          "default": 10000000,
+          "description": "Maximum output size in bytes (10MB default)",
+          "title": "Max Output Size",
+          "type": "integer"
+        }
+      },
+      "title": "PythonNodeConfig",
+      "type": "object"
+    },
+    "depends_on": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of node names this node depends on"
+    },
+    "__input_schema": {
+      "description": "Input schema for Python nodes",
+      "readOnly": true,
+      "additionalProperties": true,
+      "properties": {
+        "context": {
+          "additionalProperties": true,
+          "description": "Context data available to the Python code",
+          "title": "Context",
+          "type": "object"
+        }
+      },
+      "required": [
+        "context"
+      ],
+      "title": "PythonNodeInput",
+      "type": "object"
+    },
+    "__output_schema": {
+      "description": "Output schema for Python nodes",
+      "readOnly": true,
+      "additionalProperties": true,
+      "properties": {
+        "result": {
+          "description": "The return value from the Python code",
+          "title": "Result"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "title": "PythonNodeOutput",
+      "type": "object"
+    }
+  },
+  "required": [
+    "type",
+    "config"
+  ],
+  "additionalProperties": false
+}

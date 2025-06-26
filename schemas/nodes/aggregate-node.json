@@ -1,0 +1,130 @@
+{
+  "type": "object",
+  "properties": {
+    "type": {
+      "const": "aggregate"
+    },
+    "config": {
+      "description": "Configuration for aggregate nodes",
+      "properties": {
+        "context": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Map of variable names to node names for context",
+          "title": "Context"
+        },
+        "input_schema": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Expected input schema for validation",
+          "title": "Input Schema"
+        },
+        "output_schema": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Expected output schema for validation",
+          "title": "Output Schema"
+        },
+        "mode": {
+          "default": "array",
+          "description": "Aggregation mode: array, object, merge",
+          "title": "Mode",
+          "type": "string"
+        },
+        "field": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional: extract specific field from each result",
+          "title": "Field"
+        }
+      },
+      "title": "AggregateNodeConfig",
+      "type": "object"
+    },
+    "depends_on": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of node names this node depends on"
+    },
+    "__input_schema": {
+      "description": "Input schema for aggregate nodes",
+      "readOnly": true,
+      "additionalProperties": true,
+      "properties": {
+        "items": {
+          "description": "Items to aggregate from parallel executions",
+          "items": {},
+          "title": "Items",
+          "type": "array"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "title": "AggregateNodeInput",
+      "type": "object"
+    },
+    "__output_schema": {
+      "description": "Output schema for aggregate nodes",
+      "readOnly": true,
+      "additionalProperties": true,
+      "properties": {
+        "result": {
+          "description": "Aggregated result (array, object, or merged data)",
+          "title": "Result"
+        },
+        "count": {
+          "description": "Number of items aggregated",
+          "title": "Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "result",
+        "count"
+      ],
+      "title": "AggregateNodeOutput",
+      "type": "object"
+    }
+  },
+  "required": [
+    "type",
+    "config"
+  ],
+  "additionalProperties": false
+}

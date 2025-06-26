@@ -4,10 +4,14 @@ from typing import Any
 
 from seriesoftubes.models import Node, ForEachNodeConfig
 from seriesoftubes.nodes.base import NodeContext, NodeExecutor, NodeResult
+from seriesoftubes.schemas import ForeachNodeInput, ForeachNodeOutput
 
 
 class ForEachNodeExecutor(NodeExecutor):
     """Executor for foreach nodes that execute subgraphs for each item in an array"""
+    
+    input_schema_class = ForeachNodeInput
+    output_schema_class = ForeachNodeOutput
 
     async def execute(self, node: Node, context: NodeContext) -> NodeResult:
         """Execute foreach node to iterate over array items

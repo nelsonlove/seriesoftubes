@@ -6,10 +6,14 @@ import jinja2
 
 from seriesoftubes.models import Node, JoinNodeConfig
 from seriesoftubes.nodes.base import NodeContext, NodeExecutor, NodeResult
+from seriesoftubes.schemas import JoinNodeInput, JoinNodeOutput
 
 
 class JoinNodeExecutor(NodeExecutor):
     """Executor for join nodes that combine multiple data sources"""
+    
+    input_schema_class = JoinNodeInput
+    output_schema_class = JoinNodeOutput
 
     async def execute(self, node: Node, context: NodeContext) -> NodeResult:
         """Execute join node to combine data from multiple sources

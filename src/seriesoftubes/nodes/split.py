@@ -4,10 +4,14 @@ from typing import Any
 
 from seriesoftubes.models import Node, SplitNodeConfig
 from seriesoftubes.nodes.base import NodeContext, NodeExecutor, NodeResult
+from seriesoftubes.schemas import SplitNodeInput, SplitNodeOutput
 
 
 class SplitNodeExecutor(NodeExecutor):
     """Executor for split nodes that divide arrays into parallel processing streams"""
+    
+    input_schema_class = SplitNodeInput
+    output_schema_class = SplitNodeOutput
 
     async def execute(self, node: Node, context: NodeContext) -> NodeResult:
         """Execute split node to create parallel processing streams

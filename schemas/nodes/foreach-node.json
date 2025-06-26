@@ -1,0 +1,161 @@
+{
+  "type": "object",
+  "properties": {
+    "type": {
+      "const": "foreach"
+    },
+    "config": {
+      "description": "Configuration for foreach nodes",
+      "properties": {
+        "context": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Map of variable names to node names for context",
+          "title": "Context"
+        },
+        "input_schema": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Expected input schema for validation",
+          "title": "Input Schema"
+        },
+        "output_schema": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Expected output schema for validation",
+          "title": "Output Schema"
+        },
+        "array_field": {
+          "description": "Field containing array to iterate over",
+          "title": "Array Field",
+          "type": "string"
+        },
+        "item_name": {
+          "default": "item",
+          "description": "Name for each item in subgraph context",
+          "title": "Item Name",
+          "type": "string"
+        },
+        "subgraph_nodes": {
+          "description": "List of node names to execute for each item",
+          "items": {
+            "type": "string"
+          },
+          "title": "Subgraph Nodes",
+          "type": "array"
+        },
+        "parallel": {
+          "default": true,
+          "description": "Execute iterations in parallel (default) or sequentially",
+          "title": "Parallel",
+          "type": "boolean"
+        },
+        "collect_output": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Output field name to collect from each iteration",
+          "title": "Collect Output"
+        }
+      },
+      "required": [
+        "array_field",
+        "subgraph_nodes"
+      ],
+      "title": "ForEachNodeConfig",
+      "type": "object"
+    },
+    "depends_on": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of node names this node depends on"
+    },
+    "__input_schema": {
+      "description": "Input schema for foreach nodes",
+      "readOnly": true,
+      "additionalProperties": true,
+      "properties": {
+        "items": {
+          "description": "Array of items to iterate over",
+          "items": {},
+          "title": "Items",
+          "type": "array"
+        },
+        "foreach_context": {
+          "additionalProperties": true,
+          "description": "Additional context available to subgraph",
+          "title": "Foreach Context",
+          "type": "object"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "title": "ForeachNodeInput",
+      "type": "object"
+    },
+    "__output_schema": {
+      "description": "Output schema for foreach nodes",
+      "readOnly": true,
+      "additionalProperties": true,
+      "properties": {
+        "results": {
+          "description": "Collected results from all iterations",
+          "items": {},
+          "title": "Results",
+          "type": "array"
+        },
+        "execution_count": {
+          "description": "Number of iterations executed",
+          "title": "Execution Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "results",
+        "execution_count"
+      ],
+      "title": "ForeachNodeOutput",
+      "type": "object"
+    }
+  },
+  "required": [
+    "type",
+    "config"
+  ],
+  "additionalProperties": false
+}

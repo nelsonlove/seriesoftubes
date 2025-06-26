@@ -6,10 +6,14 @@ import jinja2
 
 from seriesoftubes.models import Node, FilterNodeConfig
 from seriesoftubes.nodes.base import NodeContext, NodeExecutor, NodeResult
+from seriesoftubes.schemas import FilterNodeInput, FilterNodeOutput
 
 
 class FilterNodeExecutor(NodeExecutor):
     """Executor for filter nodes that conditionally filter arrays"""
+    
+    input_schema_class = FilterNodeInput
+    output_schema_class = FilterNodeOutput
 
     async def execute(self, node: Node, context: NodeContext) -> NodeResult:
         """Execute filter node to filter array based on condition

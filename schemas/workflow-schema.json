@@ -1,0 +1,2002 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SeriesOfTubes Workflow Schema",
+  "description": "Schema for SeriesOfTubes workflow YAML files",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Workflow name",
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "version": {
+      "type": "string",
+      "description": "Workflow version",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-readable workflow description"
+    },
+    "inputs": {
+      "type": "object",
+      "description": "Input parameters for the workflow",
+      "patternProperties": {
+        "^[a-zA-Z_][a-zA-Z0-9_]*$": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "string",
+                "number",
+                "boolean",
+                "array",
+                "object"
+              ]
+            },
+            "description": {
+              "type": "string"
+            },
+            "required": {
+              "type": "boolean"
+            },
+            "default": {},
+            "example": {}
+          },
+          "required": [
+            "type"
+          ]
+        }
+      }
+    },
+    "nodes": {
+      "type": "object",
+      "description": "Workflow nodes (DAG)",
+      "patternProperties": {
+        "^[a-zA-Z_][a-zA-Z0-9_]*$": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "const": "llm"
+                },
+                "config": {
+                  "description": "Configuration for LLM nodes",
+                  "properties": {
+                    "context": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Map of variable names to node names for context",
+                      "title": "Context"
+                    },
+                    "input_schema": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Expected input schema for validation",
+                      "title": "Input Schema"
+                    },
+                    "output_schema": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Expected output schema for validation",
+                      "title": "Output Schema"
+                    },
+                    "prompt": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Direct prompt text",
+                      "title": "Prompt"
+                    },
+                    "prompt_template": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Path to Jinja2 prompt template",
+                      "title": "Prompt Template"
+                    },
+                    "model": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Override default model",
+                      "title": "Model"
+                    },
+                    "temperature": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Override default temperature",
+                      "title": "Temperature"
+                    },
+                    "schema": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Schema for structured extraction",
+                      "title": "Schema"
+                    }
+                  },
+                  "title": "LLMNodeConfig",
+                  "type": "object"
+                },
+                "depends_on": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "List of node names this node depends on"
+                },
+                "__input_schema": {
+                  "description": "Input schema for LLM nodes",
+                  "readOnly": true,
+                  "additionalProperties": true,
+                  "properties": {
+                    "prompt": {
+                      "description": "The prompt to send to the LLM",
+                      "title": "Prompt",
+                      "type": "string"
+                    },
+                    "context_data": {
+                      "additionalProperties": true,
+                      "description": "Additional context data for template rendering",
+                      "title": "Context Data",
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "prompt"
+                  ],
+                  "title": "LLMNodeInput",
+                  "type": "object"
+                },
+                "__output_schema": {
+                  "description": "Output schema for LLM nodes",
+                  "readOnly": true,
+                  "additionalProperties": true,
+                  "properties": {
+                    "response": {
+                      "description": "The LLM's text response",
+                      "title": "Response",
+                      "type": "string"
+                    },
+                    "structured_output": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Structured data if schema extraction was used",
+                      "title": "Structured Output"
+                    },
+                    "model_used": {
+                      "description": "The model that was used",
+                      "title": "Model Used",
+                      "type": "string"
+                    },
+                    "token_usage": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": {
+                            "type": "integer"
+                          },
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Token usage statistics",
+                      "title": "Token Usage"
+                    }
+                  },
+                  "required": [
+                    "response",
+                    "model_used"
+                  ],
+                  "title": "LLMNodeOutput",
+                  "type": "object"
+                }
+              },
+              "required": [
+                "type",
+                "config"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "const": "http"
+                },
+                "config": {
+                  "$defs": {
+                    "HTTPMethod": {
+                      "description": "HTTP methods",
+                      "enum": [
+                        "GET",
+                        "POST",
+                        "PUT",
+                        "DELETE",
+                        "PATCH"
+                      ],
+                      "title": "HTTPMethod",
+                      "type": "string"
+                    }
+                  },
+                  "description": "Configuration for HTTP nodes",
+                  "properties": {
+                    "context": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Map of variable names to node names for context",
+                      "title": "Context"
+                    },
+                    "input_schema": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Expected input schema for validation",
+                      "title": "Input Schema"
+                    },
+                    "output_schema": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Expected output schema for validation",
+                      "title": "Output Schema"
+                    },
+                    "url": {
+                      "description": "URL to call (supports Jinja2 templates)",
+                      "title": "Url",
+                      "type": "string"
+                    },
+                    "method": {
+                      "$ref": "#/$defs/HTTPMethod",
+                      "default": "GET",
+                      "description": "HTTP method"
+                    },
+                    "headers": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "HTTP headers",
+                      "title": "Headers"
+                    },
+                    "params": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Query parameters",
+                      "title": "Params"
+                    },
+                    "body": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Request body (for POST/PUT)",
+                      "title": "Body"
+                    },
+                    "timeout": {
+                      "anyOf": [
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Request timeout in seconds",
+                      "title": "Timeout"
+                    }
+                  },
+                  "required": [
+                    "url"
+                  ],
+                  "title": "HTTPNodeConfig",
+                  "type": "object"
+                },
+                "depends_on": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "List of node names this node depends on"
+                },
+                "__input_schema": {
+                  "description": "Input schema for HTTP nodes",
+                  "readOnly": true,
+                  "additionalProperties": true,
+                  "properties": {
+                    "url": {
+                      "description": "The URL to request",
+                      "title": "Url",
+                      "type": "string"
+                    },
+                    "method": {
+                      "default": "GET",
+                      "description": "HTTP method",
+                      "title": "Method",
+                      "type": "string"
+                    },
+                    "headers": {
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "HTTP headers",
+                      "title": "Headers",
+                      "type": "object"
+                    },
+                    "params": {
+                      "additionalProperties": true,
+                      "description": "Query parameters",
+                      "title": "Params",
+                      "type": "object"
+                    },
+                    "body": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Request body",
+                      "title": "Body"
+                    }
+                  },
+                  "required": [
+                    "url"
+                  ],
+                  "title": "HTTPNodeInput",
+                  "type": "object"
+                },
+                "__output_schema": {
+                  "description": "Output schema for HTTP nodes",
+                  "readOnly": true,
+                  "additionalProperties": true,
+                  "properties": {
+                    "status_code": {
+                      "description": "HTTP status code",
+                      "title": "Status Code",
+                      "type": "integer"
+                    },
+                    "headers": {
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Response headers",
+                      "title": "Headers",
+                      "type": "object"
+                    },
+                    "body": {
+                      "description": "Response body",
+                      "title": "Body"
+                    },
+                    "url": {
+                      "description": "The final URL (after redirects)",
+                      "title": "Url",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "status_code",
+                    "headers",
+                    "body",
+                    "url"
+                  ],
+                  "title": "HTTPNodeOutput",
+                  "type": "object"
+                }
+              },
+              "required": [
+                "type",
+                "config"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "const": "file"
+                },
+                "config": {
+                  "description": "Configuration for file ingestion nodes",
+                  "properties": {
+                    "context": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Map of variable names to node names for context",
+                      "title": "Context"
+                    },
+                    "input_schema": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Expected input schema for validation",
+                      "title": "Input Schema"
+                    },
+                    "output_schema": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Expected output schema for validation",
+                      "title": "Output Schema"
+                    },
+                    "path": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Single file path (supports Jinja2)",
+                      "title": "Path"
+                    },
+                    "pattern": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Glob pattern for multiple files",
+                      "title": "Pattern"
+                    },
+                    "format": {
+                      "default": "auto",
+                      "description": "File format: auto, json, jsonl, csv, txt, yaml, pdf, docx, xlsx, html",
+                      "title": "Format",
+                      "type": "string"
+                    },
+                    "encoding": {
+                      "default": "utf-8",
+                      "description": "File encoding",
+                      "title": "Encoding",
+                      "type": "string"
+                    },
+                    "extract_text": {
+                      "default": true,
+                      "description": "Extract text from documents (PDF, DOCX, HTML)",
+                      "title": "Extract Text",
+                      "type": "boolean"
+                    },
+                    "output_mode": {
+                      "default": "content",
+                      "description": "Output mode: content (single), list (records), dict (collection)",
+                      "title": "Output Mode",
+                      "type": "string"
+                    },
+                    "merge": {
+                      "default": false,
+                      "description": "Merge multiple files into single output",
+                      "title": "Merge",
+                      "type": "boolean"
+                    },
+                    "stream": {
+                      "default": false,
+                      "description": "Stream large files in chunks",
+                      "title": "Stream",
+                      "type": "boolean"
+                    },
+                    "chunk_size": {
+                      "default": 1000,
+                      "description": "Rows per chunk for streaming",
+                      "title": "Chunk Size",
+                      "type": "integer"
+                    },
+                    "sample": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Sample fraction (0.0-1.0)",
+                      "title": "Sample"
+                    },
+                    "limit": {
+                      "anyOf": [
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Limit number of records",
+                      "title": "Limit"
+                    },
+                    "delimiter": {
+                      "default": ",",
+                      "description": "CSV delimiter",
+                      "title": "Delimiter",
+                      "type": "string"
+                    },
+                    "has_header": {
+                      "default": true,
+                      "description": "CSV has header row",
+                      "title": "Has Header",
+                      "type": "boolean"
+                    },
+                    "skip_errors": {
+                      "default": false,
+                      "description": "Skip files/rows with errors",
+                      "title": "Skip Errors",
+                      "type": "boolean"
+                    }
+                  },
+                  "title": "FileNodeConfig",
+                  "type": "object"
+                },
+                "depends_on": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "List of node names this node depends on"
+                },
+                "__input_schema": {
+                  "description": "Input schema for file nodes",
+                  "readOnly": true,
+                  "additionalProperties": true,
+                  "properties": {
+                    "path": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "File path to read",
+                      "title": "Path"
+                    },
+                    "pattern": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Glob pattern for multiple files",
+                      "title": "Pattern"
+                    }
+                  },
+                  "title": "FileNodeInput",
+                  "type": "object"
+                },
+                "__output_schema": {
+                  "description": "Output schema for file nodes - varies based on format and mode",
+                  "readOnly": true,
+                  "additionalProperties": true,
+                  "properties": {
+                    "data": {
+                      "description": "The loaded file data",
+                      "title": "Data"
+                    },
+                    "metadata": {
+                      "additionalProperties": true,
+                      "description": "File metadata (size, type, count, etc.)",
+                      "title": "Metadata",
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "title": "FileNodeOutput",
+                  "type": "object"
+                }
+              },
+              "required": [
+                "type",
+                "config"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "const": "python"
+                },
+                "config": {
+                  "description": "Configuration for Python execution nodes",
+                  "properties": {
+                    "context": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Map of variable names to node names for context",
+                      "title": "Context"
+                    },
+                    "input_schema": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Expected input schema for validation",
+                      "title": "Input Schema"
+                    },
+                    "output_schema": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Expected output schema for validation",
+                      "title": "Output Schema"
+                    },
+                    "code": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Inline Python code to execute",
+                      "title": "Code"
+                    },
+                    "file": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Path to Python file (supports Jinja2)",
+                      "title": "File"
+                    },
+                    "function": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Function name to call if using file",
+                      "title": "Function"
+                    },
+                    "timeout": {
+                      "default": 30,
+                      "description": "Execution timeout in seconds",
+                      "title": "Timeout",
+                      "type": "integer"
+                    },
+                    "memory_limit": {
+                      "default": "100MB",
+                      "description": "Memory limit (e.g., '100MB', '1GB')",
+                      "title": "Memory Limit",
+                      "type": "string"
+                    },
+                    "allowed_imports": {
+                      "description": "List of allowed module imports (empty = no imports allowed)",
+                      "items": {
+                        "type": "string"
+                      },
+                      "title": "Allowed Imports",
+                      "type": "array"
+                    },
+                    "max_output_size": {
+                      "default": 10000000,
+                      "description": "Maximum output size in bytes (10MB default)",
+                      "title": "Max Output Size",
+                      "type": "integer"
+                    }
+                  },
+                  "title": "PythonNodeConfig",
+                  "type": "object"
+                },
+                "depends_on": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "List of node names this node depends on"
+                },
+                "__input_schema": {
+                  "description": "Input schema for Python nodes",
+                  "readOnly": true,
+                  "additionalProperties": true,
+                  "properties": {
+                    "context": {
+                      "additionalProperties": true,
+                      "description": "Context data available to the Python code",
+                      "title": "Context",
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "context"
+                  ],
+                  "title": "PythonNodeInput",
+                  "type": "object"
+                },
+                "__output_schema": {
+                  "description": "Output schema for Python nodes",
+                  "readOnly": true,
+                  "additionalProperties": true,
+                  "properties": {
+                    "result": {
+                      "description": "The return value from the Python code",
+                      "title": "Result"
+                    }
+                  },
+                  "required": [
+                    "result"
+                  ],
+                  "title": "PythonNodeOutput",
+                  "type": "object"
+                }
+              },
+              "required": [
+                "type",
+                "config"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "const": "split"
+                },
+                "config": {
+                  "description": "Configuration for split nodes",
+                  "properties": {
+                    "context": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Map of variable names to node names for context",
+                      "title": "Context"
+                    },
+                    "input_schema": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Expected input schema for validation",
+                      "title": "Input Schema"
+                    },
+                    "output_schema": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Expected output schema for validation",
+                      "title": "Output Schema"
+                    },
+                    "field": {
+                      "description": "Field containing array to split",
+                      "title": "Field",
+                      "type": "string"
+                    },
+                    "item_name": {
+                      "default": "item",
+                      "description": "Name for each item in downstream context",
+                      "title": "Item Name",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "field"
+                  ],
+                  "title": "SplitNodeConfig",
+                  "type": "object"
+                },
+                "depends_on": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "List of node names this node depends on"
+                },
+                "__input_schema": {
+                  "description": "Input schema for split nodes",
+                  "readOnly": true,
+                  "additionalProperties": true,
+                  "properties": {
+                    "array_data": {
+                      "description": "Array to split into individual items",
+                      "items": {},
+                      "title": "Array Data",
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "array_data"
+                  ],
+                  "title": "SplitNodeInput",
+                  "type": "object"
+                },
+                "__output_schema": {
+                  "description": "Output schema for split nodes",
+                  "readOnly": true,
+                  "additionalProperties": true,
+                  "properties": {
+                    "item": {
+                      "description": "Individual item from the split array",
+                      "title": "Item"
+                    },
+                    "index": {
+                      "description": "Index of this item in the original array",
+                      "title": "Index",
+                      "type": "integer"
+                    },
+                    "total": {
+                      "description": "Total number of items in the array",
+                      "title": "Total",
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "item",
+                    "index",
+                    "total"
+                  ],
+                  "title": "SplitNodeOutput",
+                  "type": "object"
+                }
+              },
+              "required": [
+                "type",
+                "config"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "const": "aggregate"
+                },
+                "config": {
+                  "description": "Configuration for aggregate nodes",
+                  "properties": {
+                    "context": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Map of variable names to node names for context",
+                      "title": "Context"
+                    },
+                    "input_schema": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Expected input schema for validation",
+                      "title": "Input Schema"
+                    },
+                    "output_schema": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Expected output schema for validation",
+                      "title": "Output Schema"
+                    },
+                    "mode": {
+                      "default": "array",
+                      "description": "Aggregation mode: array, object, merge",
+                      "title": "Mode",
+                      "type": "string"
+                    },
+                    "field": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Optional: extract specific field from each result",
+                      "title": "Field"
+                    }
+                  },
+                  "title": "AggregateNodeConfig",
+                  "type": "object"
+                },
+                "depends_on": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "List of node names this node depends on"
+                },
+                "__input_schema": {
+                  "description": "Input schema for aggregate nodes",
+                  "readOnly": true,
+                  "additionalProperties": true,
+                  "properties": {
+                    "items": {
+                      "description": "Items to aggregate from parallel executions",
+                      "items": {},
+                      "title": "Items",
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "title": "AggregateNodeInput",
+                  "type": "object"
+                },
+                "__output_schema": {
+                  "description": "Output schema for aggregate nodes",
+                  "readOnly": true,
+                  "additionalProperties": true,
+                  "properties": {
+                    "result": {
+                      "description": "Aggregated result (array, object, or merged data)",
+                      "title": "Result"
+                    },
+                    "count": {
+                      "description": "Number of items aggregated",
+                      "title": "Count",
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "result",
+                    "count"
+                  ],
+                  "title": "AggregateNodeOutput",
+                  "type": "object"
+                }
+              },
+              "required": [
+                "type",
+                "config"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "const": "filter"
+                },
+                "config": {
+                  "description": "Configuration for filter nodes",
+                  "properties": {
+                    "context": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Map of variable names to node names for context",
+                      "title": "Context"
+                    },
+                    "input_schema": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Expected input schema for validation",
+                      "title": "Input Schema"
+                    },
+                    "output_schema": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Expected output schema for validation",
+                      "title": "Output Schema"
+                    },
+                    "condition": {
+                      "description": "Jinja2 condition expression",
+                      "title": "Condition",
+                      "type": "string"
+                    },
+                    "field": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Array field to filter (if not provided, filters root array)",
+                      "title": "Field"
+                    }
+                  },
+                  "required": [
+                    "condition"
+                  ],
+                  "title": "FilterNodeConfig",
+                  "type": "object"
+                },
+                "depends_on": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "List of node names this node depends on"
+                },
+                "__input_schema": {
+                  "description": "Input schema for filter nodes",
+                  "readOnly": true,
+                  "additionalProperties": true,
+                  "properties": {
+                    "items": {
+                      "description": "Array of items to filter",
+                      "items": {},
+                      "title": "Items",
+                      "type": "array"
+                    },
+                    "filter_context": {
+                      "additionalProperties": true,
+                      "description": "Additional context for filter conditions",
+                      "title": "Filter Context",
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "title": "FilterNodeInput",
+                  "type": "object"
+                },
+                "__output_schema": {
+                  "description": "Output schema for filter nodes",
+                  "readOnly": true,
+                  "additionalProperties": true,
+                  "properties": {
+                    "filtered": {
+                      "description": "Items that passed the filter condition",
+                      "items": {},
+                      "title": "Filtered",
+                      "type": "array"
+                    },
+                    "removed_count": {
+                      "description": "Number of items filtered out",
+                      "title": "Removed Count",
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "filtered",
+                    "removed_count"
+                  ],
+                  "title": "FilterNodeOutput",
+                  "type": "object"
+                }
+              },
+              "required": [
+                "type",
+                "config"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "const": "transform"
+                },
+                "config": {
+                  "description": "Configuration for transform nodes",
+                  "properties": {
+                    "context": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Map of variable names to node names for context",
+                      "title": "Context"
+                    },
+                    "input_schema": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Expected input schema for validation",
+                      "title": "Input Schema"
+                    },
+                    "output_schema": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Expected output schema for validation",
+                      "title": "Output Schema"
+                    },
+                    "template": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        {
+                          "type": "string"
+                        }
+                      ],
+                      "description": "Jinja2 template for transforming each item",
+                      "title": "Template"
+                    },
+                    "field": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Array field to transform (if not provided, transforms root array)",
+                      "title": "Field"
+                    }
+                  },
+                  "required": [
+                    "template"
+                  ],
+                  "title": "TransformNodeConfig",
+                  "type": "object"
+                },
+                "depends_on": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "List of node names this node depends on"
+                },
+                "__input_schema": {
+                  "description": "Input schema for transform nodes",
+                  "readOnly": true,
+                  "additionalProperties": true,
+                  "properties": {
+                    "items": {
+                      "description": "Array of items to transform",
+                      "items": {},
+                      "title": "Items",
+                      "type": "array"
+                    },
+                    "transform_context": {
+                      "additionalProperties": true,
+                      "description": "Additional context for transformations",
+                      "title": "Transform Context",
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "title": "TransformNodeInput",
+                  "type": "object"
+                },
+                "__output_schema": {
+                  "description": "Output schema for transform nodes",
+                  "readOnly": true,
+                  "additionalProperties": true,
+                  "properties": {
+                    "transformed": {
+                      "description": "Transformed items",
+                      "items": {},
+                      "title": "Transformed",
+                      "type": "array"
+                    },
+                    "transform_count": {
+                      "description": "Number of items transformed",
+                      "title": "Transform Count",
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "transformed",
+                    "transform_count"
+                  ],
+                  "title": "TransformNodeOutput",
+                  "type": "object"
+                }
+              },
+              "required": [
+                "type",
+                "config"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "const": "join"
+                },
+                "config": {
+                  "$defs": {
+                    "JoinType": {
+                      "description": "Join types",
+                      "enum": [
+                        "inner",
+                        "left",
+                        "right",
+                        "outer",
+                        "cross",
+                        "merge"
+                      ],
+                      "title": "JoinType",
+                      "type": "string"
+                    }
+                  },
+                  "description": "Configuration for join nodes",
+                  "properties": {
+                    "context": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Map of variable names to node names for context",
+                      "title": "Context"
+                    },
+                    "input_schema": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Expected input schema for validation",
+                      "title": "Input Schema"
+                    },
+                    "output_schema": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Expected output schema for validation",
+                      "title": "Output Schema"
+                    },
+                    "sources": {
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Named data sources to join (name -> node.field)",
+                      "title": "Sources",
+                      "type": "object"
+                    },
+                    "join_type": {
+                      "$ref": "#/$defs/JoinType",
+                      "default": "merge",
+                      "description": "Type of join to perform"
+                    },
+                    "join_keys": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Join key mappings for inner/left joins (source1_key -> source2_key)",
+                      "title": "Join Keys"
+                    }
+                  },
+                  "required": [
+                    "sources"
+                  ],
+                  "title": "JoinNodeConfig",
+                  "type": "object"
+                },
+                "depends_on": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "List of node names this node depends on"
+                },
+                "__input_schema": {
+                  "description": "Input schema for join nodes",
+                  "readOnly": true,
+                  "additionalProperties": true,
+                  "properties": {
+                    "sources": {
+                      "additionalProperties": true,
+                      "description": "Named data sources to join",
+                      "title": "Sources",
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "sources"
+                  ],
+                  "title": "JoinNodeInput",
+                  "type": "object"
+                },
+                "__output_schema": {
+                  "description": "Output schema for join nodes",
+                  "readOnly": true,
+                  "additionalProperties": true,
+                  "properties": {
+                    "joined": {
+                      "description": "Joined data (structure depends on join type)",
+                      "title": "Joined"
+                    },
+                    "source_counts": {
+                      "additionalProperties": {
+                        "type": "integer"
+                      },
+                      "description": "Number of items from each source",
+                      "title": "Source Counts",
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "joined",
+                    "source_counts"
+                  ],
+                  "title": "JoinNodeOutput",
+                  "type": "object"
+                }
+              },
+              "required": [
+                "type",
+                "config"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "const": "foreach"
+                },
+                "config": {
+                  "description": "Configuration for foreach nodes",
+                  "properties": {
+                    "context": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Map of variable names to node names for context",
+                      "title": "Context"
+                    },
+                    "input_schema": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Expected input schema for validation",
+                      "title": "Input Schema"
+                    },
+                    "output_schema": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Expected output schema for validation",
+                      "title": "Output Schema"
+                    },
+                    "array_field": {
+                      "description": "Field containing array to iterate over",
+                      "title": "Array Field",
+                      "type": "string"
+                    },
+                    "item_name": {
+                      "default": "item",
+                      "description": "Name for each item in subgraph context",
+                      "title": "Item Name",
+                      "type": "string"
+                    },
+                    "subgraph_nodes": {
+                      "description": "List of node names to execute for each item",
+                      "items": {
+                        "type": "string"
+                      },
+                      "title": "Subgraph Nodes",
+                      "type": "array"
+                    },
+                    "parallel": {
+                      "default": true,
+                      "description": "Execute iterations in parallel (default) or sequentially",
+                      "title": "Parallel",
+                      "type": "boolean"
+                    },
+                    "collect_output": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Output field name to collect from each iteration",
+                      "title": "Collect Output"
+                    }
+                  },
+                  "required": [
+                    "array_field",
+                    "subgraph_nodes"
+                  ],
+                  "title": "ForEachNodeConfig",
+                  "type": "object"
+                },
+                "depends_on": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "List of node names this node depends on"
+                },
+                "__input_schema": {
+                  "description": "Input schema for foreach nodes",
+                  "readOnly": true,
+                  "additionalProperties": true,
+                  "properties": {
+                    "items": {
+                      "description": "Array of items to iterate over",
+                      "items": {},
+                      "title": "Items",
+                      "type": "array"
+                    },
+                    "foreach_context": {
+                      "additionalProperties": true,
+                      "description": "Additional context available to subgraph",
+                      "title": "Foreach Context",
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "title": "ForeachNodeInput",
+                  "type": "object"
+                },
+                "__output_schema": {
+                  "description": "Output schema for foreach nodes",
+                  "readOnly": true,
+                  "additionalProperties": true,
+                  "properties": {
+                    "results": {
+                      "description": "Collected results from all iterations",
+                      "items": {},
+                      "title": "Results",
+                      "type": "array"
+                    },
+                    "execution_count": {
+                      "description": "Number of iterations executed",
+                      "title": "Execution Count",
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "results",
+                    "execution_count"
+                  ],
+                  "title": "ForeachNodeOutput",
+                  "type": "object"
+                }
+              },
+              "required": [
+                "type",
+                "config"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "const": "conditional"
+                },
+                "config": {
+                  "$defs": {
+                    "ConditionalCondition": {
+                      "description": "A single condition in a conditional node",
+                      "properties": {
+                        "condition": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "default": null,
+                          "description": "Jinja2 condition expression (omit for default)",
+                          "title": "Condition"
+                        },
+                        "then": {
+                          "description": "Target/output value if condition is true",
+                          "title": "Then",
+                          "type": "string"
+                        },
+                        "is_default": {
+                          "default": false,
+                          "description": "Whether this is the default condition",
+                          "title": "Is Default",
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "then"
+                      ],
+                      "title": "ConditionalCondition",
+                      "type": "object"
+                    }
+                  },
+                  "description": "Configuration for conditional nodes - replaces old ROUTE functionality",
+                  "properties": {
+                    "context": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Map of variable names to node names for context",
+                      "title": "Context"
+                    },
+                    "input_schema": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Expected input schema for validation",
+                      "title": "Input Schema"
+                    },
+                    "output_schema": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Expected output schema for validation",
+                      "title": "Output Schema"
+                    },
+                    "conditions": {
+                      "description": "List of conditions to evaluate in order",
+                      "items": {
+                        "$ref": "#/$defs/ConditionalCondition"
+                      },
+                      "title": "Conditions",
+                      "type": "array"
+                    },
+                    "fallback": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "description": "Fallback value if no conditions match and no default",
+                      "title": "Fallback"
+                    }
+                  },
+                  "required": [
+                    "conditions"
+                  ],
+                  "title": "ConditionalNodeConfig",
+                  "type": "object"
+                },
+                "depends_on": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "List of node names this node depends on"
+                },
+                "__input_schema": {
+                  "description": "Input schema for conditional nodes",
+                  "readOnly": true,
+                  "additionalProperties": true,
+                  "properties": {
+                    "context_data": {
+                      "additionalProperties": true,
+                      "description": "Data to evaluate conditions against",
+                      "title": "Context Data",
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "context_data"
+                  ],
+                  "title": "ConditionalNodeInput",
+                  "type": "object"
+                },
+                "__output_schema": {
+                  "description": "Output schema for conditional nodes",
+                  "readOnly": true,
+                  "additionalProperties": true,
+                  "properties": {
+                    "selected_route": {
+                      "description": "The value from 'then' clause",
+                      "title": "Selected Route",
+                      "type": "string"
+                    },
+                    "condition_met": {
+                      "description": "The condition that was met or 'default'",
+                      "title": "Condition Met",
+                      "type": "string"
+                    },
+                    "evaluated_conditions": {
+                      "description": "List of conditions that were evaluated",
+                      "items": {
+                        "type": "string"
+                      },
+                      "title": "Evaluated Conditions",
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "selected_route",
+                    "condition_met",
+                    "evaluated_conditions"
+                  ],
+                  "title": "ConditionalNodeOutput",
+                  "type": "object"
+                }
+              },
+              "required": [
+                "type",
+                "config"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "outputs": {
+      "type": "object",
+      "description": "Output mappings",
+      "patternProperties": {
+        "^[a-zA-Z_][a-zA-Z0-9_]*$": {
+          "type": "string",
+          "description": "Node name or node.field reference"
+        }
+      }
+    }
+  },
+  "required": [
+    "name",
+    "version",
+    "nodes"
+  ],
+  "additionalProperties": false
+}
