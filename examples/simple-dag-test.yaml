@@ -1,0 +1,29 @@
+name: simple-dag-test
+version: "1.0.0"
+description: Simple workflow to test DAG visualization
+
+inputs:
+  message:
+    type: string
+    required: true
+    description: Input message to process
+
+nodes:
+  process_message:
+    type: llm
+    config:
+      prompt: "Process this message: {{ inputs.message }}"
+      model: "gpt-3.5-turbo"
+    description: Process the input message
+
+  analyze_result:
+    type: llm
+    depends_on: [process_message]
+    config:
+      prompt: "Analyze this result: {{ process_message }}"
+      model: "gpt-3.5-turbo"
+    description: Analyze the processed message
+
+outputs:
+  processed: process_message
+  analysis: analyze_result

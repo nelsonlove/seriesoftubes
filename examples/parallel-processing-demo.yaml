@@ -1,0 +1,122 @@
+name: parallel-processing-demo
+version: "1.0.0"
+description: Clear demonstration of parallel processing with split/aggregate pattern
+
+inputs:
+  product_ids:
+    type: array
+    required: true
+    description: List of product IDs to analyze
+    default: ["PROD-001", "PROD-002", "PROD-003", "PROD-004", "PROD-005"]
+
+nodes:
+  # === FAN-OUT: Split products for parallel processing ===
+  split_products:
+    type: split
+    config:
+      field: "inputs.product_ids"
+      item_name: "product_id"
+    description: Split array into individual products
+
+  # === PARALLEL REGION START ===
+  # These nodes will show with stacked cards visualization
+
+  fetch_product_details:
+    type: http
+    depends_on: [split_products]
+    config:
+      url: "https://api.store.com/products/{{ product_id }}"
+      method: GET
+    description: Fetch product information (runs N times in parallel)
+
+  fetch_inventory:
+    type: http
+    depends_on: [split_products]
+    config:
+      url: "https://api.store.com/inventory/{{ product_id }}"
+      method: GET
+    description: Check inventory levels (runs N times in parallel)
+
+  fetch_reviews:
+    type: http
+    depends_on: [split_products]
+    config:
+      url: "https://api.store.com/reviews/{{ product_id }}"
+      method: GET
+    description: Get customer reviews (runs N times in parallel)
+
+  analyze_product:
+    type: llm
+    depends_on: [fetch_product_details, fetch_inventory, fetch_reviews]
+    config:
+      prompt: |
+        Analyze this product data:
+        - Details: {{ fetch_product_details }}
+        - Inventory: {{ fetch_inventory }}
+        - Reviews: {{ fetch_reviews }}
+
+        Provide quality score and recommendations.
+      model: "gpt-4"
+    description: AI analysis of each product (runs N times in parallel)
+
+  calculate_metrics:
+    type: python
+    depends_on: [analyze_product]
+    config:
+      code: |
+        analysis = context['analyze_product']
+        details = context['fetch_product_details']
+        inventory = context['fetch_inventory']
+
+        return {
+          'product_id': context['product_id'],
+          'quality_score': calculate_quality(analysis),
+          'stock_health': assess_stock(inventory),
+          'recommendation': generate_recommendation(analysis)
+        }
+    description: Calculate metrics per product (runs N times in parallel)
+
+  # === FAN-IN: Collect all parallel results ===
+  aggregate_analyses:
+    type: aggregate
+    depends_on: [calculate_metrics]
+    config:
+      mode: "array"
+      field: "result"
+    description: Collect all product analyses into single array
+
+  # === POST-AGGREGATION: Single execution continues ===
+
+  summarize_portfolio:
+    type: llm
+    depends_on: [aggregate_analyses]
+    config:
+      prompt: |
+        Summarize the product portfolio analysis:
+        {{ aggregate_analyses }}
+
+        Provide:
+        1. Overall portfolio health
+        2. Top performing products
+        3. Products needing attention
+        4. Strategic recommendations
+      model: "gpt-4"
+    description: Generate portfolio summary (runs once)
+
+  generate_report:
+    type: python
+    depends_on: [summarize_portfolio, aggregate_analyses]
+    config:
+      code: |
+        return {
+          'summary': context['summarize_portfolio'],
+          'product_count': len(context['aggregate_analyses']),
+          'products': context['aggregate_analyses'],
+          'generated_at': datetime.now().isoformat()
+        }
+    description: Create final report (runs once)
+
+outputs:
+  report: generate_report
+  product_analyses: aggregate_analyses
+  summary: summarize_portfolio

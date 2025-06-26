@@ -1,0 +1,179 @@
+name: complex-dag-demo
+version: "1.0.0"
+description: A complex workflow demonstrating parallel processing and DAG visualization
+
+inputs:
+  company_name:
+    type: string
+    required: true
+    description: Company name to analyze
+
+  include_social:
+    type: boolean
+    required: false
+    default: true
+    description: Whether to include social media analysis
+
+nodes:
+  # First layer - parallel data fetching
+  fetch_company_data:
+    type: http
+    config:
+      url: "https://api.example.com/company/{{ inputs.company_name }}"
+      method: GET
+    description: Fetch basic company information
+
+  fetch_financial_data:
+    type: http
+    config:
+      url: "https://api.example.com/finance/{{ inputs.company_name }}"
+      method: GET
+    description: Fetch financial reports
+
+  fetch_news:
+    type: http
+    config:
+      url: "https://api.example.com/news/{{ inputs.company_name }}"
+      method: GET
+    description: Fetch recent news articles
+
+  # Second layer - process raw data
+  analyze_company:
+    type: llm
+    depends_on: [fetch_company_data]
+    config:
+      prompt: "Analyze this company data: {{ fetch_company_data }}"
+      model: "gpt-4"
+    description: AI analysis of company profile
+
+  analyze_financials:
+    type: llm
+    depends_on: [fetch_financial_data]
+    config:
+      prompt: "Analyze these financial reports: {{ fetch_financial_data }}"
+      model: "gpt-4"
+    description: AI analysis of financial health
+
+  extract_keywords:
+    type: python
+    depends_on: [fetch_news]
+    config:
+      code: |
+        news = context['fetch_news']
+        # Extract keywords from news articles
+        keywords = extract_keywords_from_news(news)
+        return {'keywords': keywords, 'count': len(keywords)}
+    description: Extract keywords from news
+
+  # Conditional branch
+  check_social_flag:
+    type: conditional
+    config:
+      conditions:
+        - condition: "{{ inputs.include_social == true }}"
+          then: "fetch_social_data"
+        - condition: "default"
+          then: "skip_social"
+          is_default: true
+    description: Check if social analysis is requested
+
+  fetch_social_data:
+    type: http
+    depends_on: [check_social_flag]
+    config:
+      url: "https://api.example.com/social/{{ inputs.company_name }}"
+      method: GET
+    description: Fetch social media presence
+
+  analyze_social:
+    type: llm
+    depends_on: [fetch_social_data]
+    config:
+      prompt: "Analyze social media presence: {{ fetch_social_data }}"
+      model: "gpt-3.5-turbo"
+    description: Analyze social media data
+
+  skip_social:
+    type: python
+    depends_on: [check_social_flag]
+    config:
+      code: |
+        return {'social_analysis': 'Skipped per user request'}
+    description: Placeholder when social analysis is skipped
+
+  # Convergence point - combine multiple analyses
+  risk_assessment:
+    type: python
+    depends_on: [analyze_company, analyze_financials]
+    config:
+      code: |
+        company = context['analyze_company']
+        financials = context['analyze_financials']
+        # Calculate risk score
+        risk_score = calculate_risk(company, financials)
+        return {'risk_score': risk_score, 'risk_level': get_risk_level(risk_score)}
+    description: Calculate risk based on multiple factors
+
+  # Another convergence
+  market_position:
+    type: llm
+    depends_on: [analyze_company, extract_keywords]
+    config:
+      prompt: |
+        Based on company analysis: {{ analyze_company }}
+        And news keywords: {{ extract_keywords }}
+        Determine market position and competitive advantage.
+      model: "gpt-4"
+    description: Assess market position
+
+  # Final convergence - multiple dependencies
+  generate_report:
+    type: llm
+    depends_on: [risk_assessment, market_position, analyze_social, skip_social]
+    config:
+      prompt: |
+        Generate comprehensive report based on:
+        - Risk Assessment: {{ risk_assessment }}
+        - Market Position: {{ market_position }}
+        - Social Analysis: {{ analyze_social | default: skip_social }}
+      model: "gpt-4"
+    description: Generate final comprehensive report
+
+  # Parallel final processing
+  create_summary:
+    type: python
+    depends_on: [generate_report]
+    config:
+      code: |
+        report = context['generate_report']
+        return create_executive_summary(report)
+    description: Create executive summary
+
+  create_visualizations:
+    type: python
+    depends_on: [risk_assessment, market_position]
+    config:
+      code: |
+        risk = context['risk_assessment']
+        market = context['market_position']
+        return generate_charts(risk, market)
+    description: Generate data visualizations
+
+  # Final packaging
+  package_results:
+    type: python
+    depends_on: [generate_report, create_summary, create_visualizations]
+    config:
+      code: |
+        return {
+          'report': context['generate_report'],
+          'summary': context['create_summary'],
+          'charts': context['create_visualizations'],
+          'timestamp': datetime.now().isoformat()
+        }
+    description: Package all results together
+
+outputs:
+  final_package: package_results
+  risk_score: risk_assessment.risk_score
+  summary: create_summary

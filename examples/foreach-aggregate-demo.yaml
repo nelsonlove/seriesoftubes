@@ -1,0 +1,105 @@
+name: foreach-aggregate-demo
+version: "1.0.0"
+description: Demonstrates foreach fan-out and aggregate fan-in visualization
+
+inputs:
+  companies:
+    type: array
+    required: true
+    description: List of company names to analyze
+    default: ["Apple", "Google", "Microsoft"]
+
+nodes:
+  # Split array into individual items for parallel processing
+  split_companies:
+    type: split
+    config:
+      field: "inputs.companies"
+      item_name: "company"
+    description: Split company array for parallel processing
+
+  # ForEach node - process each company with a subgraph
+  analyze_each_company:
+    type: foreach
+    depends_on: [split_companies]
+    config:
+      array_field: "split_companies"
+      item_name: "current_company"
+      parallel: true
+      subgraph_nodes: ["fetch_company_info", "analyze_company_data", "calculate_score"]
+    description: Process each company through analysis pipeline
+
+  # Subgraph nodes referenced by foreach
+  fetch_company_info:
+    type: http
+    config:
+      url: "https://api.example.com/company/{{ current_company }}"
+      method: GET
+    description: Fetch company information
+
+  analyze_company_data:
+    type: llm
+    depends_on: [fetch_company_info]
+    config:
+      prompt: "Analyze this company data: {{ fetch_company_info }}"
+      model: "gpt-4"
+    description: AI analysis of company
+
+  calculate_score:
+    type: python
+    depends_on: [analyze_company_data]
+    config:
+      code: |
+        analysis = context['analyze_company_data']
+        # Calculate various scores
+        return {
+          'company': context['current_company'],
+          'score': calculate_comprehensive_score(analysis),
+          'risk': assess_risk_level(analysis)
+        }
+    description: Calculate company scores
+
+  # Aggregate results from foreach processing
+  aggregate_results:
+    type: aggregate
+    depends_on: [analyze_each_company]
+    config:
+      mode: "array"
+      field: "calculate_score"
+    description: Collect all company analysis results
+
+  # Additional processing that also feeds into join
+  market_overview:
+    type: llm
+    config:
+      prompt: "Provide current market overview for tech sector"
+      model: "gpt-4"
+    description: Get market context
+
+  # Join multiple data sources
+  combine_analysis:
+    type: join
+    depends_on: [aggregate_results, market_overview]
+    config:
+      sources:
+        companies: "aggregate_results"
+        market: "market_overview"
+      join_type: "merge"
+    description: Combine company results with market data
+
+  # Final summary generation
+  generate_report:
+    type: llm
+    depends_on: [combine_analysis]
+    config:
+      prompt: |
+        Generate investment report based on:
+        - Company analyses: {{ combine_analysis.companies }}
+        - Market overview: {{ combine_analysis.market }}
+      model: "gpt-4"
+    description: Generate final investment report
+
+outputs:
+  report: generate_report
+  company_scores: aggregate_results
+  market_analysis: market_overview

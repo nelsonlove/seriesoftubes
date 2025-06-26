@@ -30,7 +30,8 @@ export const RunWorkflowModal: React.FC<RunWorkflowModalProps> = ({ workflow, op
         // Only include non-undefined values
         if (value !== undefined) {
           // Parse JSON for object/array types
-          const inputDef = workflow.workflow.inputs[key];
+          const workflowData = workflow.parsed || workflow.workflow || workflow;
+          const inputDef = workflowData.inputs?.[key];
           if (inputDef && (inputDef.type === 'object' || inputDef.type === 'array')) {
             try {
               inputs[key] = JSON.parse(value as string);
@@ -44,7 +45,7 @@ export const RunWorkflowModal: React.FC<RunWorkflowModalProps> = ({ workflow, op
       });
 
       // Run the workflow
-      const response = await workflowAPI.run(workflow.path, inputs);
+      const response = await workflowAPI.run(workflow.path || workflow.id, inputs);
 
       // Close modal and navigate to execution detail
       onClose();
@@ -129,7 +130,7 @@ export const RunWorkflowModal: React.FC<RunWorkflowModalProps> = ({ workflow, op
 
   return (
     <Modal
-      title={`Run Workflow: ${workflow.workflow.name}`}
+      title={`Run Workflow: ${(workflow.parsed || workflow.workflow || workflow).name}`}
       open={open}
       onCancel={onClose}
       footer={[
@@ -154,11 +155,12 @@ export const RunWorkflowModal: React.FC<RunWorkflowModalProps> = ({ workflow, op
         )}
 
         <Form form={form} layout="vertical">
-          {Object.entries(workflow.workflow.inputs).map(([name, input]) =>
-            renderInputField(name, input)
+          {Object.entries((workflow.parsed || workflow.workflow || workflow).inputs || {}).map(
+            ([name, input]) => renderInputField(name, input)
           )}
 
-          {Object.keys(workflow.workflow.inputs).length === 0 && (
+          {Object.keys((workflow.parsed || workflow.workflow || workflow).inputs || {}).length ===
+            0 && (
             <Alert
               message="No inputs required"
               description="This workflow doesn't require any inputs. Click 'Run Workflow' to start execution."

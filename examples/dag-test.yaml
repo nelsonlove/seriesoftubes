@@ -1,0 +1,121 @@
+name: dag-visualization-test
+version: "1.0.0"
+description: A test workflow to demonstrate DAG visualization with multiple node types
+
+inputs:
+  company_name:
+    type: string
+    required: true
+    description: Name of the company to analyze
+
+  companies_list:
+    type: array
+    required: false
+    default: []
+    description: List of companies for batch processing
+
+nodes:
+  # HTTP API call
+  fetch_company_data:
+    type: http
+    config:
+      url: "https://api.example.com/companies/{{ inputs.company_name }}"
+      method: GET
+    description: Fetch company data from external API
+
+  # LLM analysis
+  analyze_company:
+    type: llm
+    depends_on: [fetch_company_data]
+    config:
+      prompt: |
+        Analyze this company data: {{ fetch_company_data }}
+        Provide insights on revenue, market position, and growth potential.
+      model: "gpt-4"
+    description: AI-powered company analysis
+
+  # Split array for parallel processing
+  split_companies:
+    type: split
+    config:
+      field: "inputs.companies_list"
+      item_name: "company"
+    description: Split companies list for parallel processing
+
+  # Filter high-value companies
+  filter_high_value:
+    type: filter
+    depends_on: [split_companies]
+    config:
+      condition: "{{ company.revenue > 1000000 }}"
+    description: Filter companies with revenue > $1M
+
+  # Transform data structure
+  transform_company:
+    type: transform
+    depends_on: [filter_high_value]
+    config:
+      template:
+        id: "{{ item.name | replace(' ', '_') | lower }}"
+        name: "{{ item.name }}"
+        revenue_millions: "{{ (item.revenue / 1000000) | round(2) }}"
+    description: Transform company data structure
+
+  # Aggregate results
+  aggregate_results:
+    type: aggregate
+    depends_on: [transform_company]
+    config:
+      mode: "array"
+    description: Collect all processed companies
+
+  # Python processing
+  calculate_metrics:
+    type: python
+    depends_on: [analyze_company, aggregate_results]
+    config:
+      code: |
+        analysis = context['analyze_company']
+        companies = context['aggregate_results']
+
+        return {
+          'total_companies': len(companies),
+          'analysis': analysis,
+          'summary': f"Analyzed {len(companies)} high-value companies"
+        }
+    description: Calculate final metrics
+
+  # Conditional routing
+  route_by_result:
+    type: conditional
+    depends_on: [calculate_metrics]
+    config:
+      conditions:
+        - condition: "{{ calculate_metrics.total_companies > 10 }}"
+          then: "large_batch_handler"
+        - condition: "default"
+          then: "standard_handler"
+          is_default: true
+    description: Route based on batch size
+
+  # Handlers
+  large_batch_handler:
+    type: python
+    depends_on: [route_by_result]
+    config:
+      code: |
+        return {'status': 'large_batch', 'message': 'Processing large batch'}
+    description: Handle large batches
+
+  standard_handler:
+    type: python
+    depends_on: [route_by_result]
+    config:
+      code: |
+        return {'status': 'standard', 'message': 'Standard processing'}
+    description: Handle standard batches
+
+outputs:
+  analysis: analyze_company
+  metrics: calculate_metrics
+  batch_status: route_by_result
