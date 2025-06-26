@@ -23,10 +23,18 @@ export interface Workflow {
 }
 
 export interface WorkflowSummary {
-  path: string;
+  id: string;
   name: string;
   version: string;
   description?: string;
+  user_id: string;
+  username: string;
+  is_public: boolean;
+  created_at: string;
+  updated_at: string;
+  yaml_content: string;
+  // Computed fields for UI
+  path: string;
   inputs: Record<string, WorkflowInput>;
 }
 

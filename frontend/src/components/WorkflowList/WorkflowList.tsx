@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Card, List, Input, Tag, Space, Typography, Spin, Empty } from 'antd';
-import { SearchOutlined, FileTextOutlined } from '@ant-design/icons';
+import { Card, List, Input, Tag, Space, Typography, Spin, Empty, Button } from 'antd';
+import { SearchOutlined, FileTextOutlined, PlusOutlined, UploadOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { workflowAPI } from '../../api/client';
+import { NewWorkflowModal } from '../NewWorkflowModal';
 import type { WorkflowSummary } from '../../types/workflow';
 
 const { Search } = Input;
@@ -15,11 +16,13 @@ interface WorkflowListProps {
 export const WorkflowList: React.FC<WorkflowListProps> = ({ onSelectWorkflow }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTag, setSelectedTag] = useState<string | undefined>();
+  const [showNewWorkflowModal, setShowNewWorkflowModal] = useState(false);
 
   const {
     data: workflows,
     isLoading,
     error,
+    refetch,
   } = useQuery({
     queryKey: ['workflows'], // Remove search/tag from key to prevent refetching
     queryFn: () => workflowAPI.list({}), // Fetch all workflows once
@@ -70,19 +73,42 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({ onSelectWorkflow }) 
     return <Empty description={`Failed to load workflows: ${error.message}`} />;
   }
 
-  return (
-    <Space direction="vertical" style={{ width: '100%' }} size="large">
-      <Card>
-        <Space direction="vertical" style={{ width: '100%' }}>
-          <Search
-            placeholder="Search workflows..."
-            prefix={<SearchOutlined />}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            allowClear
-          />
+  const handleWorkflowCreated = (workflowId: string) => {
+    // TODO: Select the newly created workflow
+    refetch();
+  };
 
-          {allTags.length > 0 && (
+  return (
+    <>
+      <Space direction="vertical" style={{ width: '100%' }} size="large">
+        <Card>
+          <Space direction="vertical" style={{ width: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => setShowNewWorkflowModal(true)}
+              >
+                New Workflow
+              </Button>
+              <Button
+                icon={<ReloadOutlined />}
+                onClick={() => refetch()}
+                loading={isLoading}
+              >
+                Refresh
+              </Button>
+            </div>
+
+            <Search
+              placeholder="Search workflows..."
+              prefix={<SearchOutlined />}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              allowClear
+            />
+
+            {allTags.length > 0 && (
             <Space wrap>
               <Text>Filter by tag:</Text>
               <Tag
@@ -117,21 +143,25 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({ onSelectWorkflow }) 
           >
             <Card.Meta
               avatar={<FileTextOutlined style={{ fontSize: 24 }} />}
-              title={workflow.name || workflow.path}
+              title={
+                <Space>
+                  {workflow.name}
+                  {workflow.is_public ? (
+                    <Tag color="green">Public</Tag>
+                  ) : (
+                    <Tag>Private</Tag>
+                  )}
+                </Space>
+              }
               description={
                 <Space direction="vertical" style={{ width: '100%' }}>
                   {workflow.description && <Text>{workflow.description}</Text>}
                   <Space>
-                    <Text type="secondary">{Object.keys(workflow.inputs).length} inputs</Text>
-                    <Text type="secondary">•</Text>
                     <Text type="secondary">v{workflow.version}</Text>
-                  </Space>
-                  <Space wrap>
-                    {Object.entries(workflow.inputs).map(([name, input]) => (
-                      <Tag key={name} color={input.required ? 'red' : 'blue'}>
-                        {name}: {input.type}
-                      </Tag>
-                    ))}
+                    <Text type="secondary">•</Text>
+                    <Text type="secondary">by {workflow.username}</Text>
+                    <Text type="secondary">•</Text>
+                    <Text type="secondary">{new Date(workflow.updated_at).toLocaleDateString()}</Text>
                   </Space>
                 </Space>
               }
@@ -140,5 +170,12 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({ onSelectWorkflow }) 
         )}
       />
     </Space>
+
+      <NewWorkflowModal
+        visible={showNewWorkflowModal}
+        onClose={() => setShowNewWorkflowModal(false)}
+        onSuccess={handleWorkflowCreated}
+      />
+    </>
   );
 };

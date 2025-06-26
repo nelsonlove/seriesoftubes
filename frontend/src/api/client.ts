@@ -40,16 +40,102 @@ api.interceptors.response.use(
   }
 );
 
+// Helper to parse YAML and extract inputs
+const parseWorkflowInputs = (yamlContent: string): Record<string, any> => {
+  try {
+    // Simple regex to extract inputs section
+    // This is a basic implementation - in production you'd use a proper YAML parser
+    const inputsMatch = yamlContent.match(/inputs:\s*\n((?:\s{2,}.*\n)*)/);
+    if (!inputsMatch) return {};
+    
+    // For now, return empty object - the backend should ideally parse this
+    return {};
+  } catch {
+    return {};
+  }
+};
+
 export const workflowAPI = {
   // List all workflows
   list: async (params?: { tag?: string; search?: string }) => {
-    const response = await api.get<WorkflowSummary[]>('/workflows', { params });
-    return response.data;
+    const response = await api.get<any[]>('/workflows', { params });
+    // Transform the response to match our WorkflowSummary type
+    return response.data.map(wf => ({
+      ...wf,
+      path: wf.id, // Use ID as path for now
+      inputs: parseWorkflowInputs(wf.yaml_content),
+    })) as WorkflowSummary[];
   },
 
   // Get workflow details
   get: async (path: string) => {
     const response = await api.get<WorkflowDetail>(`/workflows/${encodeURIComponent(path)}`);
+    return response.data;
+  },
+
+  // Create a new workflow
+  create: async (yamlContent: string, isPublic: boolean = false) => {
+    const response = await api.post<{
+      id: string;
+      name: string;
+      version: string;
+      description: string | null;
+      user_id: string;
+      username: string;
+      is_public: boolean;
+      created_at: string;
+      updated_at: string;
+    }>('/workflows', {
+      yaml_content: yamlContent,
+      is_public: isPublic,
+    });
+    return response.data;
+  },
+
+  // Upload a workflow file
+  uploadFile: async (file: File, isPublic: boolean = false) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await api.post<{
+      id: string;
+      name: string;
+      version: string;
+      description: string | null;
+      user_id: string;
+      username: string;
+      is_public: boolean;
+      created_at: string;
+      updated_at: string;
+    }>(`/workflows/upload?is_public=${isPublic}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  // Update a workflow
+  update: async (id: string, yamlContent: string, isPublic?: boolean) => {
+    const response = await api.put<WorkflowDetail>(`/workflows/${id}`, {
+      yaml_content: yamlContent,
+      is_public: isPublic,
+    });
+    return response.data;
+  },
+
+  // Delete a workflow
+  delete: async (id: string) => {
+    const response = await api.delete<{ message: string }>(`/workflows/${id}`);
+    return response.data;
+  },
+
+  // Download a workflow
+  download: async (id: string, format: 'yaml' | 'tubes' = 'yaml') => {
+    const response = await api.get(`/workflows/${id}/download`, {
+      params: { format },
+      responseType: 'blob',
+    });
     return response.data;
   },
 
