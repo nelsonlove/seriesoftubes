@@ -171,12 +171,16 @@ export const NewWorkflowModal: React.FC<NewWorkflowModalProps> = ({
                           }
                         }
                       }}
+                      // Only show the template name when closed
+                      optionLabelProp="label"
                     >
                       {workflowTemplates.map((template, index) => (
-                        <Select.Option key={index} value={template.yaml}>
+                        <Select.Option key={index} value={template.yaml} label={template.name}>
                           <div>
                             <div style={{ fontWeight: 'bold' }}>{template.name}</div>
-                            <div style={{ fontSize: '12px' }}>{template.description}</div>
+                            <div style={{ fontSize: '12px', color: '#666' }}>
+                              {template.description}
+                            </div>
                           </div>
                         </Select.Option>
                       ))}
