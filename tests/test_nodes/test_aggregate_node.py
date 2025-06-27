@@ -258,7 +258,10 @@ class TestAggregateNode:
                     type=NodeType.TRANSFORM,
                     depends_on=["split_items"],
                     config=TransformNodeConfig(
-                        template={"name": "{{ item.name }}", "value": "{{ item.value }}"}
+                        template={
+                            "name": "{{ item.name }}",
+                            "value": "{{ item.value }}",
+                        }
                     ),
                 ),
                 "aggregate_missing": Node(
@@ -376,7 +379,7 @@ class TestAggregateNode:
         good_sales = [s for s in high_sales if s["performance"] == "good"]
 
         assert len(excellent_sales) == 1  # East/C with 2000 sales
-        assert len(good_sales) == 1       # South/B with 1500 sales
+        assert len(good_sales) == 1  # South/B with 1500 sales
 
         assert excellent_sales[0]["sales_k"] == 2.0
         assert good_sales[0]["sales_k"] == 1.5

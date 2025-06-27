@@ -113,7 +113,9 @@ class TestJoinNode:
             outputs={"result": "join_left"},
         )
 
-        context = await engine.execute(workflow, {"employees": employees, "departments": departments})
+        context = await engine.execute(
+            workflow, {"employees": employees, "departments": departments}
+        )
 
         assert len(context.errors) == 0, f"Execution errors: {context.errors}"
         result = context.outputs["join_left"]
@@ -156,7 +158,9 @@ class TestJoinNode:
             outputs={"result": "join_cross"},
         )
 
-        context = await engine.execute(workflow, {"employees": small_employees, "departments": small_departments})
+        context = await engine.execute(
+            workflow, {"employees": small_employees, "departments": small_departments}
+        )
 
         assert len(context.errors) == 0, f"Execution errors: {context.errors}"
         result = context.outputs["join_cross"]

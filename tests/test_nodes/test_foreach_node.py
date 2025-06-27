@@ -79,7 +79,7 @@ class TestForEachNode:
         # Verify transformations
         grades = {user["name"]: user["grade"] for user in result}
         assert grades["Alice"] == "B"  # 85 -> B
-        assert grades["Bob"] == "A"    # 92 -> A
+        assert grades["Bob"] == "A"  # 92 -> A
         assert grades["Charlie"] == "C"  # 78 -> C
 
     @pytest.mark.asyncio
@@ -140,7 +140,7 @@ return {
         # Verify bonus calculations
         bonuses = {user["name"]: user["bonus"] for user in result}
         assert bonuses["Alice"] == 1200  # 85 -> 1.2x bonus
-        assert bonuses["Bob"] == 1500    # 92 -> 1.5x bonus
+        assert bonuses["Bob"] == 1500  # 92 -> 1.5x bonus
         assert bonuses["Charlie"] == 1000  # 78 -> 1.0x bonus
 
     @pytest.mark.asyncio
