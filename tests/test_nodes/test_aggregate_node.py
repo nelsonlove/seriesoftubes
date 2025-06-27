@@ -1,6 +1,7 @@
 """Tests for aggregate node functionality"""
 
 import pytest
+from pydantic import ValidationError
 
 from seriesoftubes.engine import WorkflowEngine
 from seriesoftubes.models import (
@@ -408,31 +409,8 @@ class TestAggregateNode:
         assert len(context.errors) > 0
         assert "aggregate_invalid" in context.errors
 
-    @pytest.mark.asyncio
-    async def test_aggregate_invalid_mode(self, engine):
+    def test_aggregate_invalid_mode(self):
         """Test aggregate with invalid mode"""
-        workflow = Workflow(
-            name="test-aggregate-invalid-mode",
-            version="1.0.0",
-            inputs={"items": WorkflowInput(input_type="array", required=True)},
-            nodes={
-                "split_items": Node(
-                    name="split_items",
-                    type=NodeType.SPLIT,
-                    config=SplitNodeConfig(field="inputs.items", item_name="item"),
-                ),
-                "aggregate_invalid": Node(
-                    name="aggregate_invalid",
-                    type=NodeType.AGGREGATE,
-                    depends_on=["split_items"],
-                    config=AggregateNodeConfig(mode="invalid_mode"),  # type: ignore
-                ),
-            },
-            outputs={"result": "aggregate_invalid"},
-        )
-
-        context = await engine.execute(workflow, {"items": [{"id": 1}]})
-
-        # Should have errors due to invalid mode
-        assert len(context.errors) > 0
-        assert "aggregate_invalid" in context.errors
+        # Should raise ValidationError during config validation
+        with pytest.raises(ValidationError, match="Mode must be one of"):
+            AggregateNodeConfig(mode="invalid_mode")

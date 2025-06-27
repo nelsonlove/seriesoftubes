@@ -43,7 +43,18 @@ class AggregateNodeExecutor(NodeExecutor):
                 # Look for results from dependent nodes that were split
                 for dep_node in node.depends_on:
                     dep_output = context.get_output(dep_node)
-                    if isinstance(dep_output, list):
+                    
+                    # Skip split metadata (dict with parallel_data flag)
+                    if isinstance(dep_output, dict) and dep_output.get("parallel_data"):
+                        # This is split metadata, extract the actual split items
+                        split_items = dep_output.get("split_items", [])
+                        if split_items:
+                            parallel_results = split_items
+                        else:
+                            # Empty split - no items to aggregate
+                            parallel_results = []
+                        break
+                    elif isinstance(dep_output, list):
                         # This is the output from a parallel processing node (like filter)
                         parallel_results = dep_output
                         break  # Take the first list output as our parallel results
