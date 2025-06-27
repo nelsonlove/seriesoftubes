@@ -68,8 +68,8 @@ class LLMNodeConfig(BaseNodeConfig):
         None, description="Schema for structured extraction", alias="schema"
     )
 
-    @field_validator("schema_definition", mode="before")
     @classmethod
+    @field_validator("schema_definition", mode="before")
     def validate_schema(cls, v: Any) -> dict[str, Any] | None:
         """Ensure schema is a dict if provided"""
         if v is None:
@@ -205,8 +205,8 @@ class AggregateNodeConfig(BaseNodeConfig):
         None, description="Optional: extract specific field from each result"
     )
 
-    @field_validator("mode")
     @classmethod
+    @field_validator("mode")
     def validate_mode(cls, v: str) -> str:
         """Validate aggregation mode"""
         valid_modes = {"array", "object", "merge"}
@@ -322,8 +322,8 @@ class Node(BaseModel):
     )
     config: BaseNodeConfig = Field(..., description="Node-specific configuration")
 
-    @field_validator("config", mode="before")
     @classmethod
+    @field_validator("config", mode="before")
     def validate_config_type(cls, v: Any, info: Any) -> BaseNodeConfig:
         """Validate and convert config based on node type"""
         if isinstance(v, BaseNodeConfig):
@@ -391,8 +391,8 @@ class Workflow(BaseModel):
     nodes: dict[str, Node] = Field(..., description="DAG nodes")
     outputs: dict[str, str] = Field(default_factory=dict, description="Output mappings")
 
-    @field_validator("nodes", mode="before")
     @classmethod
+    @field_validator("nodes", mode="before")
     def set_node_names(cls, v: Any) -> dict[str, Node]:
         """Set node names from dict keys"""
         if not isinstance(v, dict):

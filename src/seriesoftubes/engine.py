@@ -1,9 +1,10 @@
 """DAG execution engine for seriesoftubes workflows"""
 
 import asyncio
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 from uuid import uuid4
 
 from seriesoftubes.cache import get_cache_backend
@@ -106,7 +107,7 @@ class WorkflowEngine:
                 else:
                     self.cache_manager = None
             except Exception as e:
-                print(f"Failed to initialize cache: {e}")
+                logging.warning(f"Failed to initialize cache: {e}")
                 self.cache_manager = None
         else:
             self.cache_manager = cache_manager
@@ -251,7 +252,7 @@ class WorkflowEngine:
                 # Prepare context data for caching
                 context_data = {
                     "inputs": context.inputs,
-                    "outputs": {k: v for k, v in context.outputs.items()},
+                    "outputs": dict(context.outputs.items()),
                 }
 
                 # Get exclude keys from cache settings
@@ -287,7 +288,7 @@ class WorkflowEngine:
                         return result
                 except Exception as e:
                     # Cache read error - continue with normal execution
-                    print(f"Cache read error for node {node.name}: {e}")
+                    logging.warning(f"Cache read error for node {node.name}: {e}")
 
         # Execute the node normally
         result = await executor.execute(node, context)
@@ -310,7 +311,7 @@ class WorkflowEngine:
                     # Prepare context data for caching
                     context_data = {
                         "inputs": context.inputs,
-                        "outputs": {k: v for k, v in context.outputs.items()},
+                        "outputs": dict(context.outputs.items()),
                     }
 
                     exclude_keys = cache_settings.get("exclude_context_keys", [])
@@ -333,7 +334,7 @@ class WorkflowEngine:
 
                 except Exception as e:
                     # Cache write error - don't fail the execution
-                    print(f"Cache write error for node {node.name}: {e}")
+                    logging.warning(f"Cache write error for node {node.name}: {e}")
 
         # If execution was successful, validate output against downstream requirements
         if result.success:

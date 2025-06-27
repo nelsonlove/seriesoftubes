@@ -108,7 +108,7 @@ definitions:
         type: string
         description: Model identifier
         examples:
-          - gpt-4
+          - gpt-4o
           - claude-3-opus-20240229
 
       prompt:
@@ -192,36 +192,6 @@ definitions:
         description: Map context variables from other nodes
         additionalProperties:
           type: string
-
-  route_config:
-    type: object
-    required:
-      - routes
-    properties:
-      context:
-        type: object
-        description: Map context variables from other nodes
-        additionalProperties:
-          type: string
-
-      routes:
-        type: array
-        description: Conditional routing rules
-        items:
-          type: object
-          required:
-            - to
-          properties:
-            when:
-              type: string
-              description: Jinja2 expression that evaluates to boolean
-            to:
-              type: string
-              description: Target node name to route to
-            default:
-              type: boolean
-              description: Is this the default route
-              default: false
 
   file_config:
     type: object

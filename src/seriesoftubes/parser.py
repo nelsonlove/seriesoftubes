@@ -22,16 +22,6 @@ class WorkflowParseError(Exception):
     pass
 
 
-def parse_node_config(
-    _node_type: NodeType, config_data: dict[str, Any]
-) -> dict[str, Any]:
-    """Parse node configuration based on the node type"""
-    # The Node model will handle the config validation automatically
-    # based on the node type, so we just return the raw config data
-    # This will be validated when creating the Node instance
-    return config_data
-
-
 def parse_workflow_yaml(yaml_path: Path) -> Workflow:
     """Parse and validate a workflow YAML file"""
     try:
@@ -64,8 +54,7 @@ def parse_workflow_yaml(yaml_path: Path) -> Workflow:
         nodes = {}
         for name, node_data in data.get("nodes", {}).items():
             node_type = NodeType(node_data.get("type"))
-            config_data = node_data.get("config", {})
-            config = parse_node_config(node_type, config_data)
+            config = node_data.get("config", {})
 
             nodes[name] = Node(
                 name=name,

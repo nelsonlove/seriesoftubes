@@ -16,13 +16,12 @@ class OpenAIProvider(LLMProvider):
         "gpt-4o",
         "gpt-4o-mini",
         "gpt-4o-2024-08-06",
-        "gpt-3.5-turbo",
     ]
-    
+
     # Models that support structured outputs
     STRUCTURED_OUTPUT_MODELS: ClassVar[list[str]] = [
         "gpt-4o",
-        "gpt-4o-mini", 
+        "gpt-4o-mini",
         "gpt-4o-2024-08-06",
     ]
 
@@ -30,21 +29,25 @@ class OpenAIProvider(LLMProvider):
         super().__init__(api_key)
         self.client = AsyncOpenAI(api_key=api_key) if api_key else None
 
-    def _create_nested_model(self, schema: dict[str, Any], model_name: str) -> type[BaseModel]:
+    def _create_nested_model(
+        self, schema: dict[str, Any], model_name: str
+    ) -> type[BaseModel]:
         """Create nested Pydantic model from schema"""
         properties = schema.get("properties", {})
         field_definitions = {}
-        
+
         for field_name, field_schema in properties.items():
             field_type, default = self._convert_property(field_schema, field_name)
             field_definitions[field_name] = (field_type, default)
-        
+
         return create_model(model_name, **field_definitions)
-    
-    def _convert_property(self, prop_schema: dict[str, Any], field_name: str) -> tuple[type, Any]:
+
+    def _convert_property(
+        self, prop_schema: dict[str, Any], field_name: str
+    ) -> tuple[type, Any]:
         """Convert a single property schema to Pydantic field"""
         prop_type = prop_schema.get("type")
-        
+
         if prop_type == "string":
             return (str, ...)
         elif prop_type == "integer":
@@ -63,7 +66,9 @@ class OpenAIProvider(LLMProvider):
                 return (list[float], ...)
             elif items_schema.get("type") == "object":
                 # Recursive object in array
-                item_model = self._create_nested_model(items_schema, f"{field_name}_item")
+                item_model = self._create_nested_model(
+                    items_schema, f"{field_name}_item"
+                )
                 return (list[item_model], ...)
             else:
                 return (list[Any], ...)
@@ -80,11 +85,11 @@ class OpenAIProvider(LLMProvider):
         # Convert main schema
         properties = schema.get("properties", {})
         field_definitions = {}
-        
+
         for field_name, field_schema in properties.items():
             field_type, default = self._convert_property(field_schema, field_name)
             field_definitions[field_name] = (field_type, default)
-        
+
         return create_model("ResponseModel", **field_definitions)
 
     async def call(
@@ -101,7 +106,9 @@ class OpenAIProvider(LLMProvider):
 
         # Validate model is supported
         if not self.validate_model(model):
-            raise ValueError(f"Model '{model}' not supported. Supported models: {', '.join(self.SUPPORTED_MODELS)}")
+            supported_models = ", ".join(self.SUPPORTED_MODELS)
+            msg = f"Model '{model}' not supported. Supported models: {supported_models}"
+            raise ValueError(msg)
 
         messages = [{"role": "user", "content": prompt}]
 
@@ -110,7 +117,7 @@ class OpenAIProvider(LLMProvider):
             if schema and model in self.STRUCTURED_OUTPUT_MODELS:
                 # Convert JSON schema to Pydantic model
                 response_model = self._json_schema_to_pydantic(schema)
-                
+
                 # Use the new structured outputs API
                 completion = await self.client.beta.chat.completions.parse(
                     model=model,
@@ -118,20 +125,21 @@ class OpenAIProvider(LLMProvider):
                     temperature=temperature,
                     response_format=response_model,
                 )
-                
+
                 message = completion.choices[0].message
-                
+
                 # Handle refusals
                 if message.refusal:
-                    raise ValueError(f"OpenAI refused to respond: {message.refusal}")
-                
+                    msg = f"OpenAI refused to respond: {message.refusal}"
+                    raise ValueError(msg)
+
                 # Return parsed structured output
                 if message.parsed:
                     return message.parsed.model_dump()
                 else:
                     # Fallback to content parsing
                     return json.loads(message.content or "{}")
-            
+
             else:
                 # Fall back to regular completions API
                 request_kwargs = {
@@ -139,38 +147,48 @@ class OpenAIProvider(LLMProvider):
                     "messages": messages,
                     "temperature": temperature,
                 }
-                
+
                 # Add JSON mode for older models if schema is specified
                 if schema:
                     request_kwargs["response_format"] = {"type": "json_object"}
                     messages[0]["content"] += "\n\nRespond with valid JSON."
-                
+
                 completion = await self.client.chat.completions.create(**request_kwargs)
                 content = completion.choices[0].message.content
-                
+
                 # Parse JSON if schema was specified
                 if schema and content:
                     try:
                         return json.loads(content)
                     except json.JSONDecodeError as e:
-                        raise ValueError(f"Failed to parse JSON response: {e}") from e
-                
+                        msg = f"Failed to parse JSON response: {e}"
+                        raise ValueError(msg) from e
+
                 return content
-                
+
         except Exception as e:
             error_str = str(e).lower()
             if "api key" in error_str or "unauthorized" in error_str:
-                raise ValueError("OpenAI API key not configured or invalid") from e
-            elif "model" in error_str and ("not found" in error_str or "does not exist" in error_str or "invalid" in error_str):
+                msg = "OpenAI API key not configured or invalid"
+                raise ValueError(msg) from e
+            elif "model" in error_str and (
+                "not found" in error_str
+                or "does not exist" in error_str
+                or "invalid" in error_str
+            ):
                 # Only treat as model error if it's specifically about model not found/invalid
-                raise ValueError(f"Model '{model}' not supported or available") from e
+                msg = f"Model '{model}' not supported or available"
+                raise ValueError(msg) from e
             elif "rate limit" in error_str:
-                raise ValueError("OpenAI API rate limit exceeded") from e
+                msg = "OpenAI API rate limit exceeded"
+                raise ValueError(msg) from e
             elif "quota" in error_str:
-                raise ValueError("OpenAI API quota exceeded") from e
+                msg = "OpenAI API quota exceeded"
+                raise ValueError(msg) from e
             else:
                 # Preserve the original error for debugging
-                raise ValueError(f"OpenAI API error: {e}") from e
+                msg = f"OpenAI API error: {e}"
+                raise ValueError(msg) from e
 
     def validate_model(self, model: str) -> bool:
         """Validate if the model name is supported"""

@@ -1,0 +1,141 @@
+name: story-generator-demo
+version: "1.0.0"
+description: Generate creative stories about different characters in parallel
+
+inputs:
+  characters:
+    type: array
+    required: true
+    description: List of character names to create stories about
+    default: ["Luna the cat", "Max the golden retriever", "Penny the parrot", "Oliver the owl"]
+
+  story_theme:
+    type: string
+    required: false
+    description: Theme for all the stories
+    default: "magical adventure"
+
+nodes:
+  # Split characters for parallel processing
+  split_characters:
+    type: split
+    config:
+      field: "inputs.characters"
+      item_name: "character"
+    description: Split characters into individual processing streams
+
+  # Generate backstory for each character (parallel)
+  create_backstory:
+    type: llm
+    depends_on: [split_characters]
+    config:
+      prompt: |
+        Create a short, charming backstory for {{ character }}.
+
+        Make it warm and family-friendly, about 2-3 sentences.
+        Include their personality and what makes them special.
+
+        Character: {{ character }}
+      model: "gpt-4o"
+      temperature: 0.8
+    description: Create backstory for each character
+
+  # Generate main story for each character (parallel)
+  write_story:
+    type: llm
+    depends_on: [create_backstory]
+    config:
+      prompt: |
+        Write a short, delightful story about {{ character }} having a {{ inputs.story_theme }}.
+
+        Use this backstory: {{ create_backstory }}
+
+        Make it:
+        - Family-friendly and heartwarming
+        - About 4-5 sentences long
+        - Include a small challenge they overcome
+        - End on a positive note
+
+        Story about {{ character }}:
+      model: "gpt-4o"
+      temperature: 0.9
+    description: Write main story for each character
+
+  # Create a moral or lesson for each story (parallel)
+  extract_lesson:
+    type: llm
+    depends_on: [write_story]
+    config:
+      prompt: |
+        Read this story and identify the gentle life lesson or moral:
+
+        {{ write_story }}
+
+        Write a simple, one-sentence lesson that children could understand.
+      model: "gpt-4o"
+      temperature: 0.3
+    description: Extract lesson from each story
+
+  # Collect all individual stories
+  gather_stories:
+    type: aggregate
+    depends_on: [extract_lesson]
+    config:
+      mode: "array"
+    description: Collect all character stories together
+
+  # Create a connecting narrative that ties them all together
+  create_collection:
+    type: llm
+    depends_on: [gather_stories]
+    config:
+      prompt: |
+        You have these wonderful character stories:
+
+        {% for story in gather_stories %}
+        Character Story {{ loop.index }}:
+        {{ story.write_story }}
+        Lesson: {{ story.extract_lesson }}
+
+        {% endfor %}
+
+        Write a short, sweet introduction that could tie these characters together in the same world,
+        as if they're all friends who live in the same magical neighborhood.
+
+        Make it 2-3 sentences that sets the scene for a collection of stories.
+      model: "gpt-4o"
+      temperature: 0.7
+    description: Create connecting narrative
+
+  # Format everything into a nice storybook
+  format_storybook:
+    type: python
+    depends_on: [create_collection, gather_stories]
+    config:
+      code: |
+        stories = context['gather_stories']
+        introduction = context['create_collection']
+
+        storybook = {
+            'title': f"Tales of {context['inputs']['story_theme'].title()}",
+            'introduction': introduction,
+            'stories': [],
+            'created_at': 'Generated today'
+        }
+
+        for i, story_data in enumerate(stories):
+            character = story_data.get('character', f'Character {i+1}')
+            storybook['stories'].append({
+                'character': character,
+                'backstory': story_data.get('create_backstory', ''),
+                'story': story_data.get('write_story', ''),
+                'lesson': story_data.get('extract_lesson', '')
+            })
+
+        return storybook
+    description: Format into a beautiful storybook
+
+outputs:
+  storybook: format_storybook
+  individual_stories: gather_stories
+  introduction: create_collection

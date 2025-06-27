@@ -382,7 +382,6 @@ class ConditionalNodeOutput(NodeOutputSchema):
 NODE_SCHEMAS: dict[str, dict[str, type[NodeSchema]]] = {
     "llm": {"input": LLMNodeInput, "output": LLMNodeOutput},
     "http": {"input": HTTPNodeInput, "output": HTTPNodeOutput},
-    "route": {"input": RouteNodeInput, "output": RouteNodeOutput},  # Legacy
     "conditional": {"input": ConditionalNodeInput, "output": ConditionalNodeOutput},
     "file": {"input": FileNodeInput, "output": FileNodeOutput},
     "python": {"input": PythonNodeInput, "output": PythonNodeOutput},
