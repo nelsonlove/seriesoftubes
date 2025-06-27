@@ -5,16 +5,26 @@ import json
 from pathlib import Path
 from typing import Any, Dict
 
-from seriesoftubes.schemas import NODE_SCHEMAS, NodeInputSchema, NodeOutputSchema
 from seriesoftubes.models import (
-    Workflow, Node, NodeType,
-    LLMNodeConfig, HTTPNodeConfig, FileNodeConfig, PythonNodeConfig,
-    SplitNodeConfig, AggregateNodeConfig, FilterNodeConfig, TransformNodeConfig,
-    JoinNodeConfig, ForEachNodeConfig, ConditionalNodeConfig
+    AggregateNodeConfig,
+    ConditionalNodeConfig,
+    FileNodeConfig,
+    FilterNodeConfig,
+    ForEachNodeConfig,
+    HTTPNodeConfig,
+    JoinNodeConfig,
+    LLMNodeConfig,
+    Node,
+    NodeType,
+    PythonNodeConfig,
+    SplitNodeConfig,
+    TransformNodeConfig,
+    Workflow,
 )
+from seriesoftubes.schemas import NODE_SCHEMAS, NodeInputSchema, NodeOutputSchema
 
 
-def generate_node_schema(node_type: str, config_class: type) -> Dict[str, Any]:
+def generate_node_schema(node_type: str, config_class: type) -> dict[str, Any]:
     """Generate schema for a specific node type"""
     # Get the config schema
     config_schema = config_class.model_json_schema()
@@ -38,11 +48,11 @@ def generate_node_schema(node_type: str, config_class: type) -> Dict[str, Any]:
             "depends_on": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "List of node names this node depends on"
-            }
+                "description": "List of node names this node depends on",
+            },
         },
         "required": ["type", "config"],
-        "additionalProperties": False
+        "additionalProperties": False,
     }
 
     # Add input/output documentation
@@ -50,20 +60,20 @@ def generate_node_schema(node_type: str, config_class: type) -> Dict[str, Any]:
         node_schema["properties"]["__input_schema"] = {
             "description": "Expected input data structure",
             "readOnly": True,
-            **input_schema
+            **input_schema,
         }
 
     if output_schema:
         node_schema["properties"]["__output_schema"] = {
             "description": "Output data structure",
             "readOnly": True,
-            **output_schema
+            **output_schema,
         }
 
     return node_schema
 
 
-def generate_workflow_schema() -> Dict[str, Any]:
+def generate_workflow_schema() -> dict[str, Any]:
     """Generate complete workflow JSON schema"""
 
     # Node type to config class mapping
@@ -84,7 +94,9 @@ def generate_workflow_schema() -> Dict[str, Any]:
     # Generate schema for each node type
     node_schemas = {}
     for node_type, config_class in node_configs.items():
-        node_schemas[node_type.value] = generate_node_schema(node_type.value, config_class)
+        node_schemas[node_type.value] = generate_node_schema(
+            node_type.value, config_class
+        )
 
     # Build the complete workflow schema
     workflow_schema = {
@@ -96,16 +108,16 @@ def generate_workflow_schema() -> Dict[str, Any]:
             "name": {
                 "type": "string",
                 "description": "Workflow name",
-                "pattern": "^[a-z0-9-]+$"
+                "pattern": "^[a-z0-9-]+$",
             },
             "version": {
                 "type": "string",
                 "description": "Workflow version",
-                "pattern": "^\\d+\\.\\d+\\.\\d+$"
+                "pattern": "^\\d+\\.\\d+\\.\\d+$",
             },
             "description": {
                 "type": "string",
-                "description": "Human-readable workflow description"
+                "description": "Human-readable workflow description",
             },
             "inputs": {
                 "type": "object",
@@ -116,16 +128,22 @@ def generate_workflow_schema() -> Dict[str, Any]:
                         "properties": {
                             "type": {
                                 "type": "string",
-                                "enum": ["string", "number", "boolean", "array", "object"]
+                                "enum": [
+                                    "string",
+                                    "number",
+                                    "boolean",
+                                    "array",
+                                    "object",
+                                ],
                             },
                             "description": {"type": "string"},
                             "required": {"type": "boolean"},
                             "default": {},
-                            "example": {}
+                            "example": {},
                         },
-                        "required": ["type"]
+                        "required": ["type"],
                     }
-                }
+                },
             },
             "nodes": {
                 "type": "object",
@@ -135,7 +153,7 @@ def generate_workflow_schema() -> Dict[str, Any]:
                         "oneOf": [node_schemas[nt] for nt in node_schemas]
                     }
                 },
-                "additionalProperties": False
+                "additionalProperties": False,
             },
             "outputs": {
                 "type": "object",
@@ -143,27 +161,32 @@ def generate_workflow_schema() -> Dict[str, Any]:
                 "patternProperties": {
                     "^[a-zA-Z_][a-zA-Z0-9_]*$": {
                         "type": "string",
-                        "description": "Node name or node.field reference"
+                        "description": "Node name or node.field reference",
                     }
-                }
-            }
+                },
+            },
         },
         "required": ["name", "version", "nodes"],
-        "additionalProperties": False
+        "additionalProperties": False,
     }
 
     return workflow_schema
 
 
-def generate_vscode_settings() -> Dict[str, Any]:
+def generate_vscode_settings() -> dict[str, Any]:
     """Generate VS Code settings for YAML validation"""
     return {
         "yaml.schemas": {
-            "./workflow-schema.json": ["*.workflow.yaml", "*.workflow.yml", "workflow.yaml", "workflow.yml"]
+            "./workflow-schema.json": [
+                "*.workflow.yaml",
+                "*.workflow.yml",
+                "workflow.yaml",
+                "workflow.yml",
+            ]
         },
         "yaml.validate": True,
         "yaml.hover": True,
-        "yaml.completion": True
+        "yaml.completion": True,
     }
 
 

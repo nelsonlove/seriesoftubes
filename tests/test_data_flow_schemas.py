@@ -136,7 +136,6 @@ class TestDataFlowSchemas:
             "http",
             "file",
             "python",
-            "route",  # Including existing nodes
         ]
 
         for node_type in expected_nodes:

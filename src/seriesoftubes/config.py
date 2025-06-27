@@ -16,8 +16,8 @@ class LLMConfig(BaseModel):
     temperature: float = Field(0.7, description="Default temperature")
     api_key: str | None = Field(None, description="Resolved API key")
 
-    @classmethod
     @field_validator("provider")
+    @classmethod
     def validate_provider(cls, v: str) -> str:
         """Validate LLM provider"""
         valid_providers = ["openai", "anthropic"]

@@ -24,7 +24,9 @@ from seriesoftubes.docs.schema_parser import SchemaDocGenerator
 
 def main():
     """Generate documentation from workflow schema."""
-    schema_path = project_root / "src" / "seriesoftubes" / "schemas" / "workflow-schema.yaml"
+    schema_path = (
+        project_root / "src" / "seriesoftubes" / "schemas" / "workflow-schema.yaml"
+    )
     docs_dir = project_root / "docs"
 
     if not schema_path.exists():

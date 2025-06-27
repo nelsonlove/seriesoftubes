@@ -272,27 +272,24 @@ async def test_openai_structured_outputs_integration():
     """Integration test for OpenAI structured outputs (requires real API key)"""
     api_key = os.getenv("OPENAI_API_KEY")
     provider = OpenAIProvider(api_key)
-    
+
     # Test simple schema
     schema = {
         "type": "object",
         "properties": {
             "name": {"type": "string"},
             "age": {"type": "integer"},
-            "skills": {
-                "type": "array",
-                "items": {"type": "string"}
-            }
-        }
+            "skills": {"type": "array", "items": {"type": "string"}},
+        },
     }
-    
+
     result = await provider.call(
         prompt="Generate a profile for a software engineer named Alice",
         model="gpt-4o",
         temperature=0.7,
-        schema=schema
+        schema=schema,
     )
-    
+
     # Verify structured output format
     assert isinstance(result, dict)
     assert "name" in result
@@ -308,17 +305,14 @@ async def test_openai_structured_outputs_integration():
 async def test_openai_structured_outputs_complex_schema():
     """Test complex nested schema conversion"""
     provider = OpenAIProvider("test-key")
-    
+
     # Complex schema with nested objects and arrays
     complex_schema = {
         "type": "object",
         "properties": {
             "user": {
                 "type": "object",
-                "properties": {
-                    "name": {"type": "string"},
-                    "email": {"type": "string"}
-                }
+                "properties": {"name": {"type": "string"}, "email": {"type": "string"}},
             },
             "projects": {
                 "type": "array",
@@ -327,21 +321,18 @@ async def test_openai_structured_outputs_complex_schema():
                     "properties": {
                         "title": {"type": "string"},
                         "description": {"type": "string"},
-                        "technologies": {
-                            "type": "array",
-                            "items": {"type": "string"}
-                        }
-                    }
-                }
+                        "technologies": {"type": "array", "items": {"type": "string"}},
+                    },
+                },
             },
-            "years_experience": {"type": "integer"}
-        }
+            "years_experience": {"type": "integer"},
+        },
     }
-    
+
     # Test that schema conversion works without errors
     pydantic_model = provider._json_schema_to_pydantic(complex_schema)
     assert pydantic_model is not None
-    
+
     # Test that we can create an instance
     test_data = {
         "user": {"name": "John", "email": "john@example.com"},
@@ -349,12 +340,12 @@ async def test_openai_structured_outputs_complex_schema():
             {
                 "title": "Project 1",
                 "description": "A test project",
-                "technologies": ["Python", "FastAPI"]
+                "technologies": ["Python", "FastAPI"],
             }
         ],
-        "years_experience": 5
+        "years_experience": 5,
     }
-    
+
     instance = pydantic_model(**test_data)
     assert instance.model_dump() == test_data
 
@@ -363,31 +354,31 @@ async def test_openai_structured_outputs_complex_schema():
 async def test_openai_fallback_to_json_mode():
     """Test fallback to JSON mode for older models"""
     provider = OpenAIProvider("test-key")
-    
+
     # Mock the client
     mock_client = AsyncMock()
     provider.client = mock_client
-    
+
     # Test with older model (not in STRUCTURED_OUTPUT_MODELS)
     schema = {"type": "object", "properties": {"result": {"type": "string"}}}
-    
+
     # Mock response
     mock_completion = AsyncMock()
     mock_completion.choices = [AsyncMock()]
     mock_completion.choices[0].message.content = '{"result": "test"}'
     mock_client.chat.completions.create.return_value = mock_completion
-    
+
     result = await provider.call(
         prompt="Test prompt",
-        model="gpt-3.5-turbo",  # Older model
+        model="gpt-4-turbo",  # Older model without structured outputs
         temperature=0.7,
-        schema=schema
+        schema=schema,
     )
-    
+
     # Should fall back to regular completions API
     mock_client.chat.completions.create.assert_called_once()
     call_kwargs = mock_client.chat.completions.create.call_args[1]
     assert call_kwargs["response_format"] == {"type": "json_object"}
     assert "JSON" in call_kwargs["messages"][0]["content"]
-    
+
     assert result == {"result": "test"}

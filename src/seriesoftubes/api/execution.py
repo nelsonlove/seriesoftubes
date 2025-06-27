@@ -175,6 +175,7 @@ class DatabaseProgressTrackingEngine(WorkflowEngine):
         except Exception as e:
             # Don't fail the execution just because cleanup failed
             import logging
+
             logger = logging.getLogger(__name__)
             logger.warning(f"Failed to cleanup running nodes: {e}")
 

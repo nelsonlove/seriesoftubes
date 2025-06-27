@@ -145,7 +145,7 @@ async def test_engine_cache_disabled():
             mock_provider = MagicMock()
             mock_provider.call = AsyncMock(return_value={"test": "response"})
             return mock_provider
-        
+
         mock_get_provider.side_effect = create_mock_provider
 
         # First execution
