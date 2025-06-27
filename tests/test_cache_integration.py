@@ -30,7 +30,7 @@ async def test_engine_with_memory_cache():
                 type=NodeType.LLM,
                 config=LLMNodeConfig(
                     prompt="Test prompt",
-                    model="gpt-4",
+                    model="gpt-4o",
                 ),
             )
         },
@@ -80,7 +80,7 @@ async def test_engine_cache_different_inputs():
                 type=NodeType.LLM,
                 config=LLMNodeConfig(
                     prompt="Process: {{ inputs.user_input }}",
-                    model="gpt-4",
+                    model="gpt-4o",
                 ),
             )
         },
@@ -133,7 +133,7 @@ async def test_engine_cache_disabled():
                 type=NodeType.LLM,
                 config=LLMNodeConfig(
                     prompt="Test prompt",
-                    model="gpt-4",
+                    model="gpt-4o",
                 ),
             )
         },
@@ -180,7 +180,7 @@ async def test_cache_error_handling():
                 type=NodeType.LLM,
                 config=LLMNodeConfig(
                     prompt="Test prompt",
-                    model="gpt-4",
+                    model="gpt-4o",
                 ),
             )
         },
@@ -266,7 +266,7 @@ async def test_engine_with_test_redis_cache():
                 type=NodeType.LLM,
                 config=LLMNodeConfig(
                     prompt="Test prompt",
-                    model="gpt-4",
+                    model="gpt-4o",
                 ),
             )
         },

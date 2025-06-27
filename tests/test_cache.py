@@ -100,9 +100,9 @@ class TestCacheKeys:
 
     def test_hash_config(self):
         """Test config hashing"""
-        config1 = LLMNodeConfig(prompt="test prompt", model="gpt-4")
-        config2 = LLMNodeConfig(prompt="test prompt", model="gpt-4")
-        config3 = LLMNodeConfig(prompt="different prompt", model="gpt-4")
+        config1 = LLMNodeConfig(prompt="test prompt", model="gpt-4o")
+        config2 = LLMNodeConfig(prompt="test prompt", model="gpt-4o")
+        config3 = LLMNodeConfig(prompt="different prompt", model="gpt-4o")
 
         hash1 = hash_config(config1)
         hash2 = hash_config(config2)
@@ -115,7 +115,7 @@ class TestCacheKeys:
 
     def test_cache_key_builder(self):
         """Test cache key builder"""
-        config = LLMNodeConfig(prompt="test prompt", model="gpt-4")
+        config = LLMNodeConfig(prompt="test prompt", model="gpt-4o")
         context_data = {"inputs": {"test": "data"}}
 
         key = (

@@ -27,7 +27,9 @@ def get_cache_backend(
         ImportError: If Redis backend is requested but not available
     """
     if backend_type == "memory":
-        return MemoryCacheBackend(**kwargs)
+        # Filter kwargs to only include supported parameters for memory backend
+        memory_kwargs = {k: v for k, v in kwargs.items() if k in ['max_size']}
+        return MemoryCacheBackend(**memory_kwargs)
 
     elif backend_type == "redis":
         if not REDIS_AVAILABLE:
