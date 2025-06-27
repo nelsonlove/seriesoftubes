@@ -57,7 +57,7 @@ async def test_llm_node_input_validation_error():
     with patch("seriesoftubes.nodes.llm.get_config") as mock_config:
         mock_config.return_value.llm.provider = "openai"
         mock_config.return_value.llm.api_key = "test-key"
-        mock_config.return_value.llm.model = "gpt-4"
+        mock_config.return_value.llm.model = "gpt-4o"
         mock_config.return_value.llm.temperature = 0.5
 
         # Patch the validate_input method to simulate validation error
@@ -203,7 +203,7 @@ async def test_llm_node_structured_output_validation():
     with patch("seriesoftubes.nodes.llm.get_config") as mock_config:
         mock_config.return_value.llm.provider = "openai"
         mock_config.return_value.llm.api_key = "test-key"
-        mock_config.return_value.llm.model = "gpt-4"
+        mock_config.return_value.llm.model = "gpt-4o"
         mock_config.return_value.llm.temperature = 0.5
 
         with patch("seriesoftubes.nodes.llm.get_provider") as mock_get_provider:
@@ -216,7 +216,7 @@ async def test_llm_node_structured_output_validation():
             # Output should be validated and structured
             assert result.output["structured_output"] == {"name": "John Doe", "age": 30}
             assert result.output["response"] == '{"name": "John Doe", "age": 30}'
-            assert result.output["model_used"] == "gpt-4"
+            assert result.output["model_used"] == "gpt-4o"
 
 
 @pytest.mark.asyncio

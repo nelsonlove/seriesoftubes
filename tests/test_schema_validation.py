@@ -61,7 +61,7 @@ class TestSchemaValidation:
         # Test LLM node input validation
         valid_input = {
             "prompt": "Test prompt",
-            "model": "gpt-4",
+            "model": "gpt-4o",
             "temperature": 0.7,
         }
 
@@ -72,7 +72,7 @@ class TestSchemaValidation:
         with pytest.raises(ValidationError) as exc_info:
             LLMNodeInput(
                 prompt=123,  # Should be string
-                model="gpt-4",
+                model="gpt-4o",
             )
         assert "prompt" in str(exc_info.value)
 
@@ -153,7 +153,7 @@ class TestSchemaValidation:
             mock_llm.return_value = NodeResult(
                 output={
                     "response": "Analysis complete",
-                    "model_used": "gpt-4",
+                    "model_used": "gpt-4o",
                     "structured_output": None,
                     "token_usage": {"prompt": 100, "completion": 50},
                 },

@@ -1,5 +1,6 @@
 """Tests for LLM node executor"""
 
+import os
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
@@ -11,6 +12,7 @@ from seriesoftubes.models import (
     NodeType,
 )
 from seriesoftubes.nodes import LLMNodeExecutor
+from seriesoftubes.providers.openai import OpenAIProvider
 
 
 class MockContext:
@@ -53,7 +55,7 @@ async def test_llm_node_with_openai():
     with patch("seriesoftubes.nodes.llm.get_config") as mock_config:
         mock_config.return_value.llm.provider = "openai"
         mock_config.return_value.llm.api_key = "test-key"
-        mock_config.return_value.llm.model = "gpt-4"
+        mock_config.return_value.llm.model = "gpt-4o"
         mock_config.return_value.llm.temperature = 0.5
 
         with patch("seriesoftubes.nodes.llm.get_provider") as mock_get_provider:
@@ -149,7 +151,7 @@ async def test_llm_node_with_schema():
     with patch("seriesoftubes.nodes.llm.get_config") as mock_config:
         mock_config.return_value.llm.provider = "openai"
         mock_config.return_value.llm.api_key = "test-key"
-        mock_config.return_value.llm.model = "gpt-4"
+        mock_config.return_value.llm.model = "gpt-4o"
         mock_config.return_value.llm.temperature = 0.5
 
         with patch("seriesoftubes.nodes.llm.get_provider") as mock_get_provider:
@@ -161,13 +163,13 @@ async def test_llm_node_with_schema():
             assert result.success
             assert result.output["response"] == '{"name": "John", "age": 30}'
             assert result.output["structured_output"] == {"name": "John", "age": 30}
-            assert result.output["model_used"] == "gpt-4"
+            assert result.output["model_used"] == "gpt-4o"
 
             # Check call was made with correct schema
             mock_get_provider.assert_called_once_with("openai", "test-key")
             mock_provider.call.assert_called_once_with(
                 "Extract person information",
-                "gpt-4",
+                "gpt-4o",
                 0.5,
                 schema_def,
             )
@@ -197,7 +199,7 @@ async def test_llm_node_with_prompt_file(tmp_path):
     with patch("seriesoftubes.nodes.llm.get_config") as mock_config:
         mock_config.return_value.llm.provider = "openai"
         mock_config.return_value.llm.api_key = "test-key"
-        mock_config.return_value.llm.model = "gpt-4"
+        mock_config.return_value.llm.model = "gpt-4o"
         mock_config.return_value.llm.temperature = 0.5
 
         with patch("seriesoftubes.nodes.llm.get_provider") as mock_get_provider:
@@ -209,7 +211,7 @@ async def test_llm_node_with_prompt_file(tmp_path):
             assert result.success
             assert result.output["response"] == '{"analysis": "results"}'
             assert result.output["structured_output"] == {"analysis": "results"}
-            assert result.output["model_used"] == "gpt-4"
+            assert result.output["model_used"] == "gpt-4o"
 
             # Should use the template with context data
             mock_get_provider.assert_called_once_with("openai", "test-key")
@@ -234,7 +236,7 @@ async def test_llm_node_error_handling():
     with patch("seriesoftubes.nodes.llm.get_config") as mock_config:
         mock_config.return_value.llm.provider = "openai"
         mock_config.return_value.llm.api_key = "test-key"
-        mock_config.return_value.llm.model = "gpt-4"
+        mock_config.return_value.llm.model = "gpt-4o"
         mock_config.return_value.llm.temperature = 0.5
 
         with patch("seriesoftubes.nodes.llm.get_provider") as mock_get_provider:
@@ -262,3 +264,130 @@ async def test_llm_node_invalid_config():
         )
 
     assert "Config must be a dictionary" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(not os.getenv("OPENAI_API_KEY"), reason="OPENAI_API_KEY not set")
+async def test_openai_structured_outputs_integration():
+    """Integration test for OpenAI structured outputs (requires real API key)"""
+    api_key = os.getenv("OPENAI_API_KEY")
+    provider = OpenAIProvider(api_key)
+    
+    # Test simple schema
+    schema = {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "age": {"type": "integer"},
+            "skills": {
+                "type": "array",
+                "items": {"type": "string"}
+            }
+        }
+    }
+    
+    result = await provider.call(
+        prompt="Generate a profile for a software engineer named Alice",
+        model="gpt-4o",
+        temperature=0.7,
+        schema=schema
+    )
+    
+    # Verify structured output format
+    assert isinstance(result, dict)
+    assert "name" in result
+    assert "age" in result
+    assert "skills" in result
+    assert isinstance(result["name"], str)
+    assert isinstance(result["age"], int)
+    assert isinstance(result["skills"], list)
+    assert all(isinstance(skill, str) for skill in result["skills"])
+
+
+@pytest.mark.asyncio
+async def test_openai_structured_outputs_complex_schema():
+    """Test complex nested schema conversion"""
+    provider = OpenAIProvider("test-key")
+    
+    # Complex schema with nested objects and arrays
+    complex_schema = {
+        "type": "object",
+        "properties": {
+            "user": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "email": {"type": "string"}
+                }
+            },
+            "projects": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "title": {"type": "string"},
+                        "description": {"type": "string"},
+                        "technologies": {
+                            "type": "array",
+                            "items": {"type": "string"}
+                        }
+                    }
+                }
+            },
+            "years_experience": {"type": "integer"}
+        }
+    }
+    
+    # Test that schema conversion works without errors
+    pydantic_model = provider._json_schema_to_pydantic(complex_schema)
+    assert pydantic_model is not None
+    
+    # Test that we can create an instance
+    test_data = {
+        "user": {"name": "John", "email": "john@example.com"},
+        "projects": [
+            {
+                "title": "Project 1",
+                "description": "A test project",
+                "technologies": ["Python", "FastAPI"]
+            }
+        ],
+        "years_experience": 5
+    }
+    
+    instance = pydantic_model(**test_data)
+    assert instance.model_dump() == test_data
+
+
+@pytest.mark.asyncio
+async def test_openai_fallback_to_json_mode():
+    """Test fallback to JSON mode for older models"""
+    provider = OpenAIProvider("test-key")
+    
+    # Mock the client
+    mock_client = AsyncMock()
+    provider.client = mock_client
+    
+    # Test with older model (not in STRUCTURED_OUTPUT_MODELS)
+    schema = {"type": "object", "properties": {"result": {"type": "string"}}}
+    
+    # Mock response
+    mock_completion = AsyncMock()
+    mock_completion.choices = [AsyncMock()]
+    mock_completion.choices[0].message.content = '{"result": "test"}'
+    mock_client.chat.completions.create.return_value = mock_completion
+    
+    result = await provider.call(
+        prompt="Test prompt",
+        model="gpt-3.5-turbo",  # Older model
+        temperature=0.7,
+        schema=schema
+    )
+    
+    # Should fall back to regular completions API
+    mock_client.chat.completions.create.assert_called_once()
+    call_kwargs = mock_client.chat.completions.create.call_args[1]
+    assert call_kwargs["response_format"] == {"type": "json_object"}
+    assert "JSON" in call_kwargs["messages"][0]["content"]
+    
+    assert result == {"result": "test"}
