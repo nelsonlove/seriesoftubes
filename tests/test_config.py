@@ -12,7 +12,7 @@ def test_llm_config_validation():
     # Valid config
     config = LLMConfig(
         provider="openai",
-        model="gpt-4",
+        model="gpt-4o",
         api_key_env="OPENAI_API_KEY",
         temperature=0.7,
         api_key=None,
@@ -24,7 +24,7 @@ def test_llm_config_validation():
     with pytest.raises(ValueError, match="Provider must be one of"):
         LLMConfig(
             provider="invalid",
-            model="gpt-4",
+            model="gpt-4o",
             api_key_env="OPENAI_API_KEY",
             temperature=0.7,
             api_key=None,
@@ -35,7 +35,7 @@ def test_llm_config_api_key_resolution(monkeypatch):
     """Test API key resolution from environment"""
     config = LLMConfig(
         provider="openai",
-        model="gpt-4",
+        model="gpt-4o",
         api_key_env="TEST_API_KEY",
         temperature=0.7,
         api_key=None,
@@ -58,7 +58,7 @@ def test_load_config_from_file(tmp_path, monkeypatch):
         """
 llm:
   provider: openai
-  model: gpt-4o
+  model: gpt-4oo
   api_key_env: TEST_KEY
   temperature: 0.5
 
@@ -78,7 +78,7 @@ execution:
     config = load_config(config_file)
 
     assert config.llm.provider == "openai"
-    assert config.llm.model == "gpt-4o"
+    assert config.llm.model == "gpt-4oo"
     assert config.llm.temperature == 0.5
     assert config.llm.api_key == "test-key-123"
 
@@ -155,7 +155,7 @@ def test_find_config_file(tmp_path, monkeypatch):
         """
 llm:
   provider: openai
-  model: gpt-4
+  model: gpt-4o
   api_key_env: TEST_KEY
 """
     )

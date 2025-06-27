@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Form, Input, Button, Card, Typography, message, Tabs } from 'antd';
+import { Form, Input, Button, Card, Typography, Tabs, App } from 'antd';
 import { UserOutlined, LockOutlined, MailOutlined } from '@ant-design/icons';
 import { useAuthStore } from '../../stores/auth';
 
@@ -19,6 +19,7 @@ interface RegisterFormValues {
 }
 
 export const LoginPage: React.FC = () => {
+  const { message } = App.useApp();
   const navigate = useNavigate();
   const location = useLocation();
   const { login, register, isLoading, error, clearError } = useAuthStore();
@@ -51,7 +52,7 @@ export const LoginPage: React.FC = () => {
       message.error(error);
       clearError();
     }
-  }, [error, clearError]);
+  }, [error, clearError, message]);
 
   return (
     <div

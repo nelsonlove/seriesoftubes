@@ -9,7 +9,7 @@ import {
   useLocation,
 } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ConfigProvider, Layout, Menu, Button, Dropdown, Space, Input, theme } from 'antd';
+import { ConfigProvider, Layout, Menu, Button, Dropdown, Space, Input, theme, App as AntApp } from 'antd';
 import {
   AppstoreOutlined,
   PlayCircleOutlined,
@@ -477,9 +477,11 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ConfigProvider theme={currentTheme}>
-        <Router>
-          <AppContent />
-        </Router>
+        <AntApp>
+          <Router>
+            <AppContent />
+          </Router>
+        </AntApp>
       </ConfigProvider>
     </QueryClientProvider>
   );

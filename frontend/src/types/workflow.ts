@@ -50,6 +50,19 @@ export interface WorkflowSummary {
   inputs: Record<string, WorkflowInput>;
 }
 
+export interface WorkflowResponse {
+  id: string;
+  name: string;
+  version: string;
+  description?: string;
+  user_id: string;
+  username: string;
+  is_public: boolean;
+  created_at: string;
+  updated_at: string;
+  yaml_content: string;
+}
+
 export interface WorkflowDetail {
   id: string;
   name: string;

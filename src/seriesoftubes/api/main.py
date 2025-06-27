@@ -9,6 +9,7 @@ from typing import Any, cast
 
 import yaml
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -39,6 +40,15 @@ app = FastAPI(
     description="LLM Workflow Orchestration Platform API",
     version="0.1.0",
     lifespan=lifespan,
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # Frontend origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Include routers

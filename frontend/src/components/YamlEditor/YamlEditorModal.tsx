@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Button, Space, Alert, message, Spin, Tag } from 'antd';
+import { Modal, Button, Space, Alert, App, Spin, Tag } from 'antd';
 import { SaveOutlined, ReloadOutlined, ExpandOutlined, CompressOutlined } from '@ant-design/icons';
 import Editor from '@monaco-editor/react';
 import { workflowAPI } from '../../api/client';
@@ -27,6 +27,7 @@ export const YamlEditorModal: React.FC<YamlEditorModalProps> = ({
   const [fullScreen, setFullScreen] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const { mode: themeMode } = useThemeStore();
+  const { message } = App.useApp();
 
   // Load workflow content when modal opens
   useEffect(() => {
