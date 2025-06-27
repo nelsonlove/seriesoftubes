@@ -33,7 +33,7 @@ import { useAuthStore } from './stores/auth';
 import { useThemeStore } from './stores/theme';
 import './App.css';
 
-const { Header, Content, Sider } = Layout;
+const { Header, Content, Sider, Footer } = Layout;
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -233,7 +233,7 @@ function AppContent() {
   }
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
+    <Layout style={{ minHeight: '100vh', padding: 0 }}>
       <Header
         style={{
           display: 'flex',
@@ -362,7 +362,7 @@ function AppContent() {
           </Space>
         )}
       </Header>
-      <Layout>
+      <Layout style={{ padding: 0 }}>
         <Sider
           width={280}
           style={{
@@ -394,13 +394,11 @@ function AppContent() {
             }))}
           />
         </Sider>
-        <Layout style={{ padding: '32px' }}>
+        <Layout style={{ padding: 0 }}>
           <Content
             style={{
-              padding: 32,
+              padding: '32px',
               margin: 0,
-              minHeight: 280,
-              borderRadius: 16,
               maxWidth: '1400px',
               width: '100%',
             }}
@@ -451,6 +449,14 @@ function AppContent() {
           </Content>
         </Layout>
       </Layout>
+      <Footer 
+        style={{ 
+          height: '24px', 
+          padding: 0,
+          borderTop: `1px solid ${themeMode === 'dark' ? '#334155' : '#e2e8f0'}`,
+          boxShadow: 'none',
+        }} 
+      />
     </Layout>
   );
 }

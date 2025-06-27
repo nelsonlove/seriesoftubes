@@ -1,6 +1,6 @@
 """Integration tests for caching with the workflow engine"""
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -140,16 +140,21 @@ async def test_engine_cache_disabled():
     )
 
     with patch("seriesoftubes.nodes.llm.get_provider") as mock_get_provider:
-        mock_provider = mock_get_provider.return_value
-        mock_provider.call = AsyncMock(return_value={"test": "response"})
+        # Create a new mock provider for each call to get_provider
+        def create_mock_provider():
+            mock_provider = MagicMock()
+            mock_provider.call = AsyncMock(return_value={"test": "response"})
+            return mock_provider
+        
+        mock_get_provider.side_effect = create_mock_provider
 
         # First execution
-        await engine.execute(workflow, inputs={})
-        assert mock_provider.call.call_count == 1
+        result1 = await engine.execute(workflow, inputs={})
+        assert mock_get_provider.call_count == 1
 
-        # Second execution - should call again (no caching)
-        await engine.execute(workflow, inputs={})
-        assert mock_provider.call.call_count == 2
+        # Second execution - should call get_provider again (no caching)
+        result2 = await engine.execute(workflow, inputs={})
+        assert mock_get_provider.call_count == 2
 
     await engine.close()
 

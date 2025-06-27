@@ -22,6 +22,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { executionAPI, workflowAPI } from '../../api/client';
 import { useExecutionStore } from '../../stores/execution';
+import { useThemeStore } from '../../stores/theme';
 import type { ExecutionProgress } from '../../types/workflow';
 
 const { Title, Text } = Typography;
@@ -31,6 +32,7 @@ export const ExecutionDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [, setEventSource] = useState<EventSource | null>(null);
+  const { mode: themeMode } = useThemeStore();
 
   const { setExecution, updateProgress } = useExecutionStore();
   const execution = useExecutionStore((state) => state.executions[id || '']);
@@ -235,7 +237,22 @@ export const ExecutionDetail: React.FC = () => {
       </Card>
 
       <Card title="Inputs">
-        <pre style={{ margin: 0, fontSize: '12px' }}>{JSON.stringify(inputs, null, 2)}</pre>
+        <pre 
+          style={{ 
+            margin: 0, 
+            fontSize: '12px',
+            background: themeMode === 'dark' ? '#1e293b' : '#f5f5f5',
+            color: themeMode === 'dark' ? '#f1f5f9' : '#0f172a',
+            padding: '12px',
+            borderRadius: '4px',
+            border: `1px solid ${themeMode === 'dark' ? '#475569' : '#d9d9d9'}`,
+            whiteSpace: 'pre-wrap',
+            wordWrap: 'break-word',
+            overflowWrap: 'break-word',
+          }}
+        >
+          {JSON.stringify(inputs, null, 2)}
+        </pre>
       </Card>
 
       <Card title="Node Progress">
@@ -285,9 +302,11 @@ export const ExecutionDetail: React.FC = () => {
                             style={{
                               margin: '8px 0',
                               fontSize: '12px',
-                              background: '#f5f5f5',
+                              background: themeMode === 'dark' ? '#1e293b' : '#f5f5f5',
+                              color: themeMode === 'dark' ? '#f1f5f9' : '#0f172a',
                               padding: '8px',
                               borderRadius: '4px',
+                              border: `1px solid ${themeMode === 'dark' ? '#475569' : '#d9d9d9'}`,
                               whiteSpace: 'pre-wrap',
                               wordWrap: 'break-word',
                               overflowWrap: 'break-word',
@@ -309,12 +328,12 @@ export const ExecutionDetail: React.FC = () => {
                     <div
                       style={{
                         padding: '8px',
-                        background: '#fff2f0',
-                        border: '1px solid #ffccc7',
+                        background: themeMode === 'dark' ? '#431417' : '#fff2f0',
+                        border: `1px solid ${themeMode === 'dark' ? '#7f1d1d' : '#ffccc7'}`,
                         borderRadius: '4px',
                         fontFamily: 'monospace',
                         fontSize: '12px',
-                        color: '#a8071a',
+                        color: themeMode === 'dark' ? '#fca5a5' : '#a8071a',
                       }}
                     >
                       {/* Try to get error from new progress format first, then fall back to old errors format */}
@@ -338,12 +357,12 @@ export const ExecutionDetail: React.FC = () => {
                     <div
                       style={{
                         padding: '8px',
-                        background: '#fff2f0',
-                        border: '1px solid #ffccc7',
+                        background: themeMode === 'dark' ? '#431417' : '#fff2f0',
+                        border: `1px solid ${themeMode === 'dark' ? '#7f1d1d' : '#ffccc7'}`,
                         borderRadius: '4px',
                         fontFamily: 'monospace',
                         fontSize: '12px',
-                        color: '#a8071a',
+                        color: themeMode === 'dark' ? '#fca5a5' : '#a8071a',
                       }}
                     >
                       {nodeProgress.error}
@@ -357,9 +376,11 @@ export const ExecutionDetail: React.FC = () => {
                         style={{
                           margin: '8px 0',
                           fontSize: '12px',
-                          background: '#f5f5f5',
+                          background: themeMode === 'dark' ? '#1e293b' : '#f5f5f5',
+                          color: themeMode === 'dark' ? '#f1f5f9' : '#0f172a',
                           padding: '8px',
                           borderRadius: '4px',
+                          border: `1px solid ${themeMode === 'dark' ? '#475569' : '#d9d9d9'}`,
                           whiteSpace: 'pre-wrap',
                           wordWrap: 'break-word',
                           overflowWrap: 'break-word',
@@ -385,10 +406,11 @@ export const ExecutionDetail: React.FC = () => {
             style={{
               margin: 0,
               fontSize: '12px',
-              background: '#f5f5f5',
+              background: themeMode === 'dark' ? '#1e293b' : '#f5f5f5',
+              color: themeMode === 'dark' ? '#f1f5f9' : '#0f172a',
               padding: '12px',
               borderRadius: '4px',
-              border: '1px solid #d9d9d9',
+              border: `1px solid ${themeMode === 'dark' ? '#475569' : '#d9d9d9'}`,
               whiteSpace: 'pre-wrap',
               wordWrap: 'break-word',
               overflowWrap: 'break-word',

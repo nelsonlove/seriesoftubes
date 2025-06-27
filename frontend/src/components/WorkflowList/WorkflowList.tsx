@@ -86,11 +86,12 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({ onSelectWorkflow }) 
 
   return (
     <>
-      <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 168px)' }}>
         <Card
           style={{
             marginBottom: '24px',
             borderRadius: '16px',
+            flexShrink: 0,
           }}
         >
           <Space direction="vertical" style={{ width: '100%' }} size="middle">
@@ -163,7 +164,7 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({ onSelectWorkflow }) 
           </Space>
         </Card>
 
-        <div style={{ flex: 1, overflow: 'auto' }}>
+        <div style={{ flex: 1, overflow: 'auto', paddingTop: 4 }}>
           <List
             dataSource={filteredWorkflows}
             renderItem={(workflow: WorkflowSummary) => (

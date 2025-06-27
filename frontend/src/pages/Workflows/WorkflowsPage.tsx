@@ -10,8 +10,8 @@ export const WorkflowsPage: React.FC = () => {
   const [selectedWorkflow, setSelectedWorkflow] = useState<string | null>(null);
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ marginBottom: '32px' }}>
+    <div style={{ height: 'calc(100vh - 232px)', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ marginBottom: '32px', flexShrink: 0 }}>
         <Title
           level={1}
           style={{
@@ -35,11 +35,11 @@ export const WorkflowsPage: React.FC = () => {
         </Typography.Text>
       </div>
 
-      <Row gutter={32} style={{ flex: 1, minHeight: 0 }}>
+      <Row gutter={32} style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
         <Col span={10}>
           <WorkflowList onSelectWorkflow={setSelectedWorkflow} />
         </Col>
-        <Col span={14}>
+        <Col span={14} style={{ height: '100%' }}>
           {selectedWorkflow ? (
             <WorkflowDetail path={selectedWorkflow} />
           ) : (
@@ -47,11 +47,12 @@ export const WorkflowsPage: React.FC = () => {
               style={{
                 height: '100%',
                 display: 'flex',
-                alignItems: 'center',
+                alignItems: 'flex-start',
                 justifyContent: 'center',
                 textAlign: 'center',
                 border: '2px dashed #e2e8f0',
                 background: 'transparent',
+                paddingTop: '80px',
               }}
             >
               <div>

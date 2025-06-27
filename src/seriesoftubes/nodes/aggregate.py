@@ -37,14 +37,16 @@ class AggregateNodeExecutor(NodeExecutor):
             parallel_results = []
 
             # Check if we have parallel execution results
-            if hasattr(context, "parallel_results"):
+            if hasattr(context, "parallel_results") and context.parallel_results:
                 parallel_results = context.parallel_results
             else:
                 # Look for results from dependent nodes that were split
                 for dep_node in node.depends_on:
                     dep_output = context.get_output(dep_node)
                     if isinstance(dep_output, list):
-                        parallel_results.extend(dep_output)
+                        # This is the output from a parallel processing node (like filter)
+                        parallel_results = dep_output
+                        break  # Take the first list output as our parallel results
                     elif dep_output is not None:
                         parallel_results.append(dep_output)
 
