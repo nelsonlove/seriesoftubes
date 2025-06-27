@@ -79,3 +79,4 @@ api-keys.yaml
 # Database files (if used locally)
 *.db
 *.sqlite
+.hypothesis/
