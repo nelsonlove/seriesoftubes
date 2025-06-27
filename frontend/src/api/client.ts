@@ -2,6 +2,7 @@ import axios from 'axios';
 import type {
   WorkflowSummary,
   WorkflowDetail,
+  WorkflowResponse,
   ExecutionInput,
   ExecutionResponse,
   ExecutionDetail,
@@ -149,27 +150,31 @@ export const workflowAPI = {
   },
 
   // Get raw YAML content
-  getRaw: async (path: string) => {
-    // Use the root-level endpoint, not under /api
-    const response = await axios.get<{ content: string; path: string; modified: number }>(
-      `/workflows/${encodeURIComponent(path)}/raw`
-    );
-    return response.data;
+  getRaw: async (workflowId: string) => {
+    // Use the existing workflow detail endpoint to get YAML content
+    const response = await api.get<WorkflowDetail>(`/workflows/${encodeURIComponent(workflowId)}`);
+    return {
+      content: response.data.yaml_content,
+      path: workflowId,
+      modified: new Date(response.data.updated_at).getTime(),
+    };
   },
 
   // Update raw YAML content
-  updateRaw: async (path: string, content: string, expectedModified?: number) => {
-    // Use the root-level endpoint, not under /api
-    const response = await axios.put<{
-      success: boolean;
-      path: string;
-      modified: number;
-      workflow: { name: string; version: string };
-    }>(`/workflows/${encodeURIComponent(path)}/raw`, {
-      content,
-      expected_modified: expectedModified,
-    });
-    return response.data;
+  updateRaw: async (workflowId: string, content: string) => {
+    // Use the existing workflow update endpoint
+    const response = await api.put<WorkflowResponse>(
+      `/workflows/${encodeURIComponent(workflowId)}`,
+      {
+        yaml_content: content,
+      }
+    );
+    return {
+      success: true,
+      path: workflowId,
+      modified: new Date(response.data.updated_at).getTime(),
+      workflow: { name: response.data.name, version: response.data.version },
+    };
   },
 };
 
@@ -188,9 +193,59 @@ export const executionAPI = {
 
   // Stream execution progress
   stream: (id: string, onUpdate: (data: any) => void) => {
-    const eventSource = new EventSource(`/api/executions/${id}/stream`);
+    const token = useAuthStore.getState().token;
+    // Use full backend URL for EventSource since proxy might not work with SSE
+    const backendUrl = 'http://localhost:8000';
+    const url = token
+      ? `${backendUrl}/api/executions/${id}/stream?token=${encodeURIComponent(token)}`
+      : `${backendUrl}/api/executions/${id}/stream`;
+
+    console.log('Connecting to SSE URL:', url);
+    const eventSource = new EventSource(url);
+
+    // Listen for default message events (no event type specified)
+    eventSource.onmessage = (event) => {
+      console.log('SSE message event:', event.data);
+      try {
+        // Try to parse as JSON, handling whitespace and formatting
+        let data;
+        try {
+          // Clean up the event data - remove extra whitespace, newlines, and SSE prefix
+          let cleanedData = event.data.trim();
+
+          // Remove 'data: ' prefix if present (sometimes SSE includes this)
+          if (cleanedData.startsWith('data: ')) {
+            cleanedData = cleanedData.substring(6).trim();
+          }
+
+          data = JSON.parse(cleanedData);
+          // Check if this is a complete event and close the connection
+          if (data.type === 'complete' || data.done === true) {
+            console.log('SSE stream complete, closing connection');
+            eventSource.close();
+          }
+        } catch (parseError) {
+          console.warn('Failed to parse SSE data as JSON:', parseError, 'Raw data:', event.data);
+          // If it's not valid JSON, try to extract JSON from the message
+          const trimmed = event.data.trim();
+          if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+            try {
+              data = JSON.parse(trimmed);
+            } catch {
+              data = { message: event.data };
+            }
+          } else {
+            data = { message: event.data };
+          }
+        }
+        onUpdate(data);
+      } catch (error) {
+        console.error('Failed to handle SSE message:', error);
+      }
+    };
 
     eventSource.addEventListener('update', (event) => {
+      console.log('SSE update event:', event.data);
       try {
         const data = JSON.parse(event.data);
         onUpdate(data);
@@ -200,6 +255,7 @@ export const executionAPI = {
     });
 
     eventSource.addEventListener('complete', (event) => {
+      console.log('SSE complete event:', event.data);
       try {
         const data = JSON.parse(event.data);
         onUpdate(data);
@@ -209,8 +265,12 @@ export const executionAPI = {
       }
     });
 
+    eventSource.onopen = (event) => {
+      console.log('SSE connection opened:', event);
+    };
+
     eventSource.onerror = (error) => {
-      console.error('SSE error:', error);
+      console.error('SSE error:', error, 'readyState:', eventSource.readyState);
       eventSource.close();
     };
 

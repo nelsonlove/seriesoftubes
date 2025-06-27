@@ -199,10 +199,24 @@ outputs:
         response = client.get("/api/executions/nonexistent-id")
         assert response.status_code == 404
 
-    def test_stream_execution_not_found(self, client):
+    def test_stream_execution_not_found(self, client, mock_user, mock_db_session):
         """Test streaming non-existent execution"""
-        # Test with non-existent execution ID
-        response = client.get("/api/executions/nonexistent-id/stream")
+        from seriesoftubes.api.auth import create_access_token
+        
+        # Create a valid JWT token for the mock user
+        token = create_access_token(data={"sub": mock_user.id})
+        
+        # Create two mock results - one for user lookup (found), one for execution lookup (not found)
+        user_result = MagicMock()
+        user_result.scalar_one_or_none.return_value = mock_user
+        
+        execution_result = MagicMock()
+        execution_result.scalar_one_or_none.return_value = None  # Execution not found
+        
+        # Set up execute to return user first, then execution not found
+        mock_db_session.execute.side_effect = [user_result, execution_result]
+        
+        response = client.get(f"/api/executions/nonexistent-id/stream?token={token}")
         assert response.status_code == 404
 
     def test_invalid_workflow_yaml(self, client):

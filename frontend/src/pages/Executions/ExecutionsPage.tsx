@@ -24,11 +24,11 @@ export const ExecutionsPage: React.FC = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed':
-        return 'success';
+        return 'green'; // Match the detail view
       case 'failed':
-        return 'error';
+        return 'red'; // Match the detail view
       case 'running':
-        return 'processing';
+        return 'blue'; // Match the detail view
       default:
         return 'default';
     }

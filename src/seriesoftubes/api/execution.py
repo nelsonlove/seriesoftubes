@@ -6,8 +6,15 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from seriesoftubes.engine import WorkflowEngine, run_workflow
-from seriesoftubes.models import Workflow
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from seriesoftubes.engine import (
+    ExecutionContext,
+    NodeResult,
+    WorkflowEngine,
+    run_workflow,
+)
+from seriesoftubes.models import Node, Workflow
 from seriesoftubes.parser import parse_workflow_yaml
 
 
@@ -111,29 +118,128 @@ class ExecutionManager:
         return list(self.executions.values())
 
 
-class ProgressTrackingEngine(WorkflowEngine):
-    """Workflow engine that tracks progress"""
+class DatabaseProgressTrackingEngine(WorkflowEngine):
+    """Workflow engine that tracks progress in database"""
 
-    def __init__(self, execution_id: str, executions_store: dict[str, dict[str, Any]]):
+    def __init__(self, execution_id: str, db_session: AsyncSession):
         super().__init__()
         self.execution_id = execution_id
-        self.executions_store = executions_store
+        self.db_session = db_session
 
-    async def _execute_node(self, node: Any, context: Any) -> Any:
-        """Override to track progress"""
-        # Update progress before execution
-        progress = self.executions_store[self.execution_id].get("progress", {})
-        progress[node.name] = "running"
-        self.executions_store[self.execution_id]["progress"] = progress
+    async def execute(
+        self, workflow: Workflow, inputs: dict[str, Any]
+    ) -> ExecutionContext:
+        """Override execute to add cleanup logic"""
+        try:
+            # Execute the workflow normally
+            context = await super().execute(workflow, inputs)
 
-        # Execute node
-        result = await super()._execute_node(node, context)
+            # Clean up any remaining "running" nodes after execution completes
+            await self._cleanup_running_nodes()
 
-        # Update progress after execution
-        progress[node.name] = "completed" if result.success else "failed"
-        self.executions_store[self.execution_id]["progress"] = progress
+            return context
+        except Exception as e:
+            # If execution fails, clean up any remaining "running" nodes
+            await self._cleanup_running_nodes()
+            raise e
 
-        return result
+    async def _cleanup_running_nodes(self):
+        """Clean up any nodes still marked as 'running' when execution ends"""
+        from sqlalchemy import select, update
+
+        from seriesoftubes.db.models import Execution
+
+        try:
+            # Get current progress
+            result_query = await self.db_session.execute(
+                select(Execution.progress).where(Execution.id == self.execution_id)
+            )
+            current_progress = result_query.scalar() or {}
+
+            # Set any "running" nodes to "failed" since execution has ended
+            cleanup_needed = False
+            for node_name, status in current_progress.items():
+                if status == "running":
+                    current_progress[node_name] = "failed"
+                    cleanup_needed = True
+
+            # Update database if cleanup was needed
+            if cleanup_needed:
+                await self.db_session.execute(
+                    update(Execution)
+                    .where(Execution.id == self.execution_id)
+                    .values(progress=current_progress)
+                )
+                await self.db_session.commit()
+
+        except Exception as e:
+            # Don't fail the execution just because cleanup failed
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to cleanup running nodes: {e}")
+
+    async def _execute_node(self, node: Node, context: ExecutionContext) -> NodeResult:
+        """Override to track progress in database"""
+        from sqlalchemy import select, update
+
+        from seriesoftubes.db.models import Execution
+
+        try:
+            # Get current progress
+            result_query = await self.db_session.execute(
+                select(Execution.progress).where(Execution.id == self.execution_id)
+            )
+            current_progress = result_query.scalar() or {}
+
+            # Update progress before execution - node is running
+            current_progress[node.name] = "running"
+            await self.db_session.execute(
+                update(Execution)
+                .where(Execution.id == self.execution_id)
+                .values(progress=current_progress)
+            )
+            await self.db_session.commit()
+
+            # Execute node
+            result = await super()._execute_node(node, context)
+
+            # Update progress after execution with detailed info
+            if result.success:
+                current_progress[node.name] = {
+                    "status": "completed",
+                    "completed_at": datetime.now(timezone.utc).isoformat(),
+                    "output": result.output,
+                }
+            else:
+                current_progress[node.name] = {
+                    "status": "failed",
+                    "error": result.error or "Node execution failed",
+                    "completed_at": datetime.now(timezone.utc).isoformat(),
+                }
+
+            await self.db_session.execute(
+                update(Execution)
+                .where(Execution.id == self.execution_id)
+                .values(progress=current_progress)
+            )
+            await self.db_session.commit()
+
+            return result
+
+        except Exception as e:
+            # If we fail to update progress, still try to execute the node
+            # but make sure to return an error result
+            try:
+                result = await super()._execute_node(node, context)
+                return result
+            except Exception:
+                return NodeResult(
+                    output=None, success=False, error=f"Node execution failed: {e}"
+                )
+
+
+# For backward compatibility
+ProgressTrackingEngine = DatabaseProgressTrackingEngine
 
 
 # Global execution manager instance

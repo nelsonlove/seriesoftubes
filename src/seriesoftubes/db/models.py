@@ -121,6 +121,7 @@ class ExecutionStatus(enum.Enum):
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 class Execution(Base):
@@ -145,6 +146,7 @@ class Execution(Base):
     inputs: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     outputs: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     errors: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    progress: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -178,6 +180,7 @@ class Execution(Base):
             "inputs": self.inputs,
             "outputs": self.outputs,
             "errors": self.errors,
+            "progress": self.progress,
             "started_at": self.started_at.isoformat() if self.started_at else None,
             "completed_at": (
                 self.completed_at.isoformat() if self.completed_at else None

@@ -20,7 +20,6 @@ from sqlalchemy.orm import selectinload
 from seriesoftubes.api.auth import get_current_active_user
 from seriesoftubes.db import Execution, User, Workflow, get_db
 from seriesoftubes.db import ExecutionStatus as DBExecutionStatus
-from seriesoftubes.engine import run_workflow as run_workflow_engine
 from seriesoftubes.parser import parse_workflow_yaml, validate_dag
 
 router = APIRouter(prefix="/api/workflows", tags=["workflows"])
@@ -693,16 +692,35 @@ async def run_workflow(
                 try:
                     parsed = parse_workflow_yaml(tmp_path)
 
-                    # Run the workflow
-                    outputs = await run_workflow_engine(parsed, request.inputs)
+                    # Use database-connected progress tracking engine
+                    from seriesoftubes.api.execution import (
+                        DatabaseProgressTrackingEngine,
+                    )
 
-                    # Update execution as completed
+                    engine = DatabaseProgressTrackingEngine(execution.id, session)
+                    context = await engine.execute(parsed, request.inputs)
+
+                    # Prepare outputs from workflow context
+                    outputs = {}
+                    for output_name, node_name in parsed.outputs.items():
+                        if node_name in context.outputs:
+                            outputs[output_name] = context.outputs[node_name]
+
+                    # Determine final status based on errors
+                    final_status = (
+                        DBExecutionStatus.COMPLETED.value
+                        if not context.errors
+                        else DBExecutionStatus.FAILED.value
+                    )
+
+                    # Update execution as completed/failed
                     await session.execute(
                         update(Execution)
                         .where(Execution.id == execution.id)
                         .values(
-                            status=DBExecutionStatus.COMPLETED.value,
+                            status=final_status,
                             outputs=outputs,
+                            errors=context.errors if context.errors else None,
                             completed_at=datetime.now(timezone.utc),
                         )
                     )
