@@ -54,18 +54,24 @@ docker-compose --profile with-api up -d
 
 **Use when**: Testing API in container
 
-### 3. Full Stack Development
+### 3. Full Stack Development with Hot Reload
 
 ```bash
-docker-compose --profile dev --profile with-api up -d
+docker-compose --profile dev up -d
 ```
 
 - ✅ All services running
 - ✅ Frontend with hot reload at localhost:3000
-- ✅ API at localhost:8000
+- ✅ API with hot reload at localhost:8000
 - ✅ Databases available
+- ✅ Code changes auto-reload both frontend and backend
 
-**Use when**: Testing full integration
+**Use when**: Full stack development with hot reload
+
+**How Hot Reload Works**:
+- **Frontend**: Vite dev server watches for changes
+- **Backend**: Uvicorn with --reload watches src/ directory
+- **Volumes**: Only source code is mounted, not dependencies
 
 ### 4. Production Mode
 
@@ -213,14 +219,59 @@ networks:
 4. **Enable SSL**: Use Let's Encrypt with certbot
 5. **Monitor Health**: Check `/health` endpoints
 
+## Hot Reload Performance
+
+### Backend Hot Reload
+
+The backend uses Uvicorn's `--reload` flag which:
+- Watches all Python files in `src/` directory
+- Automatically restarts on changes
+- Preserves database connections across reloads
+- Typical reload time: 1-2 seconds
+
+**Tips for Faster Reloads**:
+1. Only mount necessary directories (src, tests, workflows)
+2. Use `.dockerignore` to exclude large files
+3. Dependencies are pre-installed in image (not reloaded)
+
+### Frontend Hot Reload
+
+The frontend uses Vite's HMR (Hot Module Replacement):
+- Instant updates without full page reload
+- Preserves component state during updates
+- CSS changes apply immediately
+- Typical update time: <100ms
+
+### Troubleshooting Slow Reloads
+
+If hot reload is slow:
+
+1. **Check Volume Performance** (macOS):
+   ```bash
+   # Use delegated mode for better performance
+   volumes:
+     - ./src:/app/src:delegated
+   ```
+
+2. **Reduce Watched Files**:
+   - Add large directories to `.dockerignore`
+   - Don't mount `node_modules` or `.venv`
+
+3. **Use Dev Images**:
+   - Pre-install dependencies in Dockerfile.dev
+   - Only mount source code, not entire project
+
 ## Quick Commands
 
 ```bash
-# Start everything (dev mode)
-docker-compose --profile dev --profile with-api up -d
+# Start everything (dev mode with hot reload)
+docker-compose --profile dev up -d
 
 # Start minimal (just databases)
 docker-compose up -d
+
+# Production mode (no hot reload)
+docker-compose --profile prod --profile with-api up -d
 
 # Stop everything
 docker-compose down
@@ -229,16 +280,19 @@ docker-compose down
 docker-compose down -v
 
 # View logs
-docker-compose logs -f api
+docker-compose logs -f api-dev
 docker-compose logs -f frontend-dev
 
 # Enter container
-docker-compose exec api bash
+docker-compose exec api-dev bash
 docker-compose exec frontend-dev sh
 
 # Run migrations
-docker-compose exec api alembic upgrade head
+docker-compose exec api-dev alembic upgrade head
 
 # Run CLI in container
-docker-compose exec api s10s run workflow.yaml
+docker-compose exec api-dev s10s run workflow.yaml
+
+# Rebuild after dependency changes
+docker-compose --profile dev build
 ```

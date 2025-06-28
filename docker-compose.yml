@@ -16,7 +16,7 @@ services:
       - VITE_API_URL=http://localhost:8000
     profiles: ["dev"]  # Only starts with --profile dev
     depends_on:
-      - api
+      - api-dev
 
   # Frontend (Production build)
   frontend:
@@ -31,7 +31,7 @@ services:
     profiles: ["prod"]  # Only starts with --profile prod
     restart: unless-stopped
 
-  # API Server
+  # API Server (Production mode - no hot reload)
   api:
     build:
       context: .
@@ -61,6 +61,42 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+    profiles: ["with-api"]  # Only starts with --profile with-api
+
+  # API Server (Development mode with hot reload)
+  api-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: seriesoftubes-api-dev
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://seriesoftubes:development-password@postgres:5432/seriesoftubes
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-development-secret-key-change-in-production}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173,http://localhost}
+    volumes:
+      - ./src:/app/src  # Mount only source code for hot reload
+      - ./tests:/app/tests  # Mount tests
+      - ./workflows:/app/workflows  # Mount example workflows
+      - ./logs:/app/logs
+      - ./.env:/app/.env:ro  # Mount env file if exists
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    profiles: ["dev"]  # Only starts with --profile dev
 
   # Redis for caching
   redis:
@@ -119,3 +155,4 @@ services:
 volumes:
   redis_data:
   postgres_data:
+  api-dev-cache:
