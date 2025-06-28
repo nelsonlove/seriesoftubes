@@ -133,6 +133,24 @@ services:
       timeout: 3s
       retries: 5
 
+  # Frontend (React app)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: seriesoftubes-frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:${API_PORT:-8000}
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - api-dev
+    restart: unless-stopped
+    profiles: ["with-frontend"]  # Only starts with --profile with-frontend
+
   # Optional: Worker for background jobs (uncomment if needed)
   # worker:
   #   build:
