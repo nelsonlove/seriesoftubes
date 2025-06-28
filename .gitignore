@@ -80,3 +80,8 @@ api-keys.yaml
 *.db
 *.sqlite
 .hypothesis/
+
+# Redis
+dump.rdb
+appendonly.aof
+redis.log

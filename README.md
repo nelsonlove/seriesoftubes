@@ -17,8 +17,8 @@ pip install -e ".[dev]"
 cp .env.example .env
 # Edit .env and add your API keys (OPENAI_API_KEY or ANTHROPIC_API_KEY)
 
-# For production, generate secure configuration:
-# python -m seriesoftubes.cli.generate_config
+# Optional: Start Redis for caching (requires Docker)
+docker-compose up -d redis
 
 # Configure workflow settings (optional)
 cp .tubes.example.yaml .tubes.yaml
@@ -31,7 +31,8 @@ s10s run examples/simple-test/workflow.yaml --inputs company_name="OpenAI"
 s10s list
 ```
 
-**Security Note**: See [docs/security.md](docs/security.md) for production security configuration.
+**Note**: See [docs/development-setup.md](docs/development-setup.md) for detailed setup with PostgreSQL and Redis.
+**Security**: See [docs/security.md](docs/security.md) for production security configuration.
 
 ## Key Commands
 

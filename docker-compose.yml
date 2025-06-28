@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: seriesoftubes-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # PostgreSQL for production-like development
+  postgres:
+    image: postgres:16-alpine
+    container_name: seriesoftubes-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: seriesoftubes
+      POSTGRES_PASSWORD: development-password
+      POSTGRES_DB: seriesoftubes
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U seriesoftubes"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  redis_data:
+  postgres_data:
