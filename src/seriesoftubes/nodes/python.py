@@ -128,10 +128,21 @@ class PythonNodeExecutor(NodeExecutor):
                     memory_limit_mb=_parse_memory_limit(config.memory_limit) if config.memory_limit else 100,
                     allowed_imports=config.allowed_imports,
                 )
-                result = await asyncio.get_event_loop().run_in_executor(
-                    None,
-                    execute_fn,
-                )
+                
+                # Apply asyncio timeout
+                timeout_seconds = config.timeout or 30
+                try:
+                    result = await asyncio.wait_for(
+                        asyncio.get_event_loop().run_in_executor(None, execute_fn),
+                        timeout=timeout_seconds
+                    )
+                except asyncio.TimeoutError:
+                    return NodeResult(
+                        output=None,
+                        success=False,
+                        error=f"Python execution timed out after {timeout_seconds} seconds",
+                    )
+                    
             except SecurePythonError as e:
                 return NodeResult(
                     output=None,

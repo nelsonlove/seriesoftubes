@@ -305,6 +305,28 @@ class SecurePythonEngine:
         safe_globals_dict['_iter_unpack_sequence_'] = guarded_iter_unpack_sequence
         safe_globals_dict['_getattr_'] = safer_getattr
         safe_globals_dict['_write_'] = lambda obj: obj  # Allow writes
+        # For augmented assignments like +=, -=, etc.
+        def _inplacevar_(op_str, x, y):
+            ops = {
+                '+=': lambda a, b: a + b,
+                '-=': lambda a, b: a - b,
+                '*=': lambda a, b: a * b,
+                '/=': lambda a, b: a / b,
+                '//=': lambda a, b: a // b,
+                '%=': lambda a, b: a % b,
+                '**=': lambda a, b: a ** b,
+                '&=': lambda a, b: a & b,
+                '|=': lambda a, b: a | b,
+                '^=': lambda a, b: a ^ b,
+                '<<=': lambda a, b: a << b,
+                '>>=': lambda a, b: a >> b,
+            }
+            if op_str in ops:
+                return ops[op_str](x, y)
+            else:
+                raise ValueError(f"Unsupported inplace operation: {op_str}")
+        
+        safe_globals_dict['_inplacevar_'] = _inplacevar_
         
         return safe_globals_dict
     

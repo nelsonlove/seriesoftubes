@@ -77,7 +77,6 @@ result = process_list(context['items'])
         result = execute_secure_python(code, context)
         assert result == [3, 6, 9, 12]
 
-    @pytest.mark.skip(reason="RestrictedPython doesn't support class definitions in limited_builtins mode")
     def test_class_definition(self):
         """Test defining and using classes"""
         code = """
@@ -97,7 +96,8 @@ result = {
     'multiply': calc.multiply(3)
 }
 """
-        result = execute_secure_python(code)
+        # Classes require TRUSTED level to work properly
+        result = execute_secure_python(code, level=PythonSecurityLevel.TRUSTED)
         assert result == {"add": 15, "multiply": 30}
 
     def test_security_level_strict_no_imports(self):

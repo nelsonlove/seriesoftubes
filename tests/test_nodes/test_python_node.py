@@ -249,7 +249,6 @@ result = result
         assert result.output["result"]["pi"] == pytest.approx(3.14159, rel=1e-5)
         assert result.output["result"]["sqrt"] == 4.0
 
-    @pytest.mark.skip(reason="RestrictedPython timeout checks after execution, not during")
     async def test_timeout(self, executor, basic_context):
         """Test execution timeout"""
         node = Node(
@@ -257,12 +256,12 @@ result = result
             type=NodeType.PYTHON,
             config=PythonNodeConfig(
                 code="""
-# Simulate slow operation with infinite loop
-count = 0
-while True:
-    count += 1
-    # This will run forever
-result = count
+# Simulate slow operation with CPU-intensive computation
+# This will take much longer than 1 second
+result = 0
+for i in range(10**8):  # 100 million iterations
+    result += i * i * i
+    # No way this finishes in 1 second
 """,
                 timeout=1,  # 1 second timeout
             ),
