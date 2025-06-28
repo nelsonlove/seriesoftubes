@@ -368,7 +368,7 @@ def validate(
             console.print("\n[bold]Workflow Summary:[/bold]")
             console.print(f"  • Inputs: {len(wf.inputs)}")
             console.print(f"  • Nodes: {len(wf.nodes)}")
-            for node_type in ["llm", "http", "route", "file", "python"]:
+            for node_type in ["llm", "http", "conditional", "file", "python"]:
                 count = sum(
                     1 for n in wf.nodes.values() if n.node_type.value == node_type
                 )

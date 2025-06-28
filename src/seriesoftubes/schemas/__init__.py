@@ -112,23 +112,6 @@ class HTTPNodeOutput(NodeOutputSchema):
     url: str = Field(..., description="The final URL (after redirects)")
 
 
-# Route Node Schemas
-class RouteNodeInput(NodeInputSchema):
-    """Input schema for route nodes"""
-
-    context_data: dict[str, Any] = Field(
-        ..., description="Data to evaluate routing conditions against"
-    )
-
-
-class RouteNodeOutput(NodeOutputSchema):
-    """Output schema for route nodes"""
-
-    selected_route: str = Field(..., description="The node that was routed to")
-    condition_met: str = Field(
-        ..., description="The condition that was met or 'default'"
-    )
-
 
 # File Node Schemas
 class FileNodeInput(NodeInputSchema):

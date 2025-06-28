@@ -420,23 +420,24 @@ create_record:
 """,
                 ),
             ],
-            "route": [
+            "conditional": [
                 (
                     "Conditional routing",
                     """
 route_by_size:
-  type: route
+  type: conditional
   depends_on: [analyze_company]
   config:
     context:
       company: analyze_company
-    routes:
-      - when: "{{ company.revenue > 1000000 }}"
-        to: process_enterprise
-      - when: "{{ company.employees < 50 }}"
-        to: process_small_business
-      - default: true
-        to: process_standard
+    conditions:
+      - condition: "{{ company.revenue > 1000000 }}"
+        then: process_enterprise
+      - condition: "{{ company.employees < 50 }}"
+        then: process_small_business
+      - condition: "default"
+        then: process_standard
+        is_default: true
 """,
                 ),
             ],
@@ -749,7 +750,7 @@ transform_data:
                 "",
                 "nodes:",
                 "  ${7:node_name}:",
-                "    type: ${8|llm,http,route,file,python|}",
+                "    type: ${8|llm,http,conditional,file,python|}",
                 "    config:",
                 "      ${9}",
                 "",
@@ -807,18 +808,19 @@ transform_data:
                 "      ${10:type}: ${11|bearer,basic,api_key|}",
                 '      ${12:token}: "${13:\\$\\{\\{ env.API_TOKEN \\}\\}}"',
             ],
-            "route": [
+            "conditional": [
                 "${1:node_name}:",
-                "  type: route",
+                "  type: conditional",
                 "  depends_on: [${2:dependency}]",
                 "  config:",
                 "    context:",
                 "      ${3:data}: ${4:source_node}",
-                "    routes:",
-                '      - when: "${5:\\$\\{\\{ data.value > 100 \\}\\}}"',
-                "        to: ${6:high_value_node}",
-                "      - default: true",
-                "        to: ${7:default_node}",
+                "    conditions:",
+                '      - condition: "${5:\\$\\{\\{ data.value > 100 \\}\\}}"',
+                "        then: ${6:high_value_node}",
+                "      - condition: \"default\"",
+                "        then: ${7:default_node}",
+                "        is_default: true",
             ],
             "file": [
                 "${1:node_name}:",
