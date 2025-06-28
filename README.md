@@ -17,8 +17,10 @@ pip install -e ".[dev]"
 cp .env.example .env
 # Edit .env and add your API keys (OPENAI_API_KEY or ANTHROPIC_API_KEY)
 
-# Optional: Start Redis for caching (requires Docker)
-docker-compose up -d redis
+# Optional: Start services with Docker
+docker-compose up -d               # Just databases (Redis + PostgreSQL)
+# OR
+docker-compose --profile dev up -d # Full stack with hot reload
 
 # Configure workflow settings (optional)
 cp .tubes.example.yaml .tubes.yaml
@@ -54,6 +56,54 @@ mypy src/                          # Type checking
 pre-commit run --all-files         # Run all linters
 ```
 
+## Features
+
+### ✅ Implemented
+
+- **11 Node Types**: LLM, HTTP, File, Python, Conditional, Split/Aggregate, Filter, Transform, Join, ForEach
+- **Structured Output**: Pydantic schemas for LLM responses
+- **Parallel Execution**: Split arrays and process in parallel
+- **Template Engine**: Jinja2 templates with security levels
+- **Python Execution**: RestrictedPython with 3 security levels
+- **File Operations**: Read JSON, CSV, YAML, TXT, JSONL with security
+- **Caching**: In-memory or Redis caching per node
+- **API Server**: FastAPI with authentication
+- **Web UI**: React frontend for workflow management
+- **Docker Support**: Full stack with hot reload
+- **Security**: JWT auth, CORS, file path validation, SSTI prevention
+
+### 🚧 In Progress
+
+- Message queue integration for distributed execution
+- Object storage for large artifacts
+- Workflow versioning and rollback
+- Real-time execution monitoring
+
+## Docker & API
+
+### Quick Docker Commands
+
+```bash
+# Development with hot reload
+docker-compose --profile dev up -d
+
+# Custom ports
+FRONTEND_PORT=3001 API_PORT=8001 docker-compose --profile dev up -d
+
+# Production mode
+docker-compose --profile prod --profile with-api up -d
+
+# View logs
+docker-compose logs -f api-dev
+```
+
+### API Endpoints
+
+When running the API server:
+- API Documentation: http://localhost:8000/docs
+- Health Check: http://localhost:8000/health
+- Frontend: http://localhost:3000 (when using Docker)
+
 ## Architecture
 
 ### Core Concepts
@@ -63,7 +113,20 @@ pre-commit run --all-files         # Run all linters
 3. **Context**: Explicit data passing between nodes
 4. **Templates**: Jinja2 templates for dynamic prompts
 
-### Node Types (MVP)
+### Node Types
+
+Currently supported node types:
+- `llm` - LLM API calls with structured output support
+- `http` - HTTP/REST API calls
+- `conditional` - Route execution based on conditions
+- `file` - Read files (JSON, CSV, YAML, TXT, JSONL)
+- `python` - Execute Python code with security levels
+- `split` - Split arrays for parallel processing
+- `aggregate` - Collect results from parallel executions
+- `filter` - Filter arrays based on conditions
+- `transform` - Transform data with Jinja2 templates
+- `join` - Join data from multiple sources
+- `foreach` - Iterate over arrays with subgraph execution
 
 **1. `llm` Node**
 ```yaml
@@ -95,10 +158,10 @@ fetch_github:
       Accept: "application/vnd.github.v3+json"
 ```
 
-**3. `route` Node**
+**3. `conditional` Node** (formerly `route`)
 ```yaml
 route_by_size:
-  type: route
+  type: conditional
   depends_on: [classify_company]
   config:
     context:

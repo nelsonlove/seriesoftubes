@@ -8,7 +8,7 @@ services:
       dockerfile: Dockerfile.dev
     container_name: seriesoftubes-frontend-dev
     ports:
-      - "3000:5173"  # Map to port 3000 for consistency
+      - "${FRONTEND_PORT:-3000}:5173"  # Default to 3000 if not specified
     volumes:
       - ./frontend:/app
       - /app/node_modules  # Prevent overwriting node_modules
@@ -38,7 +38,7 @@ services:
       dockerfile: Dockerfile
     container_name: seriesoftubes-api
     ports:
-      - "8000:8000"
+      - "${API_PORT:-8000}:8000"
     environment:
       - DATABASE_URL=postgresql://seriesoftubes:development-password@postgres:5432/seriesoftubes
       - REDIS_URL=redis://redis:6379
@@ -70,7 +70,7 @@ services:
       dockerfile: Dockerfile.dev
     container_name: seriesoftubes-api-dev
     ports:
-      - "8000:8000"
+      - "${API_PORT:-8000}:8000"
     environment:
       - DATABASE_URL=postgresql://seriesoftubes:development-password@postgres:5432/seriesoftubes
       - REDIS_URL=redis://redis:6379
