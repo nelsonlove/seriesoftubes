@@ -1,6 +1,37 @@
 version: '3.8'
 
 services:
+  # API Server
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: seriesoftubes-api
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://seriesoftubes:development-password@postgres:5432/seriesoftubes
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-development-secret-key-change-in-production}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - ./logs:/app/logs
+      - ./workflows:/app/workflows:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Redis for caching
   redis:
     image: redis:7-alpine
     container_name: seriesoftubes-redis
@@ -34,6 +65,25 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+
+  # Optional: Worker for background jobs (uncomment if needed)
+  # worker:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.worker
+  #   container_name: seriesoftubes-worker
+  #   environment:
+  #     - DATABASE_URL=postgresql://seriesoftubes:development-password@postgres:5432/seriesoftubes
+  #     - REDIS_URL=redis://redis:6379
+  #     - OPENAI_API_KEY=${OPENAI_API_KEY}
+  #     - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+  #   volumes:
+  #     - ./workflows:/app/workflows
+  #     - ./outputs:/app/outputs
+  #   depends_on:
+  #     - postgres
+  #     - redis
+  #   restart: unless-stopped
 
 volumes:
   redis_data:

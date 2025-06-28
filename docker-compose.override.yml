@@ -1,0 +1,18 @@
+# Development override - use this when developing locally
+# The API service is commented out so you can run it directly with uvicorn --reload
+
+version: '3.8'
+
+services:
+  # Comment out the API service for local development
+  api:
+    profiles: ["with-api"]  # Only starts if you run: docker-compose --profile with-api up
+    
+  # Redis and PostgreSQL still run normally
+  redis:
+    ports:
+      - "6379:6379"
+      
+  postgres:
+    ports:
+      - "5432:5432"

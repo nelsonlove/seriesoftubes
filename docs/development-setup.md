@@ -115,6 +115,54 @@ SQLite is used by default for simplicity:
 - No additional setup required
 - Good for single-user development
 
+## Docker Development Options
+
+### Option 1: Services Only (Recommended for Development)
+
+Run only Redis and PostgreSQL in Docker, develop the app locally:
+
+```bash
+# Start only Redis and PostgreSQL
+docker-compose up -d
+
+# Run the API locally with hot-reload
+uvicorn seriesoftubes.api.main:app --reload
+```
+
+### Option 2: Full Docker Stack
+
+Run everything in Docker including the API:
+
+```bash
+# Build and start all services
+docker-compose --profile with-api up -d
+
+# View logs
+docker-compose logs -f api
+
+# Run CLI commands in container
+docker-compose exec api s10s run workflow.yaml
+```
+
+### Option 3: Docker for Deployment Testing
+
+Test production-like deployment:
+
+```bash
+# Build the image
+docker build -t seriesoftubes:latest .
+
+# Run with production config
+docker run -d \
+  --name seriesoftubes-api \
+  -p 8000:8000 \
+  -e DATABASE_URL="postgresql://..." \
+  -e REDIS_URL="redis://..." \
+  -e JWT_SECRET_KEY="..." \
+  -e OPENAI_API_KEY="..." \
+  seriesoftubes:latest
+```
+
 ## Development Workflow
 
 ### Running Tests
