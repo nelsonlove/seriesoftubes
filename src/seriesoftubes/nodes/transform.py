@@ -41,31 +41,103 @@ class TransformNodeExecutor(NodeExecutor):
             # Check if we're in a parallel execution context (processing single items)
             is_parallel = hasattr(context, "is_parallel_context") and context.is_parallel_context
             
+            
             if is_parallel:
-                # In parallel execution, we transform the single item
-                # Look for the split item in the context
-                item_data = None
+                # For ForEach contexts, we don't need to look for item data - it's already in the context
+                # Just render the template with the current context
+                jinja_env = jinja2.Environment(
+                    loader=jinja2.BaseLoader(),
+                    undefined=jinja2.StrictUndefined,
+                    autoescape=True,
+                )
                 
-                # Find the item data - it should be a simple value, not a dict with parallel_data
-                for key, value in template_data.items():
-                    if key != "inputs" and key != "env":
-                        # Allow dicts that are not parallel metadata
-                        if isinstance(value, dict) and value.get("parallel_data"):
-                            continue
-                        item_data = value
-                        break
-                
-                if item_data is None:
+                try:
+                    if isinstance(config.template, dict):
+                        # Template is a dict structure - transform each field
+                        transformed_item = {}
+                        for field_name, field_template in config.template.items():
+                            if isinstance(field_template, str):
+                                # Render template
+                                template = jinja_env.from_string(field_template)
+                                rendered_value = template.render(template_data)
+
+                                # Try to parse as JSON if it looks like JSON
+                                try:
+                                    if rendered_value.strip().startswith(
+                                        ("{", "[", '"')
+                                    ) or rendered_value.strip() in (
+                                        "true",
+                                        "false",
+                                        "null",
+                                    ):
+                                        transformed_item[field_name] = json.loads(rendered_value)
+                                    # Try to convert to appropriate type
+                                    elif rendered_value.isdigit():
+                                        transformed_item[field_name] = int(rendered_value)
+                                    elif rendered_value.replace(".", "").isdigit():
+                                        transformed_item[field_name] = float(rendered_value)
+                                    else:
+                                        transformed_item[field_name] = rendered_value
+                                except (json.JSONDecodeError, ValueError):
+                                    transformed_item[field_name] = rendered_value
+                            else:
+                                # Non-string template values are used as-is
+                                transformed_item[field_name] = field_template
+
+                        return NodeResult(
+                            output=transformed_item,
+                            success=True,
+                            metadata={"node_type": "transform", "parallel_execution": True},
+                        )
+
+                    elif isinstance(config.template, str):
+                        # Template is a string - render with current context
+                        try:
+                            template = jinja_env.from_string(config.template)
+                        except jinja2.TemplateSyntaxError as e:
+                            return NodeResult(
+                                output=None,
+                                success=False,
+                                error=f"Invalid template syntax: {e!s}",
+                            )
+
+                        try:
+                            rendered_value = template.render(template_data)
+
+                            # Try to parse as JSON
+                            try:
+                                parsed_value = json.loads(rendered_value)
+                                return NodeResult(
+                                    output=parsed_value,
+                                    success=True,
+                                    metadata={"node_type": "transform", "parallel_execution": True},
+                                )
+                            except json.JSONDecodeError:
+                                return NodeResult(
+                                    output=rendered_value,
+                                    success=True,
+                                    metadata={"node_type": "transform", "parallel_execution": True},
+                                )
+
+                        except jinja2.TemplateError as e:
+                            return NodeResult(
+                                output=None,
+                                success=False,
+                                error=f"Template error: {e!s}",
+                            )
+                    else:
+                        return NodeResult(
+                            output=None,
+                            success=False,
+                            error=f"Invalid template type: {type(config.template).__name__}",
+                        )
+                        
+                except Exception as e:
                     return NodeResult(
                         output=None,
                         success=False,
-                        error="No item data found in parallel execution context",
+                        error=f"Parallel transform failed: {e!s}",
                     )
-                
-                # Transform the single item
-                return await self._transform_single_item(
-                    config, template_data, item_data, jinja_env=None
-                )
             
             # Regular execution - get the array data to transform
             if config.field:
@@ -249,109 +321,3 @@ class TransformNodeExecutor(NodeExecutor):
                 error=f"Transform node execution failed: {e!s}",
             )
 
-    async def _transform_single_item(
-        self,
-        config: TransformNodeConfig,
-        template_data: dict[str, Any],
-        item_data: Any,
-        jinja_env: jinja2.Environment | None = None,
-    ) -> NodeResult:
-        """Transform a single item in parallel execution context"""
-        if jinja_env is None:
-            jinja_env = jinja2.Environment(
-                loader=jinja2.BaseLoader(),
-                undefined=jinja2.StrictUndefined,
-                autoescape=True,
-            )
-
-        # Create context for this item
-        item_context = template_data.copy()
-        item_context["item"] = item_data
-
-        try:
-            if isinstance(config.template, dict):
-                # Template is a dict structure - transform each field
-                transformed_item = {}
-                for field_name, field_template in config.template.items():
-                    if isinstance(field_template, str):
-                        # Render template
-                        template = jinja_env.from_string(field_template)
-                        rendered_value = template.render(item_context)
-
-                        # Try to parse as JSON if it looks like JSON
-                        try:
-                            if rendered_value.strip().startswith(
-                                ("{", "[", '"')
-                            ) or rendered_value.strip() in (
-                                "true",
-                                "false",
-                                "null",
-                            ):
-                                transformed_item[field_name] = json.loads(rendered_value)
-                            # Try to convert to appropriate type
-                            elif rendered_value.isdigit():
-                                transformed_item[field_name] = int(rendered_value)
-                            elif rendered_value.replace(".", "").isdigit():
-                                transformed_item[field_name] = float(rendered_value)
-                            else:
-                                transformed_item[field_name] = rendered_value
-                        except (json.JSONDecodeError, ValueError):
-                            transformed_item[field_name] = rendered_value
-                    else:
-                        # Non-string template values are used as-is
-                        transformed_item[field_name] = field_template
-
-                return NodeResult(
-                    output=transformed_item,
-                    success=True,
-                    metadata={"node_type": "transform", "parallel_execution": True},
-                )
-
-            elif isinstance(config.template, str):
-                # Template is a string - render for the item
-                try:
-                    template = jinja_env.from_string(config.template)
-                except jinja2.TemplateSyntaxError as e:
-                    return NodeResult(
-                        output=None,
-                        success=False,
-                        error=f"Invalid template syntax: {e!s}",
-                    )
-
-                try:
-                    rendered_value = template.render(item_context)
-
-                    # Try to parse as JSON
-                    try:
-                        parsed_value = json.loads(rendered_value)
-                        return NodeResult(
-                            output=parsed_value,
-                            success=True,
-                            metadata={"node_type": "transform", "parallel_execution": True},
-                        )
-                    except json.JSONDecodeError:
-                        return NodeResult(
-                            output=rendered_value,
-                            success=True,
-                            metadata={"node_type": "transform", "parallel_execution": True},
-                        )
-
-                except jinja2.TemplateError as e:
-                    return NodeResult(
-                        output=None,
-                        success=False,
-                        error=f"Template error for item {item_data}: {e!s}",
-                    )
-            else:
-                return NodeResult(
-                    output=None,
-                    success=False,
-                    error=f"Invalid template type: {type(config.template).__name__}",
-                )
-
-        except Exception as e:
-            return NodeResult(
-                output=None,
-                success=False,
-                error=f"Single item transform failed: {e!s}",
-            )

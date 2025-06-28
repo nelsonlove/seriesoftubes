@@ -77,48 +77,23 @@ class ForEachNodeExecutor(NodeExecutor):
                     error=f"Data to iterate over is not an array (got {type(array_data).__name__})",
                 )
 
-            # For now, foreach will prepare iteration data for the execution engine
-            # The actual subgraph execution would be handled by the engine
-            iteration_results = []
-
-            for i, item in enumerate(array_data):
-                # Create iteration context
-                iteration_context = {
-                    "index": i,
-                    "item": item,
-                    config.item_name: item,
-                    "is_first": i == 0,
-                    "is_last": i == len(array_data) - 1,
-                    "total_count": len(array_data),
-                }
-
-                # For now, just collect the items and context
-                # In a full implementation, this would execute the subgraph
-                iteration_result = {
-                    "iteration_index": i,
-                    "item_data": item,
-                    "context": iteration_context,
-                    "subgraph_nodes": config.subgraph_nodes,
-                }
-
-                iteration_results.append(iteration_result)
-
-            # Return the iteration plan
-            # NOTE: This is a simplified implementation
-            # A full implementation would need engine support for subgraph execution
+            # Return ForEach configuration for the execution engine to handle
+            # Similar to Split nodes, the engine will handle the actual subgraph execution
             return NodeResult(
                 output={
-                    "iteration_plan": iteration_results,
-                    "total_iterations": len(array_data),
+                    "foreach_items": array_data,
                     "item_name": config.item_name,
                     "subgraph_nodes": config.subgraph_nodes,
-                    "array_field": config.array_field,
+                    "parallel": config.parallel,
+                    "collect_output": config.collect_output,
+                    "foreach_data": True,  # Flag to indicate this is foreach data
                 },
                 success=True,
                 metadata={
                     "node_type": "foreach",
                     "iterations": len(array_data),
                     "subgraph_size": len(config.subgraph_nodes),
+                    "parallel_execution": config.parallel,
                 },
             )
 

@@ -80,7 +80,12 @@ class NodeExecutor(ABC):
             for key, value in context.outputs.items():
                 # Only add single values, not complex split metadata
                 if not isinstance(value, dict) or not value.get("parallel_data"):
-                    data[key] = value
+                    # Unwrap Python node schema results for easier template access
+                    if (isinstance(value, dict) and "result" in value and len(value) == 1 
+                        and isinstance(value["result"], (dict, list, str, int, float, bool, type(None)))):
+                        data[key] = value["result"]
+                    else:
+                        data[key] = value
 
         # Return raw data - users should use bracket notation or filters in templates
         # e.g., data['items'] not data.items, or data|items not data.items()

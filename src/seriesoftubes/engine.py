@@ -135,6 +135,9 @@ class WorkflowEngine:
 
         # Track split contexts for parallel execution
         split_data: dict[str, dict[str, Any]] = {}  # node_name -> split info
+        
+        # Track foreach contexts for subgraph execution
+        foreach_data: dict[str, dict[str, Any]] = {}  # node_name -> foreach info
 
         # Execute nodes in parallel groups
         for group in execution_groups:
@@ -183,6 +186,17 @@ class WorkflowEngine:
                             context.set_error(
                                 node_name, result.error or "Split node failed"
                             )
+                    elif node.node_type == NodeType.FOREACH:
+                        # ForEach nodes execute subgraphs immediately
+                        result = await self._execute_foreach_node(
+                            node_name, node, context
+                        )
+                        if result.success:
+                            context.set_output(node_name, result.output)
+                        else:
+                            context.set_error(
+                                node_name, result.error or "ForEach node failed"
+                            )
                     else:
                         # Create task for this node
                         tasks.append(self._execute_node_async(node_name, node, context))
@@ -220,12 +234,16 @@ class WorkflowEngine:
     def _should_skip_node(self, node: Node, context: ExecutionContext) -> bool:
         """Check if a node should be skipped
 
-        This is used for routing - if a route node has already selected
-        a path, we should skip nodes that aren't on that path.
+        This is used for routing and to skip nodes that are part of ForEach subgraphs.
         """
-        # For MVP, we execute all nodes
-        # In the future, we'll implement proper path pruning based on route decisions
-        _ = node, context  # Will be used in future implementation
+        # Skip nodes that are part of ForEach subgraphs during main execution
+        for workflow_node in context.workflow.nodes.values():
+            if workflow_node.node_type == NodeType.FOREACH:
+                from seriesoftubes.models import ForEachNodeConfig
+                if isinstance(workflow_node.config, ForEachNodeConfig):
+                    if node.name in workflow_node.config.subgraph_nodes:
+                        return True
+        
         return False
 
     async def _execute_node(self, node: Node, context: ExecutionContext) -> NodeResult:
@@ -396,6 +414,52 @@ class WorkflowEngine:
             },
             success=True,
             metadata=result.metadata,
+        )
+
+    async def _execute_foreach_node(
+        self, node_name: str, node: Node, context: ExecutionContext
+    ) -> NodeResult:
+        """Execute a foreach node and its subgraphs"""
+        # First execute the foreach node to get the iteration data
+        result = await self._execute_node(node, context)
+
+        if not result.success:
+            return result
+
+        # Extract foreach information
+        foreach_output = result.output
+        if not isinstance(foreach_output, dict) or "foreach_items" not in foreach_output:
+            return NodeResult(
+                output=None,
+                success=False,
+                error="ForEach node did not return expected foreach_items format",
+            )
+
+        foreach_items = foreach_output["foreach_items"]
+        item_name = foreach_output.get("item_name", "item")
+        subgraph_nodes = foreach_output.get("subgraph_nodes", [])
+        parallel = foreach_output.get("parallel", True)
+        collect_output = foreach_output.get("collect_output")
+
+        # Execute subgraph for each item
+        if parallel:
+            results = await self._execute_foreach_parallel(
+                foreach_items, item_name, subgraph_nodes, context, collect_output
+            )
+        else:
+            results = await self._execute_foreach_sequential(
+                foreach_items, item_name, subgraph_nodes, context, collect_output
+            )
+
+        return NodeResult(
+            output=results,
+            success=True,
+            metadata={
+                "node_type": "foreach",
+                "iterations": len(foreach_items),
+                "subgraph_size": len(subgraph_nodes),
+                "parallel_execution": parallel,
+            },
         )
 
     async def _execute_split_group(
@@ -572,6 +636,146 @@ class WorkflowEngine:
                             )
 
         return errors
+
+    async def _execute_foreach_parallel(
+        self,
+        foreach_items: list[Any],
+        item_name: str,
+        subgraph_nodes: list[str],
+        context: ExecutionContext,
+        collect_output: str | None,
+    ) -> list[Any]:
+        """Execute foreach subgraph in parallel for each item"""
+        # Create parallel execution tasks for each item
+        parallel_tasks = []
+
+        for item_index, item in enumerate(foreach_items):
+            # Create task to execute subgraph for this item
+            task = self._execute_subgraph_for_item(
+                item, item_index, item_name, subgraph_nodes, context, collect_output
+            )
+            parallel_tasks.append(task)
+
+        # Execute all parallel tasks
+        parallel_results = await asyncio.gather(*parallel_tasks, return_exceptions=True)
+
+        # Collect successful results
+        results = []
+        for i, result in enumerate(parallel_results):
+            if isinstance(result, Exception):
+                # For now, include None for failed iterations
+                # Could be configurable behavior (fail fast vs continue)
+                results.append(None)
+            else:
+                results.append(result)
+
+        return results
+
+    async def _execute_foreach_sequential(
+        self,
+        foreach_items: list[Any],
+        item_name: str,
+        subgraph_nodes: list[str],
+        context: ExecutionContext,
+        collect_output: str | None,
+    ) -> list[Any]:
+        """Execute foreach subgraph sequentially for each item"""
+        results = []
+
+        for item_index, item in enumerate(foreach_items):
+            try:
+                result = await self._execute_subgraph_for_item(
+                    item, item_index, item_name, subgraph_nodes, context, collect_output
+                )
+                results.append(result)
+            except Exception:
+                # For now, include None for failed iterations
+                # Could be configurable behavior (fail fast vs continue)
+                results.append(None)
+
+        return results
+
+    async def _execute_subgraph_for_item(
+        self,
+        item: Any,
+        item_index: int,
+        item_name: str,
+        subgraph_nodes: list[str],
+        parent_context: ExecutionContext,
+        collect_output: str | None,
+    ) -> Any:
+        """Execute a subgraph for a single foreach item"""
+        # Create isolated execution context for this iteration
+        iteration_context = ExecutionContext(parent_context.workflow, parent_context.inputs)
+        iteration_context.is_parallel_context = True  # Mark as parallel context for node detection
+        iteration_context.parent_context = parent_context
+        
+        # Copy parent outputs (so subgraph can access nodes executed before foreach)
+        iteration_context.outputs = parent_context.outputs.copy()
+        
+        # Add the current item to the context
+        iteration_context.outputs[item_name] = item
+        
+        # Add iteration metadata
+        iteration_context.outputs["_iteration_index"] = item_index
+        iteration_context.outputs["_is_first"] = item_index == 0
+        iteration_context.outputs["_is_last"] = item_index == len(parent_context.outputs) - 1
+
+        # Execute subgraph nodes in dependency order
+        subgraph_workflow = self._create_subgraph_workflow(
+            parent_context.workflow, subgraph_nodes
+        )
+        subgraph_groups = self._get_execution_groups(subgraph_workflow)
+
+        # Execute subgraph
+        for group in subgraph_groups:
+            # Only execute nodes that are in our subgraph
+            filtered_group = [name for name in group if name in subgraph_nodes]
+            if not filtered_group:
+                continue
+
+            tasks = []
+            for node_name in filtered_group:
+                node = parent_context.workflow.nodes[node_name]
+                tasks.append(self._execute_node_async(node_name, node, iteration_context))
+
+            if tasks:
+                await asyncio.gather(*tasks)
+
+        # Return the specified output or the result of the last node
+        if collect_output and collect_output in iteration_context.outputs:
+            result = iteration_context.outputs[collect_output]
+        elif subgraph_nodes:
+            # Return the output of the last node in the subgraph
+            last_node = subgraph_nodes[-1]
+            result = iteration_context.outputs.get(last_node)
+        else:
+            # Return the item itself if no subgraph
+            result = item
+        
+        # Unwrap schema-wrapped results for final ForEach output
+        # This only applies to the final result, not intermediate results in multi-node subgraphs
+        if (isinstance(result, dict) and "result" in result and len(result) == 1 
+            and isinstance(result["result"], (dict, list, str, int, float, bool, type(None)))):
+            result = result["result"]
+        
+        return result
+
+    def _create_subgraph_workflow(self, workflow: Workflow, subgraph_nodes: list[str]) -> Workflow:
+        """Create a workflow containing only the specified subgraph nodes"""
+        subgraph_workflow_nodes = {}
+        
+        for node_name in subgraph_nodes:
+            if node_name in workflow.nodes:
+                subgraph_workflow_nodes[node_name] = workflow.nodes[node_name]
+
+        return Workflow(
+            name=f"{workflow.name}_subgraph",
+            version=workflow.version,
+            inputs=workflow.inputs,
+            nodes=subgraph_workflow_nodes,
+            outputs={},  # Subgraph doesn't need outputs mapping
+        )
 
     async def close(self) -> None:
         """Close the engine and cleanup resources"""
