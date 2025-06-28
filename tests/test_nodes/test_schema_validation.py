@@ -134,12 +134,12 @@ async def test_python_node_simple_execution():
         name="simple_calc",
         type=NodeType.PYTHON,
         depends_on=[],
-        config=PythonNodeConfig(code="return {'result': 42}"),
+        config=PythonNodeConfig(code="result = {'result': 42}"),
     )
 
     context = MockContext()
 
-    with patch("seriesoftubes.nodes.python._execute_in_process") as mock_execute:
+    with patch("seriesoftubes.secure_python.execute_secure_python") as mock_execute:
         mock_execute.return_value = {"result": 42}
 
         result = await executor.execute(node, context)
@@ -167,17 +167,11 @@ async def test_python_node_context_validation():
     # Context with valid data
     context = MockContext(outputs={"data_node": [1, 2, 3, 4, 5]})
 
-    with patch("seriesoftubes.nodes.python._execute_in_process") as mock_execute:
-        mock_execute.return_value = 5
+    # Test actual execution without mocking to verify it works correctly
+    result = await executor.execute(node, context)
 
-        result = await executor.execute(node, context)
-
-        assert result.success
-        assert result.output["result"] == 5
-
-        # Verify the context was passed correctly
-        call_args = mock_execute.call_args[0]
-        assert call_args[1]["items"] == [1, 2, 3, 4, 5]
+    assert result.success
+    assert result.output["result"] == 5
 
 
 @pytest.mark.asyncio

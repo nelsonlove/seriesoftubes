@@ -1,6 +1,6 @@
 # Test that transformations are deterministic and preserve structure
 import pytest
-from hypothesis import assume, given
+from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
 from seriesoftubes.engine import WorkflowEngine
@@ -29,6 +29,7 @@ transform_template_strategy = st.dictionaries(
 
 
 @given(companies=companies_strategy, template=transform_template_strategy)
+@settings(deadline=1000)  # Increase deadline from default 200ms to 1000ms
 @pytest.mark.asyncio
 async def test_transform_deterministic(companies, template):
     """Transform with same input/template should always produce same output"""

@@ -58,7 +58,7 @@ else:
     selected_route = "default_path"
     condition_met = "default"
 
-return {
+result = {
     'selected_route': selected_route,
     'condition_met': condition_met,
     'score_value': score
@@ -72,11 +72,9 @@ return {
     context = MockContext(outputs={"previous_node": {"score": 0.8}})
 
     # Mock the execution
-    # ruff: noqa: PLC0415
-    # ruff: noqa: PLC0415
     from unittest.mock import patch
 
-    with patch("seriesoftubes.nodes.python._execute_in_process") as mock_execute:
+    with patch("seriesoftubes.secure_python.execute_secure_python") as mock_execute:
         mock_execute.return_value = {
             "selected_route": "high_score_path",
             "condition_met": "score > 0.5",
@@ -93,7 +91,7 @@ return {
     # Test low score path
     context = MockContext(outputs={"previous_node": {"score": 0.3}})
 
-    with patch("seriesoftubes.nodes.python._execute_in_process") as mock_execute:
+    with patch("seriesoftubes.secure_python.execute_secure_python") as mock_execute:
         mock_execute.return_value = {
             "selected_route": "low_score_path",
             "condition_met": "score <= 0.5",
@@ -123,11 +121,11 @@ async def test_simple_boolean_conditional():
 input_value = inputs.get('test_flag', False)
 
 if input_value:
-    result = "true_path"
+    path = "true_path"
 else:
-    result = "false_path"
+    path = "false_path"
 
-return {'path': result, 'input_was': input_value}
+result = {'path': path, 'input_was': input_value}
 """
         ),
     )
@@ -135,10 +133,9 @@ return {'path': result, 'input_was': input_value}
     # Test true case
     context = MockContext(inputs={"test_flag": True})
 
-    # ruff: noqa: PLC0415
     from unittest.mock import patch
 
-    with patch("seriesoftubes.nodes.python._execute_in_process") as mock_execute:
+    with patch("seriesoftubes.secure_python.execute_secure_python") as mock_execute:
         mock_execute.return_value = {"path": "true_path", "input_was": True}
 
         result = await executor.execute(node, context)
@@ -150,7 +147,7 @@ return {'path': result, 'input_was': input_value}
     # Test false case
     context = MockContext(inputs={"test_flag": False})
 
-    with patch("seriesoftubes.nodes.python._execute_in_process") as mock_execute:
+    with patch("seriesoftubes.secure_python.execute_secure_python") as mock_execute:
         mock_execute.return_value = {"path": "false_path", "input_was": False}
 
         result = await executor.execute(node, context)
@@ -184,7 +181,7 @@ elif priority > 5:
 else:
     path = 'normal_path'
 
-return {
+result = {
     'selected_path': path,
     'category': category,
     'priority': priority
@@ -196,10 +193,9 @@ return {
     # Test critical path
     context = MockContext(inputs={"category": "urgent", "priority": 9})
 
-    # ruff: noqa: PLC0415
     from unittest.mock import patch
 
-    with patch("seriesoftubes.nodes.python._execute_in_process") as mock_execute:
+    with patch("seriesoftubes.secure_python.execute_secure_python") as mock_execute:
         mock_execute.return_value = {
             "selected_path": "critical_path",
             "category": "urgent",
@@ -214,7 +210,7 @@ return {
     # Test normal path
     context = MockContext(inputs={"category": "normal", "priority": 3})
 
-    with patch("seriesoftubes.nodes.python._execute_in_process") as mock_execute:
+    with patch("seriesoftubes.secure_python.execute_secure_python") as mock_execute:
         mock_execute.return_value = {
             "selected_path": "normal_path",
             "category": "normal",

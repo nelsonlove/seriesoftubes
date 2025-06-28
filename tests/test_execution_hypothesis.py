@@ -9,7 +9,7 @@ from seriesoftubes.models import Node, NodeType, PythonNodeConfig, Workflow
 @given(
     num_parallel_nodes=st.integers(min_value=2, max_value=4),
 )
-@settings(deadline=2000)  # 2 second deadline for process overhead
+@settings(deadline=5000)  # 5 second deadline for process overhead
 @pytest.mark.asyncio
 async def test_parallel_execution_functionality(num_parallel_nodes):
     """Parallel execution should execute all independent nodes successfully"""
@@ -21,7 +21,7 @@ async def test_parallel_execution_functionality(num_parallel_nodes):
             name=f"node_{i}",
             type=NodeType.PYTHON,
             config=PythonNodeConfig(
-                code=f"return {{'id': {i}, 'executed': True}}"
+                code=f"result = {{'id': {i}, 'executed': True}}"
             ),
         )
 

@@ -116,7 +116,7 @@ elif score >= 80:
 else:
     bonus = base_bonus
 
-return {
+result = {
     'user_id': context['user']['id'],
     'name': context['user']['name'],
     'score': score,
@@ -174,7 +174,7 @@ return {
 words = context['doc']['words']
 # Assume 200 words per minute reading speed
 reading_time = max(1, round(words / 200))
-return {
+result = {
     'id': context['doc']['id'],
     'title': context['doc']['title'],
     'words': words,
@@ -296,7 +296,7 @@ return {
                         code="""
 order = context['order']
 total = sum(item['price'] * item['qty'] for item in order['items'])
-return {
+result = {
     'order_id': order['order_id'],
     'customer': order['customer'],
     'total': total,
@@ -387,7 +387,7 @@ return {
                         code="""
 item_value = context['item']['value']
 multiplier = context['inputs']['multiplier']
-return {
+result = {
     'original': item_value,
     'multiplied': item_value * multiplier
 }

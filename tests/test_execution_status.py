@@ -36,7 +36,7 @@ nodes:
     config:
       code: |
         message = context['inputs']['message']
-        return {"result": f"Echo: {message}"}
+        result = {"result": f"Echo: {message}"}
 
 outputs:
   result: echo.result
@@ -90,14 +90,14 @@ nodes:
     type: python
     config:
       code: |
-        return {"doubled": context['inputs']['number'] * 2}
+        result = {"doubled": context['inputs']['number'] * 2}
 
   triple:
     type: python
     depends_on: [double]
     config:
       code: |
-        return {"tripled": context['double']['result']['doubled'] * 3}
+        result = {"tripled": context['double']['result']['doubled'] * 3}
 
 outputs:
   result: triple.tripled

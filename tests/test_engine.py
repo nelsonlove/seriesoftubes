@@ -32,7 +32,7 @@ def simple_workflow():
                 type=NodeType.PYTHON,
                 depends_on=[],
                 config=PythonNodeConfig(
-                    code="return {'result': 'hello_path' if inputs['text'] == 'hello' else 'default_path'}"
+                    code="result = {'result': 'hello_path' if inputs['text'] == 'hello' else 'default_path'}"
                 ),
             )
         },
