@@ -169,6 +169,10 @@ class PythonNodeConfig(BaseNodeConfig):
     max_output_size: int = Field(
         10_000_000, description="Maximum output size in bytes (10MB default)"
     )
+    security_level: str = Field(
+        "normal",
+        description="Security level: strict, normal, or trusted",
+    )
 
     @model_validator(mode="after")
     def validate_code_source(self) -> Self:
