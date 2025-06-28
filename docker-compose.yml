@@ -40,7 +40,7 @@ services:
     ports:
       - "${API_PORT:-8000}:8000"
     environment:
-      - DATABASE_URL=postgresql://seriesoftubes:development-password@postgres:5432/seriesoftubes
+      - DATABASE_URL=postgresql+asyncpg://seriesoftubes:development-password@postgres:5432/seriesoftubes
       - REDIS_URL=redis://redis:6379
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-development-secret-key-change-in-production}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
@@ -72,7 +72,7 @@ services:
     ports:
       - "${API_PORT:-8000}:8000"
     environment:
-      - DATABASE_URL=postgresql://seriesoftubes:development-password@postgres:5432/seriesoftubes
+      - DATABASE_URL=postgresql+asyncpg://seriesoftubes:development-password@postgres:5432/seriesoftubes
       - REDIS_URL=redis://redis:6379
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-development-secret-key-change-in-production}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
