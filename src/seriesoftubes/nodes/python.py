@@ -243,8 +243,8 @@ class PythonNodeExecutor(NodeExecutor):
         config = node.config
 
         try:
-            # Prepare context data
-            context_data = self.prepare_context_data(node, context)
+            # Prepare context data - don't unwrap Python results for Python nodes
+            context_data = self.prepare_context_data(node, context, unwrap_python_results=False)
 
             # Always validate input when schema is defined
             input_data = {"context": context_data}

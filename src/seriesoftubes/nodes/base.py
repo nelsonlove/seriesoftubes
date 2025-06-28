@@ -50,12 +50,13 @@ class NodeExecutor(ABC):
         """
         pass
 
-    def prepare_context_data(self, node: Node, context: NodeContext) -> dict[str, Any]:
+    def prepare_context_data(self, node: Node, context: NodeContext, unwrap_python_results: bool = True) -> dict[str, Any]:
         """Prepare context data for template rendering
 
         Args:
             node: The node being executed
             context: Execution context
+            unwrap_python_results: Whether to unwrap Python node results for easier template access
 
         Returns:
             Dictionary of context variables
@@ -80,8 +81,8 @@ class NodeExecutor(ABC):
             for key, value in context.outputs.items():
                 # Only add single values, not complex split metadata
                 if not isinstance(value, dict) or not value.get("parallel_data"):
-                    # Unwrap Python node schema results for easier template access
-                    if (isinstance(value, dict) and "result" in value and len(value) == 1 
+                    # Unwrap Python node schema results for easier template access (but not for Python nodes themselves)
+                    if (unwrap_python_results and isinstance(value, dict) and "result" in value and len(value) == 1 
                         and isinstance(value["result"], (dict, list, str, int, float, bool, type(None)))):
                         data[key] = value["result"]
                     else:
