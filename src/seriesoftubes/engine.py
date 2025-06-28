@@ -131,7 +131,12 @@ class WorkflowEngine:
         context = ExecutionContext(workflow, validated_inputs)
 
         # Get execution order and groups for parallel execution
-        execution_groups = self._get_execution_groups(workflow)
+        try:
+            execution_groups = self._get_execution_groups(workflow)
+        except ValueError:
+            # If there's a dependency error, create a simplified execution plan
+            # that will attempt to execute each node and fail at the node level
+            execution_groups = [[node_name] for node_name in workflow.nodes.keys()]
 
         # Track split contexts for parallel execution
         split_data: dict[str, dict[str, Any]] = {}  # node_name -> split info
@@ -172,6 +177,12 @@ class WorkflowEngine:
 
                     # Check if we should skip this node
                     if self._should_skip_node(node, context):
+                        continue
+                    
+                    # Check for missing dependencies
+                    missing_deps = [dep for dep in node.depends_on if dep not in workflow.nodes]
+                    if missing_deps:
+                        context.set_error(node_name, f"Missing dependencies: {', '.join(missing_deps)}")
                         continue
 
                     # Check if this is a split node
@@ -571,6 +582,10 @@ class WorkflowEngine:
         def get_level(node_name: str) -> int:
             if node_name in levels:
                 return levels[node_name]
+
+            if node_name not in nodes:
+                msg = f"Node '{node_name}' referenced in dependencies but not found in workflow"
+                raise ValueError(msg)
 
             node = nodes[node_name]
             if not node.depends_on:

@@ -137,7 +137,7 @@ class JoinNodeExecutor(NodeExecutor):
 
         for base_item in base_data:
             # Start with base item
-            joined_item = {f"{base_source}_{k}": v for k, v in base_item.items()}
+            joined_item = {base_source: base_item.copy()}
 
             # Try to join with other sources
             join_successful = True
@@ -156,9 +156,8 @@ class JoinNodeExecutor(NodeExecutor):
                         break
 
                 if matching_item:
-                    # Add fields from matching item
-                    for k, v in matching_item.items():
-                        joined_item[f"{other_source}_{k}"] = v
+                    # Add matching item as nested object
+                    joined_item[other_source] = matching_item.copy()
                 else:
                     # No match found - skip this base item
                     join_successful = False
@@ -193,7 +192,7 @@ class JoinNodeExecutor(NodeExecutor):
 
         for base_item in base_data:
             # Start with base item
-            joined_item = {f"{base_source}_{k}": v for k, v in base_item.items()}
+            joined_item = {base_source: base_item.copy()}
 
             # Try to join with other sources
             for other_source in source_names[1:]:
@@ -210,13 +209,11 @@ class JoinNodeExecutor(NodeExecutor):
                         break
 
                 if matching_item:
-                    # Add fields from matching item
-                    for k, v in matching_item.items():
-                        joined_item[f"{other_source}_{k}"] = v
-                # No match - add null values
-                elif other_data:  # If we have sample data, use its keys
-                    for k in other_data[0].keys():
-                        joined_item[f"{other_source}_{k}"] = None
+                    # Add matching item as nested object
+                    joined_item[other_source] = matching_item.copy()
+                else:
+                    # No match - add None for the entire source
+                    joined_item[other_source] = None
 
             results.append(joined_item)
 
@@ -248,8 +245,8 @@ class JoinNodeExecutor(NodeExecutor):
         results = []
 
         for right_item in right_data:
-            # Start with right item
-            joined_item = {f"{right_source}_{k}": v for k, v in right_item.items()}
+            # Start with right item (preserve source order: left, right)
+            joined_item = {right_source: right_item.copy()}
 
             # Find matching item in left source
             matching_item = None
@@ -259,13 +256,11 @@ class JoinNodeExecutor(NodeExecutor):
                     break
 
             if matching_item:
-                # Add fields from matching left item
-                for k, v in matching_item.items():
-                    joined_item[f"{left_source}_{k}"] = v
-            # No match - add null values for left side
-            elif left_data:  # If we have sample data, use its keys
-                for k in left_data[0].keys():
-                    joined_item[f"{left_source}_{k}"] = None
+                # Add matching left item
+                joined_item[left_source] = matching_item.copy()
+            else:
+                # No match - add None for left source
+                joined_item[left_source] = None
 
             results.append(joined_item)
 
@@ -298,7 +293,7 @@ class JoinNodeExecutor(NodeExecutor):
 
         # Process left side (like left join)
         for left_item in left_data:
-            joined_item = {f"{left_source}_{k}": v for k, v in left_item.items()}
+            joined_item = {left_source: left_item.copy()}
 
             # Find matching item in right source
             matching_item = None
@@ -310,27 +305,22 @@ class JoinNodeExecutor(NodeExecutor):
                     break
 
             if matching_item:
-                # Add fields from matching right item
-                for k, v in matching_item.items():
-                    joined_item[f"{right_source}_{k}"] = v
+                # Add matching right item
+                joined_item[right_source] = matching_item.copy()
                 matched_right_indices.add(matching_index)
-            # No match - add null values for right side
-            elif right_data:
-                for k in right_data[0].keys():
-                    joined_item[f"{right_source}_{k}"] = None
+            else:
+                # No match - add None for right side
+                joined_item[right_source] = None
 
             results.append(joined_item)
 
         # Add unmatched right items
         for i, right_item in enumerate(right_data):
             if i not in matched_right_indices:
-                joined_item = {f"{right_source}_{k}": v for k, v in right_item.items()}
-
-                # Add null values for left side
-                if left_data:
-                    for k in left_data[0].keys():
-                        joined_item[f"{left_source}_{k}"] = None
-
+                joined_item = {
+                    left_source: None,
+                    right_source: right_item.copy()
+                }
                 results.append(joined_item)
 
         return results
@@ -355,7 +345,7 @@ class JoinNodeExecutor(NodeExecutor):
 
         # Initialize with base items
         for base_item in base_data:
-            results.append({f"{base_source}_{k}": v for k, v in base_item.items()})
+            results.append({base_source: base_item.copy()})
 
         # Cross join with each additional source
         for other_source in source_names[1:]:
@@ -369,8 +359,7 @@ class JoinNodeExecutor(NodeExecutor):
                 for other_item in other_data:
                     # Combine result item with other item
                     combined_item = result_item.copy()
-                    for k, v in other_item.items():
-                        combined_item[f"{other_source}_{k}"] = v
+                    combined_item[other_source] = other_item.copy()
                     new_results.append(combined_item)
 
             results = new_results
@@ -378,24 +367,48 @@ class JoinNodeExecutor(NodeExecutor):
         return results
 
     def _merge_join(
-        self, source_data: dict[str, Any], _config: JoinNodeConfig
-    ) -> dict[str, Any]:
-        """Perform merge join (combine objects)"""
-        result = {}
+        self, source_data: dict[str, Any], config: JoinNodeConfig
+    ) -> list[dict[str, Any]]:
+        """Perform merge join (combines matching records by merging their fields)"""
+        if not config.join_keys:
+            msg = "Merge join requires join_keys to be specified"
+            raise ValueError(msg)
 
-        for source_name, data in source_data.items():
-            if isinstance(data, dict):
-                # Merge dictionary
-                for k, v in data.items():
-                    result[f"{source_name}_{k}"] = v
-            elif isinstance(data, list):
-                # Add array as-is
-                result[source_name] = data
-            else:
-                # Add primitive value
-                result[source_name] = data
+        source_names = list(source_data.keys())
+        if len(source_names) < 2:
+            msg = "Merge join requires at least 2 sources"
+            raise ValueError(msg)
 
-        return result
+        base_source = source_names[0]
+        base_data = source_data[base_source]
+
+        if not isinstance(base_data, list):
+            msg = f"Source '{base_source}' must be an array for merge join"
+            raise ValueError(msg)
+
+        results = []
+
+        for base_item in base_data:
+            # Start with base item
+            merged_item = base_item.copy()
+
+            # Try to merge with other sources
+            for other_source in source_names[1:]:
+                other_data = source_data[other_source]
+                if not isinstance(other_data, list):
+                    msg = f"Source '{other_source}' must be an array for merge join"
+                    raise ValueError(msg)
+
+                # Find matching item
+                for other_item in other_data:
+                    if self._items_match(base_item, other_item, config.join_keys):
+                        # Merge fields from matching item (overwriting if same key exists)
+                        merged_item.update(other_item)
+                        break
+
+            results.append(merged_item)
+
+        return results
 
     def _items_match(
         self, item1: dict[str, Any], item2: dict[str, Any], join_keys: dict[str, str]
