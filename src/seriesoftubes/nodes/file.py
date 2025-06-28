@@ -10,6 +10,11 @@ from typing import Any
 import yaml
 from pydantic import ValidationError
 
+from seriesoftubes.file_security import (
+    FileAccessMode,
+    FileSecurityConfig,
+    SecureFilePath,
+)
 from seriesoftubes.models import FileNodeConfig, Node
 from seriesoftubes.nodes.base import NodeContext, NodeExecutor, NodeResult
 from seriesoftubes.schemas import FileNodeInput, FileNodeOutput
@@ -50,6 +55,16 @@ class FileNodeExecutor(NodeExecutor):
 
     input_schema_class = FileNodeInput
     output_schema_class = FileNodeOutput
+    
+    def __init__(self, file_security_config: FileSecurityConfig | None = None):
+        """Initialize with optional file security configuration.
+        
+        Args:
+            file_security_config: Security configuration for file access.
+                                If None, file security is disabled (backward compatibility)
+        """
+        super().__init__()
+        self.file_security = SecureFilePath(file_security_config) if file_security_config else None
 
     async def execute(self, node: Node, context: NodeContext) -> NodeResult:
         """Execute a file ingestion node"""
@@ -172,31 +187,94 @@ class FileNodeExecutor(NodeExecutor):
         if config.path:
             # Single file path
             rendered_path = self._render_template(config.path, context)
-            path = Path(rendered_path)
-            if path.exists():
-                paths.append(path)
-            elif not config.skip_errors:
-                msg = f"File not found: {path}"
-                raise FileNotFoundError(msg)
+            try:
+                if self.file_security:
+                    # Validate path with security checks
+                    path = self.file_security.validate_path(
+                        rendered_path,
+                        mode=FileAccessMode.READ,
+                        must_exist=not config.skip_errors
+                    )
+                else:
+                    # No security - just use the path
+                    path = Path(rendered_path)
+                    if not path.exists() and not config.skip_errors:
+                        raise FileNotFoundError(f"File not found: {path}")
+                
+                if path.exists():
+                    paths.append(path)
+            except FileNotFoundError:
+                if not config.skip_errors:
+                    raise
+            except Exception as e:
+                if not config.skip_errors:
+                    raise ValueError(f"Invalid file path: {e}") from e
 
         elif config.pattern:
             # Glob pattern
             rendered_pattern = self._render_template(config.pattern, context)
-            # Handle recursive globs
-            if "**" in rendered_pattern:
-                found_paths = list(Path(".").glob(rendered_pattern))
+            
+            # For glob patterns, we need to validate the base directory first
+            # Extract the base directory from the pattern
+            pattern_parts = rendered_pattern.split('/')
+            base_parts = []
+            for part in pattern_parts:
+                if '*' in part or '?' in part or '[' in part:
+                    break
+                base_parts.append(part)
+            
+            # Handle absolute and relative paths
+            if rendered_pattern.startswith('/'):
+                base_dir = '/' + '/'.join(base_parts) if base_parts else '/'
             else:
+                base_dir = '/'.join(base_parts) if base_parts else '.'
+            
+            try:
+                if self.file_security:
+                    # Validate base directory access
+                    validated_base = self.file_security.validate_path(
+                        base_dir,
+                        mode=FileAccessMode.READ,
+                        must_exist=True
+                    )
+                
+                # Now perform glob
                 found_paths = [Path(p) for p in glob.glob(rendered_pattern)]
-
-            for p in found_paths:
-                path = Path(p)
-                if path.is_file():
-                    paths.append(path)
+                
+                # Filter to only include files (not directories)
+                found_paths = [p for p in found_paths if p.is_file()]
+                
+                # Validate each found path if security is enabled
+                for p in found_paths:
+                    try:
+                        if self.file_security:
+                            validated_path = self.file_security.validate_path(
+                                p,
+                                mode=FileAccessMode.READ,
+                                must_exist=True
+                            )
+                            if validated_path.is_file():
+                                paths.append(validated_path)
+                        else:
+                            # No security - just add the path
+                            if p.is_file():
+                                paths.append(p)
+                    except Exception:
+                        if not config.skip_errors:
+                            raise
+            except Exception as e:
+                if not config.skip_errors:
+                    raise ValueError(f"Invalid glob pattern or access denied: {e}") from e
 
         return sorted(paths)  # Consistent ordering
 
     async def _process_single_file(self, path: Path, config: FileNodeConfig) -> Any:
         """Process a single file"""
+        # Log file access for security auditing
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"File access: Reading file '{path}' (format: {config.format_type})")
+        
         content = await self._read_file(path, config)
 
         # Apply transformations
