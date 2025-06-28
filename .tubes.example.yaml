@@ -1,15 +1,20 @@
 # SeriesOfTubes workflow configuration
 # Copy this to .tubes.yaml to customize workflow behavior
 # 
-# NOTE: This file is for non-sensitive configuration only.
-# API keys and secrets should be set in .env file
+# This file contains non-sensitive workflow settings.
+# API keys should be set as environment variables in .env file.
 
 llm:
   provider: openai  # or anthropic
   model: gpt-4o
-  api_key_env: OPENAI_API_KEY  # References env var from .env
+  api_key_env: OPENAI_API_KEY  # Name of env var containing the API key
   temperature: 0.7
   max_tokens: 4096
+  
+  # How it works:
+  # 1. Set your API key in .env: OPENAI_API_KEY=sk-...
+  # 2. This config tells the app which env var to look for
+  # 3. Never put actual API keys in this file
 
 http:
   timeout: 30
@@ -24,6 +29,4 @@ execution:
 cache:
   enabled: true
   ttl: 3600  # 1 hour
-
-# All sensitive values (API keys, passwords, secrets) 
-# should be set in .env file, not here
+  backend: memory  # or 'redis' if you have Redis running

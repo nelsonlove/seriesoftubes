@@ -31,7 +31,8 @@ s10s run examples/simple-test/workflow.yaml --inputs company_name="OpenAI"
 s10s list
 ```
 
-**Note**: See [docs/development-setup.md](docs/development-setup.md) for detailed setup with PostgreSQL and Redis.
+**Configuration**: See [docs/configuration-guide.md](docs/configuration-guide.md) for detailed configuration options.
+**Development**: See [docs/development-setup.md](docs/development-setup.md) for Docker setup with PostgreSQL and Redis.
 **Security**: See [docs/security.md](docs/security.md) for production security configuration.
 
 ## Key Commands
