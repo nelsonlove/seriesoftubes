@@ -8,7 +8,7 @@ services:
       dockerfile: Dockerfile.dev
     container_name: seriesoftubes-frontend-dev
     ports:
-      - "${FRONTEND_PORT:-3000}:5173"  # Vite dev server runs on 5173
+      - "${FRONTEND_PORT:-3000}:3000"  # Vite configured to run on 3000
     volumes:
       - ./frontend:/app
       - /app/node_modules  # Prevent overwriting node_modules
