@@ -3,7 +3,6 @@
 import json
 from pathlib import Path
 
-from jinja2 import Template
 from pydantic import ValidationError
 
 from seriesoftubes.config import get_config
@@ -11,6 +10,7 @@ from seriesoftubes.models import LLMNodeConfig, Node
 from seriesoftubes.nodes.base import NodeContext, NodeExecutor, NodeResult
 from seriesoftubes.providers import get_provider
 from seriesoftubes.schemas import LLMNodeInput, LLMNodeOutput
+from seriesoftubes.template_engine import TemplateSecurityLevel, render_template
 
 
 class LLMNodeExecutor(NodeExecutor):
@@ -130,7 +130,12 @@ class LLMNodeExecutor(NodeExecutor):
             msg = "No prompt or prompt_template specified"
             raise ValueError(msg)
 
-        # Render template with context
-        template = Template(prompt_text)
+        # Render template with context using secure template engine
         context_data = self.prepare_context_data(node, context)
-        return template.render(**context_data)
+        # LLM prompts often need safe expressions for formatting
+        return render_template(
+            prompt_text, 
+            context_data, 
+            level=TemplateSecurityLevel.SAFE_EXPRESSIONS,
+            node_type="llm"
+        )

@@ -8,12 +8,12 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from jinja2 import Template
 from pydantic import ValidationError
 
 from seriesoftubes.models import FileNodeConfig, Node
 from seriesoftubes.nodes.base import NodeContext, NodeExecutor, NodeResult
 from seriesoftubes.schemas import FileNodeInput, FileNodeOutput
+from seriesoftubes.template_engine import TemplateSecurityLevel, render_template
 
 # Optional imports for document processing
 try:
@@ -472,6 +472,11 @@ class FileNodeExecutor(NodeExecutor):
             }
 
     def _render_template(self, template_str: str, context: dict[str, Any]) -> str:
-        """Render a Jinja2 template string"""
-        template = Template(template_str)
-        return template.render(**context)
+        """Render a template string securely"""
+        # File paths should only use simple interpolation, no expressions
+        return render_template(
+            template_str, 
+            context, 
+            level=TemplateSecurityLevel.INTERPOLATION_ONLY,
+            node_type="file"
+        )

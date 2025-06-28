@@ -3,13 +3,13 @@
 from typing import Any
 
 import httpx
-from jinja2 import Template
 from pydantic import ValidationError
 
 from seriesoftubes.config import get_config
 from seriesoftubes.models import HTTPNodeConfig, Node
 from seriesoftubes.nodes.base import NodeContext, NodeExecutor, NodeResult
 from seriesoftubes.schemas import HTTPNodeInput, HTTPNodeOutput
+from seriesoftubes.template_engine import TemplateSecurityLevel, render_template
 
 # HTTP status codes
 HTTP_ERROR_THRESHOLD = 400
@@ -157,9 +157,14 @@ class HTTPNodeExecutor(NodeExecutor):
             )
 
     def _render_template(self, template_str: str, context: dict[str, Any]) -> str:
-        """Render a Jinja2 template string"""
-        template = Template(template_str)
-        return template.render(**context)
+        """Render a template string securely"""
+        # HTTP nodes need interpolation for URLs and headers, but not full expressions
+        return render_template(
+            template_str, 
+            context, 
+            level=TemplateSecurityLevel.INTERPOLATION_ONLY,
+            node_type="http"
+        )
 
     def _render_template_value(self, value: Any, context: dict[str, Any]) -> Any:
         """Render a template value (could be string or other type)"""
