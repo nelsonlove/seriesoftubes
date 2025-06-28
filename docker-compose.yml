@@ -133,23 +133,23 @@ services:
       timeout: 3s
       retries: 5
 
-  # Frontend (React app)
-  frontend:
+  # Frontend (Development mode with hot reload)
+  frontend-dev:
     build:
       context: ./frontend
       dockerfile: Dockerfile.dev
-    container_name: seriesoftubes-frontend
+    container_name: seriesoftubes-frontend-dev
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     environment:
-      - REACT_APP_API_URL=http://localhost:${API_PORT:-8000}
+      - VITE_API_URL=http://localhost:${API_PORT:-8000}
     volumes:
       - ./frontend:/app
       - /app/node_modules
     depends_on:
       - api-dev
     restart: unless-stopped
-    profiles: ["with-frontend"]  # Only starts with --profile with-frontend
+    profiles: ["dev"]  # Only starts with --profile dev
 
   # Optional: Worker for background jobs (uncomment if needed)
   # worker:
