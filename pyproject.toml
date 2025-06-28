@@ -36,6 +36,7 @@ dependencies = [
     "jsonschema>=4.0.0",
     "openai>=1.90.0",  # For structured outputs support
     "RestrictedPython>=7.0",  # For secure Python code execution
+    "python-dotenv>=1.0.0",  # For loading .env files
 ]
 
 [project.optional-dependencies]

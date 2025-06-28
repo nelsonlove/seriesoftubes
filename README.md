@@ -13,9 +13,16 @@ seriesoftubes is an LLM workflow orchestration platform that uses DAG-based YAML
 # Install
 pip install -e ".[dev]"
 
-# Configure API keys
+# Set up configuration
+cp .env.example .env
+# Edit .env and add your API keys (OPENAI_API_KEY or ANTHROPIC_API_KEY)
+
+# For production, generate secure configuration:
+# python -m seriesoftubes.cli.generate_config
+
+# Configure workflow settings (optional)
 cp .tubes.example.yaml .tubes.yaml
-# Edit .tubes.yaml with your OpenAI/Anthropic API key
+# Edit .tubes.yaml to customize model, temperature, etc.
 
 # Run example workflow
 s10s run examples/simple-test/workflow.yaml --inputs company_name="OpenAI"
@@ -23,6 +30,8 @@ s10s run examples/simple-test/workflow.yaml --inputs company_name="OpenAI"
 # See available workflows
 s10s list
 ```
+
+**Security Note**: See [docs/security.md](docs/security.md) for production security configuration.
 
 ## Key Commands
 

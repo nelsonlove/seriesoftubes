@@ -8,15 +8,20 @@ from pathlib import Path
 from typing import Any, cast
 
 import yaml
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+# Load environment variables from .env file
+load_dotenv()
+
 from seriesoftubes.api.auth_routes import router as auth_router
 from seriesoftubes.api.docs_routes import router as docs_router
 from seriesoftubes.api.execution_routes import router as execution_router
 from seriesoftubes.api.workflow_routes import router as workflow_router
+from seriesoftubes.config_validation import validate_required_env_vars, validate_security_config
 from seriesoftubes.db import init_db
 
 logger = logging.getLogger(__name__)
@@ -25,6 +30,11 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:  # noqa: ARG001
     """Initialize app on startup"""
+    # Validate configuration before starting
+    validate_required_env_vars()
+    validate_security_config()
+    logger.info("Configuration validation passed")
+    
     # Initialize database
     await init_db()
     logger.info("Database initialized")
@@ -42,13 +52,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Configure CORS from environment
+import os
+cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
+allowed_origins = [origin.strip() for origin in cors_origins.split(",")]
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],  # Frontend origins
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

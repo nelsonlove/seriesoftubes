@@ -54,6 +54,12 @@ class CacheConfig(BaseModel):
     redis_db: int = Field(default=0, description="Redis database number")
     key_prefix: str = Field(default="s10s:", description="Cache key prefix")
     default_ttl: int = Field(default=3600, description="Default TTL in seconds")
+    
+    def model_post_init(self, __context: Any) -> None:
+        """Override Redis URL from environment if set"""
+        import os
+        if redis_env := os.getenv("REDIS_URL"):
+            self.redis_url = redis_env
 
 
 class ExecutionConfig(BaseModel):

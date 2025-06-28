@@ -1,21 +1,29 @@
-# Example configuration for seriesoftubes
-# Copy this to .tubes.yaml and fill in your API keys
+# SeriesOfTubes workflow configuration
+# Copy this to .tubes.yaml to customize workflow behavior
+# 
+# NOTE: This file is for non-sensitive configuration only.
+# API keys and secrets should be set in .env file
 
 llm:
   provider: openai  # or anthropic
   model: gpt-4o
-  api_key_env: OPENAI_API_KEY
+  api_key_env: OPENAI_API_KEY  # References env var from .env
   temperature: 0.7
+  max_tokens: 4096
 
 http:
   timeout: 30
   retry_attempts: 3
+  user_agent: "SeriesOfTubes/1.0"
 
 execution:
   max_duration: 300  # 5 minutes
   save_intermediate: true
+  parallel_limit: 5
 
-# Environment variables for API keys
-# Set these in your shell or .env file:
-# OPENAI_API_KEY=your-key-here
-# ANTHROPIC_API_KEY=your-key-here
+cache:
+  enabled: true
+  ttl: 3600  # 1 hour
+
+# All sensitive values (API keys, passwords, secrets) 
+# should be set in .env file, not here

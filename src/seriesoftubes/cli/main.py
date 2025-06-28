@@ -7,8 +7,12 @@ from typing import Annotated, Any
 
 import httpx
 import typer
+from dotenv import load_dotenv
 from rich.console import Console
 from rich.table import Table
+
+# Load environment variables from .env file
+load_dotenv()
 
 from seriesoftubes.cli.auth import auth_app
 from seriesoftubes.cli.client import APIClient
