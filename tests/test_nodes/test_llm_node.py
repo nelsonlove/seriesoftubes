@@ -2,7 +2,7 @@
 
 import os
 from typing import Any
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -267,38 +267,64 @@ async def test_llm_node_invalid_config():
 
 
 @pytest.mark.asyncio
-@pytest.mark.skipif(not os.getenv("OPENAI_API_KEY"), reason="OPENAI_API_KEY not set")
 async def test_openai_structured_outputs_integration():
-    """Integration test for OpenAI structured outputs (requires real API key)"""
-    api_key = os.getenv("OPENAI_API_KEY")
-    provider = OpenAIProvider(api_key)
-
-    # Test simple schema
-    schema = {
-        "type": "object",
-        "properties": {
-            "name": {"type": "string"},
-            "age": {"type": "integer"},
-            "skills": {"type": "array", "items": {"type": "string"}},
-        },
-    }
-
-    result = await provider.call(
-        prompt="Generate a profile for a software engineer named Alice",
-        model="gpt-4o",
-        temperature=0.7,
-        schema=schema,
-    )
-
-    # Verify structured output format
-    assert isinstance(result, dict)
-    assert "name" in result
-    assert "age" in result
-    assert "skills" in result
-    assert isinstance(result["name"], str)
-    assert isinstance(result["age"], int)
-    assert isinstance(result["skills"], list)
-    assert all(isinstance(skill, str) for skill in result["skills"])
+    """Test OpenAI structured outputs with mocked API"""
+    # Mock the OpenAI client to avoid real API calls
+    with patch("seriesoftubes.providers.openai.AsyncOpenAI") as mock_openai_class:
+        # Set up mock client
+        mock_client = AsyncMock()
+        mock_openai_class.return_value = mock_client
+        
+        # Create provider
+        provider = OpenAIProvider("test-key")
+        
+        # Test simple schema
+        schema = {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "age": {"type": "integer"},
+                "skills": {"type": "array", "items": {"type": "string"}},
+            },
+        }
+        
+        # Mock the structured output response
+        mock_completion = AsyncMock()
+        mock_completion.choices = [AsyncMock()]
+        mock_message = mock_completion.choices[0].message
+        mock_message.refusal = None  # No refusal
+        mock_message.parsed = MagicMock()  # Regular mock for the parsed object
+        mock_message.parsed.model_dump = MagicMock(return_value={
+            "name": "Alice",
+            "age": 28,
+            "skills": ["Python", "JavaScript", "Go", "Docker"]
+        })
+        mock_client.beta.chat.completions.parse.return_value = mock_completion
+        
+        # Call the provider
+        result = await provider.call(
+            prompt="Generate a profile for a software engineer named Alice",
+            model="gpt-4o",
+            temperature=0.7,
+            schema=schema,
+        )
+        
+        # Verify structured output format
+        assert isinstance(result, dict)
+        assert "name" in result
+        assert result["name"] == "Alice"
+        assert "age" in result
+        assert result["age"] == 28
+        assert "skills" in result
+        assert isinstance(result["skills"], list)
+        assert len(result["skills"]) == 4
+        assert all(isinstance(skill, str) for skill in result["skills"])
+        
+        # Verify the API was called correctly
+        mock_client.beta.chat.completions.parse.assert_called_once()
+        call_args = mock_client.beta.chat.completions.parse.call_args[1]
+        assert call_args["model"] == "gpt-4o"
+        assert call_args["temperature"] == 0.7
 
 
 @pytest.mark.asyncio

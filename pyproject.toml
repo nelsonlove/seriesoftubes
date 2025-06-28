@@ -292,3 +292,5 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+# Integration tests in tests/test_integration/ are skipped by default
+# To run them: OPENAI_API_KEY=xxx RUN_EXPENSIVE_TESTS=true pytest tests/test_integration/

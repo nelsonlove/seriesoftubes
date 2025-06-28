@@ -19,6 +19,7 @@ def mock_user():
         username="testuser",
         email="test@example.com",
         is_active=True,
+        is_admin=False,
         is_system=False,
         password_hash="dummy-hash",
     )

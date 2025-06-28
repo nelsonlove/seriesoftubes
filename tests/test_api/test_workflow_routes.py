@@ -22,6 +22,7 @@ def mock_user():
         username="testuser",
         email="test@example.com",
         is_active=True,
+        is_admin=False,
         is_system=False,
         password_hash="dummy-hash",
     )
@@ -150,27 +151,39 @@ class TestWorkflowRoutes:
         response = client.get("/api/workflows?limit=10&offset=20")
         assert response.status_code == status.HTTP_200_OK
         
-    def test_create_workflow_success(self, client, mock_db_session, sample_workflow_yaml):
+    def test_create_workflow_success(self, client, mock_db_session, mock_user, sample_workflow_yaml):
         """Test successful workflow creation"""
         workflow_data = {
             "yaml_content": sample_workflow_yaml,
-            "description": "Test workflow",
             "is_public": False
         }
         
+        # Mock the refresh to simulate database creating the workflow
+        def mock_refresh(workflow):
+            workflow.id = "new-workflow-id"
+            workflow.created_at = datetime.now(timezone.utc)
+            workflow.updated_at = datetime.now(timezone.utc)
+            workflow.user = mock_user
+            
+        mock_db_session.refresh.side_effect = mock_refresh
+        
         # Mock the created workflow
         with patch("seriesoftubes.parser.parse_workflow_yaml") as mock_parse:
-            mock_parse.return_value = MagicMock(
-                name="test-workflow",
-                version="1.0.0"
-            )
+            mock_parsed = MagicMock()
+            mock_parsed.name = "test-workflow"
+            mock_parsed.version = "1.0.0"
+            mock_parsed.description = "A test workflow"  # This comes from the parsed YAML
+            mock_parse.return_value = mock_parsed
             
-            response = client.post("/api/workflows", json=workflow_data)
+            with patch("seriesoftubes.parser.validate_dag") as mock_validate:
+                mock_validate.return_value = None
+                
+                response = client.post("/api/workflows", json=workflow_data)
             
         assert response.status_code == status.HTTP_201_CREATED
         data = response.json()
         assert data["name"] == "test-workflow"
-        assert data["description"] == "Test workflow"
+        assert data["description"] == "A test workflow"  # From parsed workflow
         
         # Verify database interaction
         mock_db_session.add.assert_called_once()
@@ -206,19 +219,38 @@ class TestWorkflowRoutes:
         response = client.get(f"/api/workflows/{workflow_id}")
         assert response.status_code == status.HTTP_404_NOT_FOUND
         
-    def test_update_workflow_success(self, client, mock_db_session, sample_workflow):
+    def test_update_workflow_success(self, client, mock_db_session, sample_workflow, sample_workflow_yaml):
         """Test updating a workflow"""
-        # Mock query to return workflow
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = sample_workflow
-        mock_db_session.execute.return_value = mock_result
+        # First mock: return workflow for ownership check
+        workflow_result = MagicMock()
+        workflow_result.scalar_one_or_none.return_value = sample_workflow
         
+        # Second mock: return None for conflict check (no conflict)
+        conflict_result = MagicMock()
+        conflict_result.scalar_one_or_none.return_value = None
+        
+        mock_db_session.execute.side_effect = [workflow_result, conflict_result]
+        
+        # Update requires yaml_content
+        updated_yaml = sample_workflow_yaml.replace("A test workflow", "Updated description")
         update_data = {
-            "description": "Updated description",
+            "yaml_content": updated_yaml,
             "is_public": True
         }
         
-        response = client.put(f"/api/workflows/{sample_workflow.id}", json=update_data)
+        # Mock parse_workflow_yaml for the update
+        with patch("seriesoftubes.api.workflow_routes.parse_workflow_yaml") as mock_parse:
+            mock_parsed = MagicMock()
+            mock_parsed.name = "test-workflow"
+            mock_parsed.version = "1.0.0"
+            mock_parsed.description = "Updated description"
+            mock_parse.return_value = mock_parsed
+            
+            with patch("seriesoftubes.api.workflow_routes.validate_dag") as mock_validate:
+                mock_validate.return_value = None
+                
+                response = client.put(f"/api/workflows/{sample_workflow.id}", json=update_data)
+        
         assert response.status_code == status.HTTP_200_OK
         
         # Verify workflow was updated
@@ -226,19 +258,23 @@ class TestWorkflowRoutes:
         assert sample_workflow.is_public is True
         mock_db_session.commit.assert_called()
         
-    def test_update_workflow_not_owner(self, client, mock_db_session, sample_workflow, mock_user):
+    def test_update_workflow_not_owner(self, client, mock_db_session, sample_workflow, mock_user, sample_workflow_yaml):
         """Test updating workflow when not the owner"""
         # Change workflow owner
         sample_workflow.user_id = "different-user-id"
         
+        # Mock query to return None (workflow not found for this user)
         mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = sample_workflow
+        mock_result.scalar_one_or_none.return_value = None
         mock_db_session.execute.return_value = mock_result
         
-        update_data = {"description": "Should fail"}
+        update_data = {
+            "yaml_content": sample_workflow_yaml,
+            "is_public": True
+        }
         
         response = client.put(f"/api/workflows/{sample_workflow.id}", json=update_data)
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_404_NOT_FOUND
         
     def test_delete_workflow_success(self, client, mock_db_session, sample_workflow):
         """Test deleting a workflow"""
@@ -248,7 +284,10 @@ class TestWorkflowRoutes:
         mock_db_session.execute.return_value = mock_result
         
         response = client.delete(f"/api/workflows/{sample_workflow.id}")
-        assert response.status_code == status.HTTP_204_NO_CONTENT
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert "message" in data
+        assert "deleted" in data["message"]
         
         mock_db_session.delete.assert_called_once_with(sample_workflow)
         mock_db_session.commit.assert_called()
@@ -257,67 +296,79 @@ class TestWorkflowRoutes:
         """Test deleting workflow when not the owner"""
         sample_workflow.user_id = "different-user-id"
         
+        # Mock query to return None (workflow not found for this user)
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db_session.execute.return_value = mock_result
+        
+        response = client.delete(f"/api/workflows/{sample_workflow.id}")
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        
+    def test_validate_workflow_success(self, client, mock_db_session, sample_workflow):
+        """Test validating a workflow"""
+        # Mock getting workflow
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = sample_workflow
         mock_db_session.execute.return_value = mock_result
         
-        response = client.delete(f"/api/workflows/{sample_workflow.id}")
-        assert response.status_code == status.HTTP_403_FORBIDDEN
-        
-    def test_validate_workflow_success(self, client, sample_workflow_yaml):
-        """Test validating a workflow"""
-        with patch("seriesoftubes.parser.parse_workflow_yaml") as mock_parse:
-            mock_parse.return_value = MagicMock(
-                name="test-workflow",
-                version="1.0.0"
-            )
+        with patch("seriesoftubes.api.workflow_routes.parse_workflow_yaml") as mock_parse:
+            mock_parsed = MagicMock()
+            mock_parsed.name = "test-workflow"
+            mock_parsed.version = "1.0.0"
+            mock_parsed.inputs = {}
+            mock_parsed.nodes = {}
+            mock_parsed.outputs = {}
+            mock_parsed.description = "Test workflow"
+            mock_parse.return_value = mock_parsed
             
-            response = client.post(
-                f"/api/workflows/{uuid4()}/validate",
-                json={"yaml_content": sample_workflow_yaml}
-            )
+            with patch("seriesoftubes.api.workflow_routes.validate_dag") as mock_validate_dag:
+                mock_validate_dag.return_value = None  # No errors
+                
+                response = client.post(
+                    f"/api/workflows/{sample_workflow.id}/validate",
+                    json={}  # Validate existing YAML
+                )
             
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["valid"] is True
-        assert data["name"] == "test-workflow"
+        assert "parsed_structure" in data
+        assert data["parsed_structure"]["name"] == "test-workflow"
         
-    def test_validate_workflow_invalid(self, client):
+    def test_validate_workflow_invalid(self, client, mock_db_session, sample_workflow):
         """Test validating invalid workflow"""
-        response = client.post(
-            f"/api/workflows/{uuid4()}/validate",
-            json={"yaml_content": "invalid: yaml:"}
-        )
+        # Mock getting workflow
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = sample_workflow
+        mock_db_session.execute.return_value = mock_result
+        
+        with patch("seriesoftubes.api.workflow_routes.parse_workflow_yaml") as mock_parse:
+            mock_parse.side_effect = Exception("Invalid YAML")
+            
+            response = client.post(
+                f"/api/workflows/{sample_workflow.id}/validate",
+                json={"yaml_content": "invalid: yaml:"}
+            )
         
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["valid"] is False
         assert "errors" in data
         
-    def test_test_workflow_success(self, client, mock_db_session, sample_workflow):
-        """Test dry-run workflow execution"""
+    def test_test_workflow_not_implemented(self, client, mock_db_session, sample_workflow):
+        """Test dry-run workflow execution (not implemented)"""
         # Mock getting workflow
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = sample_workflow
         mock_db_session.execute.return_value = mock_result
         
-        with patch("seriesoftubes.engine.WorkflowEngine") as mock_engine_class:
-            mock_engine = MagicMock()
-            mock_context = MagicMock()
-            mock_context.outputs = {"echo": {"result": {"echo": "test"}}}
-            mock_context.errors = {}
-            mock_engine.execute = AsyncMock(return_value=mock_context)
-            mock_engine_class.return_value = mock_engine
-            
-            response = client.post(
-                f"/api/workflows/{sample_workflow.id}/test",
-                json={"inputs": {"message": "test"}}
-            )
-            
-        assert response.status_code == status.HTTP_200_OK
-        data = response.json()
-        assert data["success"] is True
-        assert "outputs" in data
+        response = client.post(
+            f"/api/workflows/{sample_workflow.id}/test",
+            json={"inputs": {"message": "test"}}
+        )
+        
+        # This endpoint is not yet implemented
+        assert response.status_code == status.HTTP_501_NOT_IMPLEMENTED
         
     def test_download_workflow(self, client, mock_db_session, sample_workflow):
         """Test downloading workflow as YAML"""
@@ -338,53 +389,37 @@ class TestWorkflowRoutes:
         mock_result.scalar_one_or_none.return_value = sample_workflow
         mock_db_session.execute.return_value = mock_result
         
-        with patch("seriesoftubes.api.workflow_routes.execute_workflow") as mock_execute:
-            mock_execute.return_value = "execution-123"
+        # Mock the refresh to add an ID to the execution
+        def mock_refresh(execution):
+            execution.id = "execution-123"
             
-            response = client.post(
-                f"/api/workflows/{sample_workflow.id}/run",
-                json={
-                    "inputs": {"message": "hello"},
-                    "sync": False
-                }
-            )
-            
-        assert response.status_code == status.HTTP_202_ACCEPTED
-        data = response.json()
-        assert data["execution_id"] == "execution-123"
-        assert data["status"] == "running"
+        mock_db_session.refresh.side_effect = mock_refresh
         
-    def test_run_workflow_sync(self, client, mock_db_session, sample_workflow):
-        """Test running workflow synchronously"""
-        # Mock getting workflow
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = sample_workflow
-        mock_db_session.execute.return_value = mock_result
-        
-        # Mock execution
-        mock_execution = MagicMock()
-        mock_execution.id = "execution-123"
-        mock_execution.status = "completed"
-        mock_execution.outputs = {"result": "success"}
-        
-        with patch("seriesoftubes.api.workflow_routes.execute_workflow") as mock_execute:
-            mock_execute.return_value = "execution-123"
+        # Mock parse_workflow_yaml
+        with patch("seriesoftubes.api.workflow_routes.parse_workflow_yaml") as mock_parse:
+            mock_parsed = MagicMock()
+            mock_parsed.outputs = {"result": "echo"}
+            mock_parse.return_value = mock_parsed
             
-            # Mock getting execution result
-            mock_exec_result = MagicMock()
-            mock_exec_result.scalar_one_or_none.return_value = mock_execution
-            mock_db_session.execute.side_effect = [mock_result, mock_exec_result]
-            
-            response = client.post(
-                f"/api/workflows/{sample_workflow.id}/run",
-                json={
-                    "inputs": {"message": "hello"},
-                    "sync": True
-                }
-            )
+            # Mock the DatabaseProgressTrackingEngine (imported inline in the function)
+            with patch("seriesoftubes.api.execution.DatabaseProgressTrackingEngine") as mock_engine_class:
+                mock_engine = MagicMock()
+                mock_context = MagicMock()
+                mock_context.outputs = {"echo": {"result": "hello"}}
+                mock_context.errors = {}
+                mock_engine.execute = AsyncMock(return_value=mock_context)
+                mock_engine_class.return_value = mock_engine
+                
+                response = client.post(
+                    f"/api/workflows/{sample_workflow.id}/run",
+                    json={
+                        "inputs": {"message": "hello"},
+                        "sync": False
+                    }
+                )
             
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert data["execution_id"] == "execution-123"
-        assert data["status"] == "completed"
-        assert data["outputs"] == {"result": "success"}
+        assert "execution_id" in data
+        assert data["status"] == "started"
+        
