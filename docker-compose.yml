@@ -1,6 +1,36 @@
 version: '3.8'
 
 services:
+  # Frontend (Development with hot reload)
+  frontend-dev:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: seriesoftubes-frontend-dev
+    ports:
+      - "3000:5173"  # Map to port 3000 for consistency
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules  # Prevent overwriting node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    profiles: ["dev"]  # Only starts with --profile dev
+    depends_on:
+      - api
+
+  # Frontend (Production build)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: seriesoftubes-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    profiles: ["prod"]  # Only starts with --profile prod
+    restart: unless-stopped
+
   # API Server
   api:
     build:
@@ -16,6 +46,7 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173,http://localhost}
     volumes:
       - ./logs:/app/logs
       - ./workflows:/app/workflows:ro

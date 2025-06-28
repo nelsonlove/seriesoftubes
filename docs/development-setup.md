@@ -65,14 +65,37 @@ uvicorn seriesoftubes.api.main:app --reload
 # API docs at http://localhost:8000/docs
 ```
 
-### 6. Start the Frontend (Optional)
+### 6. Start the Frontend
+
+#### Option A: Local Development (Recommended)
 
 ```bash
 cd frontend
 npm install
 npm run dev
 
-# Frontend will be available at http://localhost:3000
+# Frontend will be available at http://localhost:5173
+# Configure proxy in vite.config.ts or use VITE_API_URL env var
+```
+
+#### Option B: Docker Development with Hot Reload
+
+```bash
+# Start frontend with hot reload in Docker
+docker-compose --profile dev up -d
+
+# Frontend available at http://localhost:3000
+# API available at http://localhost:8000
+```
+
+#### Option C: Production Build in Docker
+
+```bash
+# Build and run production frontend
+docker-compose --profile prod up -d
+
+# Frontend available at http://localhost
+# API proxied through nginx at /api
 ```
 
 ## Service Configuration
