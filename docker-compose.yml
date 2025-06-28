@@ -8,12 +8,12 @@ services:
       dockerfile: Dockerfile.dev
     container_name: seriesoftubes-frontend-dev
     ports:
-      - "${FRONTEND_PORT:-3000}:5173"  # Default to 3000 if not specified
+      - "${FRONTEND_PORT:-3000}:5173"  # Vite dev server runs on 5173
     volumes:
       - ./frontend:/app
       - /app/node_modules  # Prevent overwriting node_modules
     environment:
-      - VITE_API_URL=http://localhost:8000
+      - VITE_API_URL=http://localhost:${API_PORT:-8000}
     profiles: ["dev"]  # Only starts with --profile dev
     depends_on:
       - api-dev
@@ -132,24 +132,6 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
-
-  # Frontend (Development mode with hot reload)
-  frontend-dev:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile.dev
-    container_name: seriesoftubes-frontend-dev
-    ports:
-      - "${FRONTEND_PORT:-3000}:3000"
-    environment:
-      - VITE_API_URL=http://localhost:${API_PORT:-8000}
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    depends_on:
-      - api-dev
-    restart: unless-stopped
-    profiles: ["dev"]  # Only starts with --profile dev
 
   # Optional: Worker for background jobs (uncomment if needed)
   # worker:
