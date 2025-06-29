@@ -1,12 +1,15 @@
 """OpenAI LLM provider with structured outputs support"""
 
 import json
+import logging
 from typing import Any, ClassVar
 
 from openai import AsyncOpenAI
 from pydantic import BaseModel, create_model
 
 from seriesoftubes.providers.base import LLMProvider
+
+logger = logging.getLogger(__name__)
 
 
 class OpenAIProvider(LLMProvider):
@@ -129,13 +132,18 @@ class OpenAIProvider(LLMProvider):
 
                 message = completion.choices[0].message
 
-                # Handle refusals
-                if message.refusal:
+                # Handle refusals in structured outputs
+                if hasattr(message, "refusal") and message.refusal:
+                    logger.warning(f"OpenAI structured output refusal: {message.refusal}")
+                    # Include finish reason if available
+                    finish_reason = completion.choices[0].finish_reason if hasattr(completion.choices[0], 'finish_reason') else None
+                    if finish_reason:
+                        logger.warning(f"Finish reason: {finish_reason}")
                     msg = f"OpenAI refused to respond: {message.refusal}"
                     raise ValueError(msg)
 
                 # Return parsed structured output
-                if message.parsed:
+                if hasattr(message, "parsed") and message.parsed:
                     return message.parsed.model_dump()
                 else:
                     # Fallback to content parsing
@@ -155,7 +163,16 @@ class OpenAIProvider(LLMProvider):
                     messages[0]["content"] += "\n\nRespond with valid JSON."
 
                 completion = await self.client.chat.completions.create(**request_kwargs)
-                content = completion.choices[0].message.content
+                message = completion.choices[0].message
+                content = message.content
+                
+                # Check if the response indicates a refusal
+                if content and any(phrase in content.lower() for phrase in ["i'm sorry", "cannot assist", "refused"]):
+                    logger.warning(f"OpenAI refusal detected. Response: {content[:200]}...")
+                    # Include finish reason if available
+                    finish_reason = completion.choices[0].finish_reason if hasattr(completion.choices[0], 'finish_reason') else None
+                    if finish_reason:
+                        logger.warning(f"Finish reason: {finish_reason}")
 
                 # Parse JSON if schema was specified
                 if schema and content:
@@ -169,7 +186,13 @@ class OpenAIProvider(LLMProvider):
 
         except Exception as e:
             error_str = str(e).lower()
-            if "api key" in error_str or "unauthorized" in error_str:
+            original_error = str(e)
+            
+            # Check for refusal messages
+            if "refused" in error_str or "cannot assist" in error_str or "i'm sorry" in error_str:
+                msg = f"OpenAI refused to respond: {original_error}"
+                raise ValueError(msg) from e
+            elif "api key" in error_str or "unauthorized" in error_str:
                 msg = "OpenAI API key not configured or invalid"
                 raise ValueError(msg) from e
             elif "model" in error_str and (
@@ -186,9 +209,12 @@ class OpenAIProvider(LLMProvider):
             elif "quota" in error_str:
                 msg = "OpenAI API quota exceeded"
                 raise ValueError(msg) from e
+            elif "content policy" in error_str or "content_policy" in error_str:
+                msg = f"OpenAI content policy violation: {original_error}"
+                raise ValueError(msg) from e
             else:
                 # Preserve the original error for debugging
-                msg = f"OpenAI API error: {e}"
+                msg = f"OpenAI API error: {original_error}"
                 raise ValueError(msg) from e
 
     def validate_model(self, model: str) -> bool:
