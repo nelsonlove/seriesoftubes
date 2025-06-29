@@ -41,6 +41,7 @@ class SecureTemplateEngine:
         # String filters
         'upper', 'lower', 'title', 'capitalize', 'trim', 'strip',
         'replace', 'truncate', 'wordwrap', 'center', 'ljust', 'rjust',
+        'regex_search',
         # Numeric filters
         'abs', 'round', 'int', 'float',
         # List filters
@@ -92,6 +93,9 @@ class SecureTemplateEngine:
             if filter_name in self.safe_env.filters:
                 continue  # Keep built-in implementation
         
+        # Add custom filters
+        self.safe_env.filters['regex_search'] = self._regex_search_filter
+        
         # Add safe globals
         self.safe_env.globals.update(self.SAFE_GLOBALS)
         
@@ -102,12 +106,34 @@ class SecureTemplateEngine:
             finalize=lambda x: x if x is not None else '',
         )
         self.sandbox_env.globals.update(self.SAFE_GLOBALS)
+        self.sandbox_env.filters['regex_search'] = self._regex_search_filter
         
         # Unsafe environment (for legacy compatibility only)
         self.unsafe_env = Environment(
             autoescape=False,
             undefined=StrictUndefined,
         )
+        self.unsafe_env.filters['regex_search'] = self._regex_search_filter
+    
+    def _regex_search_filter(self, value: str, pattern: str) -> str | None:
+        """Jinja2 filter for regex search.
+        
+        Args:
+            value: The string to search in
+            pattern: The regex pattern to search for
+            
+        Returns:
+            The first match found, or None if no match
+        """
+        if not isinstance(value, str):
+            return None
+        
+        try:
+            match = re.search(pattern, value)
+            return match.group(0) if match else None
+        except re.error:
+            # Invalid regex pattern
+            return None
     
     def render(
         self,
