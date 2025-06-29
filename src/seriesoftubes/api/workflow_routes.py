@@ -663,107 +663,167 @@ async def run_workflow(
             detail="Workflow not found",
         )
 
+    # Capture workflow values before any commits
+    workflow_yaml = workflow.yaml_content
+    workflow_name = workflow.name
+    workflow_id_str = workflow.id
+    user_id = current_user.id
+
     # Create execution in database
     execution = Execution(
-        workflow_id=workflow.id,
-        user_id=current_user.id,
+        workflow_id=workflow_id_str,
+        user_id=user_id,
         inputs=request.inputs,
         status=DBExecutionStatus.PENDING.value,
     )
     db.add(execution)
     await db.commit()
     await db.refresh(execution)
+    
+    # Capture execution values after commit
+    execution_id = execution.id
 
-    # Start execution asynchronously
-    async def run_and_update() -> None:
-        """Run workflow and update database"""
-        async with AsyncSession(db.bind) as session:
-            try:
-                # Update status to running
-                await session.execute(
-                    update(Execution)
-                    .where(Execution.id == execution.id)
-                    .values(status=DBExecutionStatus.RUNNING.value)
-                )
-                await session.commit()
-
-                # Parse and run workflow from YAML content
-                with tempfile.NamedTemporaryFile(
-                    mode="w", suffix=".yaml", delete=False
-                ) as tmp:
-                    tmp.write(workflow.yaml_content)
-                    tmp_path = Path(tmp.name)
-
+    # Check if Celery is available
+    try:
+        from seriesoftubes.tasks import execute_workflow
+        use_celery = True
+    except ImportError:
+        use_celery = False
+        logger.warning("Celery not available, falling back to in-process execution")
+    
+    if use_celery:
+        # Queue workflow execution in Celery
+        try:
+            result = execute_workflow.delay(
+                execution_id=execution_id,
+                workflow_yaml=workflow_yaml,
+                inputs=request.inputs,
+                user_id=user_id,
+            )
+            logger.info(f"Queued execution {execution_id} with task ID: {result.id}")
+        except Exception as e:
+            logger.error(f"Failed to queue execution: {e}")
+            # Fall back to in-process execution
+            use_celery = False
+    
+    if not use_celery:
+        # Fallback: Start execution in background (original behavior)
+        async def run_and_update() -> None:
+            """Run workflow and update database"""
+            async with AsyncSession(db.bind) as session:
                 try:
-                    parsed = parse_workflow_yaml(tmp_path)
-
-                    # Use database-connected progress tracking engine
-                    from seriesoftubes.api.execution import (
-                        DatabaseProgressTrackingEngine,
-                    )
-
-                    engine = DatabaseProgressTrackingEngine(execution.id, session, current_user.id)
-                    logger.info(f"Starting execution {execution.id} for workflow {workflow.name}")
-                    context = await engine.execute(parsed, request.inputs)
-                    logger.info(f"Completed execution {execution.id} with status: {'success' if not context.errors else 'failed'}")
-
-                    # Prepare outputs from workflow context
-                    outputs = {}
-                    for output_name, node_name in parsed.outputs.items():
-                        if node_name in context.outputs:
-                            outputs[output_name] = context.outputs[node_name]
-
-                    # Determine final status based on errors
-                    final_status = (
-                        DBExecutionStatus.COMPLETED.value
-                        if not context.errors
-                        else DBExecutionStatus.FAILED.value
-                    )
-
-                    # Update execution as completed/failed
-                    execution_update = {
-                        "status": final_status,
-                        "outputs": outputs,
-                        "errors": context.errors if context.errors else None,
-                        "completed_at": datetime.now(timezone.utc),
-                    }
-                    
-                    # Add error details if available
-                    if hasattr(context, 'error_details') and context.error_details:
-                        execution_update["error_details"] = context.error_details
-                    
-                    # Add storage keys if available
-                    if hasattr(context, 'storage_keys') and context.storage_keys:
-                        execution_update["storage_keys"] = context.storage_keys
-                    
+                    # Update status to running
                     await session.execute(
                         update(Execution)
-                        .where(Execution.id == execution.id)
-                        .values(**execution_update)
+                        .where(Execution.id == execution_id)
+                        .values(status=DBExecutionStatus.RUNNING.value)
                     )
                     await session.commit()
 
-                finally:
-                    tmp_path.unlink()
+                    # Parse and run workflow from YAML content
+                    with tempfile.NamedTemporaryFile(
+                        mode="w", suffix=".yaml", delete=False
+                    ) as tmp:
+                        tmp.write(workflow_yaml)
+                        tmp_path = Path(tmp.name)
 
-            except Exception as e:
-                # Update execution as failed
-                await session.execute(
-                    update(Execution)
-                    .where(Execution.id == execution.id)
-                    .values(
-                        status=DBExecutionStatus.FAILED.value,
-                        errors={"error": str(e)},
-                        completed_at=datetime.now(timezone.utc),
+                    try:
+                        parsed = parse_workflow_yaml(tmp_path)
+
+                        # Use database-connected progress tracking engine
+                        from seriesoftubes.api.execution import (
+                            DatabaseProgressTrackingEngine,
+                        )
+
+                        engine = DatabaseProgressTrackingEngine(execution_id, None, user_id)
+                        logger.info(f"Starting execution {execution_id} for workflow {workflow_name}")
+                        context = await engine.execute(parsed, request.inputs)
+                        logger.info(f"Completed execution {execution_id} with status: {'success' if not context.errors else 'failed'}")
+
+                        # Prepare outputs from workflow context
+                        outputs = {}
+                        for output_name, node_name in parsed.outputs.items():
+                            if node_name in context.outputs:
+                                outputs[output_name] = context.outputs[node_name]
+
+                        # Determine final status based on errors
+                        final_status = (
+                            DBExecutionStatus.COMPLETED.value
+                            if not context.errors
+                            else DBExecutionStatus.FAILED.value
+                        )
+
+                        # Update execution as completed/failed
+                        execution_update = {
+                            "status": final_status,
+                            "outputs": outputs,
+                            "errors": context.errors if context.errors else None,
+                            "completed_at": datetime.now(timezone.utc),
+                        }
+                        
+                        # Add error details if available
+                        if hasattr(context, 'error_details') and context.error_details:
+                            execution_update["error_details"] = context.error_details
+                        
+                        # Add storage keys if available
+                        if hasattr(context, 'storage_keys') and context.storage_keys:
+                            execution_update["storage_keys"] = context.storage_keys
+                        
+                        await session.execute(
+                            update(Execution)
+                            .where(Execution.id == execution_id)
+                            .values(**execution_update)
+                        )
+                        await session.commit()
+
+                    finally:
+                        tmp_path.unlink()
+
+                except Exception as e:
+                    # Update execution as failed
+                    await session.execute(
+                        update(Execution)
+                        .where(Execution.id == execution_id)
+                        .values(
+                            status=DBExecutionStatus.FAILED.value,
+                            errors={"error": str(e)},
+                            completed_at=datetime.now(timezone.utc),
+                        )
                     )
-                )
-                await session.commit()
+                    await session.commit()
 
-    # Start execution in background
-    asyncio.create_task(run_and_update())  # noqa: RUF006
+        # Start execution in background with error handling
+        task = asyncio.create_task(run_and_update())  # noqa: RUF006
+        
+        # Add error handler to catch crashes
+        def handle_task_exception(task):
+            try:
+                task.result()
+            except Exception as e:
+                logger.error(f"Execution {execution_id} crashed: {e}")
+                # Try to update status to failed
+                async def mark_failed():
+                    try:
+                        async with AsyncSession(db.bind) as session:
+                            await session.execute(
+                                update(Execution)
+                                .where(Execution.id == execution_id)
+                                .values(
+                                    status=DBExecutionStatus.FAILED.value,
+                                    errors={"error": f"Execution crashed: {str(e)}"},
+                                    completed_at=datetime.now(timezone.utc),
+                                )
+                            )
+                            await session.commit()
+                    except Exception as update_error:
+                        logger.error(f"Failed to update execution status: {update_error}")
+                
+                asyncio.create_task(mark_failed())
+        
+        task.add_done_callback(handle_task_exception)
 
     return WorkflowRunResponse(
-        execution_id=execution.id,
+        execution_id=execution_id,
         status="started",
-        message=f"Workflow execution started with ID: {execution.id}",
+        message=f"Workflow execution started with ID: {execution_id}",
     )

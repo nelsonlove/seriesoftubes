@@ -41,6 +41,23 @@ class ExecutionResponse(BaseModel):
     completed_at: str | None
 
 
+class ExecutionListResponse(BaseModel):
+    """Lighter execution response for list views"""
+
+    model_config = {"from_attributes": True}
+
+    id: str
+    workflow_id: str
+    workflow_name: str
+    workflow_version: str
+    user_id: str
+    username: str
+    status: str
+    started_at: str
+    completed_at: str | None
+    # Exclude large fields: inputs, outputs, errors, error_details, progress
+
+
 class ExecutionCreateResponse(BaseModel):
     """Response when creating an execution"""
 
@@ -51,12 +68,13 @@ class ExecutionCreateResponse(BaseModel):
     message: str
 
 
-@router.get("", response_model=list[ExecutionResponse])
+@router.get("", response_model=list[ExecutionListResponse])
 async def list_executions(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
-    limit: int = 100,
-) -> list[ExecutionResponse]:
+    limit: int = 50,  # Reduced default limit
+    offset: int = 0,
+) -> list[ExecutionListResponse]:
     """List user's executions"""
     result = await db.execute(
         select(Execution)
@@ -64,11 +82,12 @@ async def list_executions(
         .where(Execution.user_id == current_user.id)
         .order_by(Execution.started_at.desc())
         .limit(limit)
+        .offset(offset)
     )
     executions = result.scalars().all()
 
     return [
-        ExecutionResponse(
+        ExecutionListResponse(
             id=e.id,
             workflow_id=e.workflow_id,
             workflow_name=e.workflow.name,
@@ -76,12 +95,6 @@ async def list_executions(
             user_id=e.user_id,
             username=e.user.username,
             status=e.status if isinstance(e.status, str) else e.status.value,
-            inputs=e.inputs or {},
-            outputs=e.outputs,
-            errors=e.errors,
-            error_details=e.error_details,
-            progress=e.progress or {},
-            storage_keys=e.storage_keys,
             started_at=e.started_at.isoformat(),
             completed_at=e.completed_at.isoformat() if e.completed_at else None,
         )
@@ -170,21 +183,35 @@ async def stream_execution(
             # Send initial execution status
             async with async_session() as session:
                 result = await session.execute(
-                    select(Execution).where(Execution.id == execution_id)
+                    select(
+                        Execution.id,
+                        Execution.status,
+                        Execution.started_at,
+                        Execution.completed_at,
+                        Execution.outputs,
+                        Execution.errors,
+                        Execution.error_details,
+                        Execution.progress
+                    ).where(Execution.id == execution_id)
                 )
-                current_execution = result.scalar_one_or_none()
+                row = result.one_or_none()
 
-                if current_execution:
+                if row:
+                    (
+                        exec_id, status, started_at, completed_at,
+                        outputs, errors, error_details, progress
+                    ) = row
+                    
                     yield f"data: {json.dumps({
                         'type': 'status',
                         'execution_id': execution_id,
-                        'status': current_execution.status.value,
-                        'started_at': current_execution.started_at.isoformat() if current_execution.started_at else None,
-                        'completed_at': current_execution.completed_at.isoformat() if current_execution.completed_at else None,
-                        'outputs': current_execution.outputs,
-                        'errors': current_execution.errors,
-                        'error_details': current_execution.error_details,
-                        'progress': current_execution.progress or {},
+                        'status': status if isinstance(status, str) else status.value,
+                        'started_at': started_at.isoformat() if started_at else None,
+                        'completed_at': completed_at.isoformat() if completed_at else None,
+                        'outputs': outputs,
+                        'errors': errors,
+                        'error_details': error_details,
+                        'progress': progress or {},
                     })}\n\n"
 
             # Poll for updates every 2 seconds
@@ -194,53 +221,80 @@ async def stream_execution(
             max_polls = 150  # 5 minutes maximum
 
             while poll_count < max_polls:
-                async with async_session() as session:
-                    result = await session.execute(
-                        select(Execution).where(Execution.id == execution_id)
-                    )
-                    current_execution = result.scalar_one_or_none()
+                row = None
+                try:
+                    async with async_session() as session:
+                        # Only select the fields we need to reduce memory usage
+                        result = await session.execute(
+                            select(
+                                Execution.id,
+                                Execution.status,
+                                Execution.started_at,
+                                Execution.completed_at,
+                                Execution.outputs,
+                                Execution.errors,
+                                Execution.error_details,
+                                Execution.progress
+                            ).where(Execution.id == execution_id)
+                        )
+                        row = result.one_or_none()
+                        
+                        # Explicitly close the session to free resources
+                        await session.close()
+                except Exception as e:
+                    logger.error(f"Error polling execution {execution_id}: {e}")
+                    # Continue polling on error
+                    await asyncio.sleep(2)
+                    poll_count += 1
+                    continue
 
-                    if current_execution:
-                        current_status = current_execution.status.value
-                        current_progress = current_execution.progress or {}
+                if row:
+                    # Extract data from row tuple
+                    (
+                        exec_id, status, started_at, completed_at,
+                        outputs, errors, error_details, progress
+                    ) = row
+                    
+                    current_status = status if isinstance(status, str) else status.value
+                    current_progress = progress or {}
 
-                        # Send update if status or progress changed
-                        if (
-                            current_status != last_status
-                            or current_progress != last_progress
-                        ):
-                            yield f"data: {json.dumps({
-                                'type': 'update',
-                                'execution_id': execution_id,
-                                'status': current_status,
-                                'started_at': current_execution.started_at.isoformat() if current_execution.started_at else None,
-                                'completed_at': current_execution.completed_at.isoformat() if current_execution.completed_at else None,
-                                'outputs': current_execution.outputs,
-                                'errors': current_execution.errors,
-                                'error_details': current_execution.error_details,
-                                'progress': current_progress,
-                            })}\n\n"
-                            last_status = current_status
-                            last_progress = current_progress
+                    # Send update if status or progress changed
+                    if (
+                        current_status != last_status
+                        or current_progress != last_progress
+                    ):
+                        yield f"data: {json.dumps({
+                            'type': 'update',
+                            'execution_id': execution_id,
+                            'status': current_status,
+                            'started_at': started_at.isoformat() if started_at else None,
+                            'completed_at': completed_at.isoformat() if completed_at else None,
+                            'outputs': outputs,
+                            'errors': errors,
+                            'error_details': error_details,
+                            'progress': current_progress,
+                        })}\n\n"
+                        last_status = current_status
+                        last_progress = current_progress
 
-                        # Check if execution is complete
-                        if current_status in ["COMPLETED", "FAILED", "CANCELLED"]:
-                            yield f"data: {json.dumps({
-                                'type': 'complete',
-                                'execution_id': execution_id,
-                                'status': current_status,
-                                'started_at': current_execution.started_at.isoformat() if current_execution.started_at else None,
-                                'completed_at': current_execution.completed_at.isoformat() if current_execution.completed_at else None,
-                                'outputs': current_execution.outputs,
-                                'errors': current_execution.errors,
-                                'error_details': current_execution.error_details,
-                                'progress': current_progress,
-                                'done': True
-                            })}\n\n"
-                            logger.info(
-                                f"Execution {execution_id} completed with status {current_status}"
-                            )
-                            break
+                    # Check if execution is complete
+                    if current_status in ["COMPLETED", "FAILED", "CANCELLED"]:
+                        yield f"data: {json.dumps({
+                            'type': 'complete',
+                            'execution_id': execution_id,
+                            'status': current_status,
+                            'started_at': started_at.isoformat() if started_at else None,
+                            'completed_at': completed_at.isoformat() if completed_at else None,
+                            'outputs': outputs,
+                            'errors': errors,
+                            'error_details': error_details,
+                            'progress': current_progress,
+                            'done': True
+                        })}\n\n"
+                        logger.info(
+                            f"Execution {execution_id} completed with status {current_status}"
+                        )
+                        break
 
                 await asyncio.sleep(2)
                 poll_count += 1
