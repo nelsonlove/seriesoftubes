@@ -31,7 +31,12 @@ class OpenAIProvider(LLMProvider):
 
     def __init__(self, api_key: str | None = None):
         super().__init__(api_key)
-        self.client = AsyncOpenAI(api_key=api_key) if api_key else None
+        # Add timeout to prevent hanging requests
+        self.client = AsyncOpenAI(
+            api_key=api_key,
+            timeout=30.0,  # 30 second timeout
+            max_retries=2,
+        ) if api_key else None
 
     def _create_nested_model(
         self, schema: dict[str, Any], model_name: str

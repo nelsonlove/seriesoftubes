@@ -39,7 +39,7 @@ class AnthropicProvider(LLMProvider):
         if schema:
             logger.info(f"LLM Request - Schema: {json.dumps(schema, indent=2)}")
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             request_data: dict[str, Any] = {
                 "model": model,
                 "max_tokens": 4096,
