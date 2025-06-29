@@ -10,7 +10,7 @@ import type {
 import { useAuthStore } from '../stores/auth';
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: '', // No base URL so we can use both /api and /auth
   headers: {
     'Content-Type': 'application/json',
   },
@@ -32,8 +32,12 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // Clear auth and redirect to login
+    // Don't redirect on login/register attempts
+    const isAuthEndpoint = error.config?.url?.includes('/auth/login') || 
+                          error.config?.url?.includes('/auth/register');
+    
+    if (error.response?.status === 401 && !isAuthEndpoint) {
+      // Clear auth and redirect to login for non-auth endpoints
       useAuthStore.getState().logout();
       window.location.href = '/login';
     }
@@ -59,7 +63,7 @@ const parseWorkflowInputs = (yamlContent: string): Record<string, any> => {
 export const workflowAPI = {
   // List all workflows
   list: async (params?: { tag?: string; search?: string }) => {
-    const response = await api.get<any[]>('/workflows', { params });
+    const response = await api.get<any[]>('/api/workflows', { params });
     // Transform the response to match our WorkflowSummary type
     return response.data.map((wf) => ({
       ...wf,
@@ -70,7 +74,7 @@ export const workflowAPI = {
 
   // Get workflow details
   get: async (path: string) => {
-    const response = await api.get<WorkflowDetail>(`/workflows/${encodeURIComponent(path)}`);
+    const response = await api.get<WorkflowDetail>(`/api/workflows/${encodeURIComponent(path)}`);
     return response.data;
   },
 
@@ -86,7 +90,7 @@ export const workflowAPI = {
       is_public: boolean;
       created_at: string;
       updated_at: string;
-    }>('/workflows', {
+    }>('/api/workflows', {
       yaml_content: yamlContent,
       is_public: isPublic,
     });
@@ -108,7 +112,7 @@ export const workflowAPI = {
       is_public: boolean;
       created_at: string;
       updated_at: string;
-    }>(`/workflows/upload?is_public=${isPublic}`, formData, {
+    }>(`/api/workflows/upload?is_public=${isPublic}`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -118,7 +122,7 @@ export const workflowAPI = {
 
   // Update a workflow
   update: async (id: string, yamlContent: string, isPublic?: boolean) => {
-    const response = await api.put<WorkflowDetail>(`/workflows/${id}`, {
+    const response = await api.put<WorkflowDetail>(`/api/workflows/${id}`, {
       yaml_content: yamlContent,
       is_public: isPublic,
     });
@@ -127,13 +131,13 @@ export const workflowAPI = {
 
   // Delete a workflow
   delete: async (id: string) => {
-    const response = await api.delete<{ message: string }>(`/workflows/${id}`);
+    const response = await api.delete<{ message: string }>(`/api/workflows/${id}`);
     return response.data;
   },
 
   // Download a workflow
   download: async (id: string, format: 'yaml' | 'tubes' = 'yaml') => {
-    const response = await api.get(`/workflows/${id}/download`, {
+    const response = await api.get(`/api/workflows/${id}/download`, {
       params: { format },
       responseType: 'blob',
     });
@@ -143,7 +147,7 @@ export const workflowAPI = {
   // Run a workflow
   run: async (path: string, inputs: ExecutionInput) => {
     const response = await api.post<{ execution_id: string; status: string; message: string }>(
-      `/workflows/${encodeURIComponent(path)}/run`,
+      `/api/workflows/${encodeURIComponent(path)}/run`,
       { inputs }
     );
     return response.data;
@@ -152,7 +156,7 @@ export const workflowAPI = {
   // Get raw YAML content
   getRaw: async (workflowId: string) => {
     // Use the existing workflow detail endpoint to get YAML content
-    const response = await api.get<WorkflowDetail>(`/workflows/${encodeURIComponent(workflowId)}`);
+    const response = await api.get<WorkflowDetail>(`/api/workflows/${encodeURIComponent(workflowId)}`);
     return {
       content: response.data.yaml_content,
       path: workflowId,
@@ -164,7 +168,7 @@ export const workflowAPI = {
   updateRaw: async (workflowId: string, content: string) => {
     // Use the existing workflow update endpoint
     const response = await api.put<WorkflowResponse>(
-      `/workflows/${encodeURIComponent(workflowId)}`,
+      `/api/workflows/${encodeURIComponent(workflowId)}`,
       {
         yaml_content: content,
       }
@@ -181,13 +185,13 @@ export const workflowAPI = {
 export const executionAPI = {
   // List all executions
   list: async (params?: { workflow?: string; status?: string; limit?: number }) => {
-    const response = await api.get<ExecutionResponse[]>('/executions', { params });
+    const response = await api.get<ExecutionResponse[]>('/api/executions', { params });
     return response.data;
   },
 
   // Get execution details
   get: async (id: string) => {
-    const response = await api.get<ExecutionDetail>(`/executions/${id}`);
+    const response = await api.get<ExecutionDetail>(`/api/executions/${id}`);
     return response.data;
   },
 
@@ -293,13 +297,13 @@ export interface DocsListResponse {
 export const docsAPI = {
   // List all documentation files
   list: async () => {
-    const response = await api.get<DocsListResponse>('/docs/');
+    const response = await api.get<DocsListResponse>('/api/docs/');
     return response.data;
   },
 
   // Get documentation content
   getContent: async (filePath: string) => {
-    const response = await api.get<string>(`/docs/${filePath}`, {
+    const response = await api.get<string>(`/api/docs/${filePath}`, {
       responseType: 'text',
     });
     return response.data;

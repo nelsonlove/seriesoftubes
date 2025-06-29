@@ -3,6 +3,15 @@ set -e
 
 echo "Starting SeriesOfTubes..."
 
+# Check for .tubes.yaml configuration file
+if [ ! -f "/app/.tubes.yaml" ]; then
+    echo "ERROR: .tubes.yaml configuration file not found!"
+    echo "Please create .tubes.yaml from .tubes.example.yaml and mount it into the container."
+    echo "Example: docker run -v $(pwd)/.tubes.yaml:/app/.tubes.yaml ..."
+    exit 1
+fi
+
+
 # Wait for PostgreSQL to be ready (if using PostgreSQL)
 if [[ "$DATABASE_URL" == postgresql* ]]; then
     echo "Waiting for PostgreSQL..."

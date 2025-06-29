@@ -52,6 +52,8 @@ services:
     volumes:
       - ./logs:/app/logs
       - ./workflows:/app/workflows:ro
+      - ./docs:/app/docs:ro  # Mount docs directory read-only
+      - ./.tubes.yaml:/app/.tubes.yaml:ro  # Mount tubes config file
     depends_on:
       postgres:
         condition: service_healthy
@@ -86,7 +88,9 @@ services:
       - ./tests:/app/tests  # Mount tests
       - ./workflows:/app/workflows  # Mount example workflows
       - ./logs:/app/logs
+      - ./docs:/app/docs  # Mount docs directory
       - ./.env:/app/.env:ro  # Mount env file if exists
+      - ./.tubes.yaml:/app/.tubes.yaml:ro  # Mount tubes config file
     depends_on:
       postgres:
         condition: service_healthy

@@ -47,3 +47,22 @@ Map context variables from other nodes
 
 
 ## Examples
+
+### Example 1: Conditional routing
+
+```yaml
+route_by_size:
+  type: conditional
+  depends_on: [analyze_company]
+  config:
+    context:
+      company: analyze_company
+    conditions:
+      - condition: "{{ company.revenue > 1000000 }}"
+        then: process_enterprise
+      - condition: "{{ company.employees < 50 }}"
+        then: process_small_business
+      - condition: "default"
+        then: process_standard
+        is_default: true
+```

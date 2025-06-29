@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Form, Input, Button, Card, Typography, Tabs, App } from 'antd';
+import { Form, Input, Button, Card, Typography, Tabs, Alert } from 'antd';
 import { UserOutlined, LockOutlined, MailOutlined } from '@ant-design/icons';
 import { useAuthStore } from '../../stores/auth';
 
@@ -19,40 +19,45 @@ interface RegisterFormValues {
 }
 
 export const LoginPage: React.FC = () => {
-  const { message } = App.useApp();
   const navigate = useNavigate();
   const location = useLocation();
   const { login, register, isLoading, error, clearError } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
+  const [localError, setLocalError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const from = (location.state as any)?.from?.pathname || '/workflows';
 
   const handleLogin = async (values: LoginFormValues) => {
     try {
       await login(values.username, values.password);
-      message.success('Login successful!');
       navigate(from, { replace: true });
-    } catch {
-      // Error is handled in the store
+    } catch (error: any) {
+      console.error('Login error:', error);
+      // Show error immediately in case useEffect doesn't trigger
+      const errorMessage = error.response?.data?.detail || 'Login failed';
+      console.log('Error message:', errorMessage);
+      
+      // Set local error state to show Alert
+      setLocalError(errorMessage);
     }
   };
 
   const handleRegister = async (values: RegisterFormValues) => {
     try {
       await register(values.username, values.email, values.password);
-      message.success('Registration successful! Please login.');
       setActiveTab('login');
-    } catch {
-      // Error is handled in the store
+      setSuccessMessage('Registration successful! Please login.');
+    } catch (error: any) {
+      // Show error immediately in case useEffect doesn't trigger
+      const errorMessage = error.response?.data?.detail || 'Registration failed';
+      
+      // Set local error state to show Alert
+      setLocalError(errorMessage);
     }
   };
 
-  React.useEffect(() => {
-    if (error) {
-      message.error(error);
-      clearError();
-    }
-  }, [error, clearError, message]);
+  // Remove the useEffect that was causing duplicate error messages
 
   return (
     <div
@@ -72,9 +77,38 @@ export const LoginPage: React.FC = () => {
           <Typography.Text type="secondary">LLM Workflow Orchestration Platform</Typography.Text>
         </div>
 
+        {(error || localError) && (
+          <Alert
+            message={error || localError}
+            type="error"
+            showIcon
+            closable
+            onClose={() => {
+              clearError();
+              setLocalError(null);
+            }}
+            style={{ marginBottom: 16 }}
+          />
+        )}
+        
+        {successMessage && (
+          <Alert
+            message={successMessage}
+            type="success"
+            showIcon
+            closable
+            onClose={() => setSuccessMessage(null)}
+            style={{ marginBottom: 16 }}
+          />
+        )}
+
         <Tabs
           activeKey={activeTab}
-          onChange={(key) => setActiveTab(key as 'login' | 'register')}
+          onChange={(key) => {
+            setActiveTab(key as 'login' | 'register');
+            clearError();
+            setLocalError(null);
+          }}
           items={[
             {
               key: 'login',

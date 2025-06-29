@@ -69,10 +69,14 @@ export const ExecutionDetail: React.FC = () => {
 
   // Set up SSE connection for real-time updates
   useEffect(() => {
-    if (!id || !execution) return;
+    if (!id) return;
+
+    // Use initial data if execution is not yet in store
+    const currentExecution = execution || initialData;
+    if (!currentExecution) return;
 
     // Only set up SSE for running executions
-    if (execution.status !== 'running' && execution.status !== 'pending') {
+    if (currentExecution.status !== 'running' && currentExecution.status !== 'pending') {
       return;
     }
 
@@ -84,15 +88,21 @@ export const ExecutionDetail: React.FC = () => {
         data.type &&
         (data.type === 'status' || data.type === 'update' || data.type === 'complete')
       ) {
-        setExecution({
-          ...execution,
-          status: data.status,
-          started_at: data.started_at,
-          completed_at: data.completed_at,
-          outputs: data.outputs,
-          errors: data.errors,
-          progress: data.progress || execution.progress || {},
-        });
+        const updatedExecution = {
+          ...currentExecution,
+          status: data.status || currentExecution.status,
+          started_at: data.started_at || currentExecution.started_at,
+          completed_at: data.completed_at || currentExecution.completed_at,
+          outputs: data.outputs || currentExecution.outputs,
+          errors: data.errors || currentExecution.errors,
+          progress: data.progress || currentExecution.progress || {},
+        };
+        setExecution(updatedExecution);
+        
+        // If execution is complete, close the SSE connection
+        if (data.status === 'completed' || data.status === 'failed') {
+          es.close();
+        }
       }
 
       // Update progress for each node (if progress data is available)
@@ -116,7 +126,7 @@ export const ExecutionDetail: React.FC = () => {
     return () => {
       es.close();
     };
-  }, [id, execution, updateProgress, setExecution]);
+  }, [id, execution, initialData, updateProgress, setExecution]);
 
   if (isLoading || workflowLoading) {
     return (

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import axios from 'axios';
+import api from '../api/client';
 
 interface User {
   id: string;
@@ -25,12 +25,12 @@ interface AuthState {
   checkAuth: () => void;
 }
 
-// Configure axios defaults
-const setupAxiosInterceptors = (token: string | null) => {
+// Configure api defaults
+const setupApiInterceptors = (token: string | null) => {
   if (token) {
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
   } else {
-    delete axios.defaults.headers.common['Authorization'];
+    delete api.defaults.headers.common['Authorization'];
   }
 };
 
@@ -46,14 +46,14 @@ export const useAuthStore = create<AuthState>()(
       login: async (username: string, password: string) => {
         set({ isLoading: true, error: null });
         try {
-          const response = await axios.post('/auth/login', { username, password });
+          const response = await api.post('/auth/login', { username, password });
           const { access_token } = response.data;
 
-          // Set token in axios defaults
-          setupAxiosInterceptors(access_token);
+          // Set token in api defaults
+          setupApiInterceptors(access_token);
 
           // Get user info from /auth/me endpoint
-          const userResponse = await axios.get('/auth/me');
+          const userResponse = await api.get('/auth/me');
           const user: User = userResponse.data;
 
           set({
@@ -64,9 +64,12 @@ export const useAuthStore = create<AuthState>()(
             error: null,
           });
         } catch (error: any) {
+          console.error('Auth store login error:', error);
+          const errorMessage = error.response?.data?.detail || 'Login failed';
+          console.log('Setting error state:', errorMessage);
           set({
             isLoading: false,
-            error: error.response?.data?.detail || 'Login failed',
+            error: errorMessage,
           });
           throw error;
         }
@@ -75,7 +78,7 @@ export const useAuthStore = create<AuthState>()(
       register: async (username: string, email: string, password: string) => {
         set({ isLoading: true, error: null });
         try {
-          const response = await axios.post('/auth/register', {
+          const response = await api.post('/auth/register', {
             username,
             email,
             password,
@@ -101,7 +104,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: () => {
-        setupAxiosInterceptors(null);
+        setupApiInterceptors(null);
         set({
           user: null,
           token: null,
@@ -115,7 +118,7 @@ export const useAuthStore = create<AuthState>()(
       checkAuth: () => {
         const state = get();
         if (state.token) {
-          setupAxiosInterceptors(state.token);
+          setupApiInterceptors(state.token);
         }
       },
     }),
@@ -127,24 +130,11 @@ export const useAuthStore = create<AuthState>()(
         isAuthenticated: state.isAuthenticated,
       }),
       onRehydrateStorage: () => (state) => {
-        // Setup axios interceptors when store is rehydrated
+        // Setup api interceptors when store is rehydrated
         if (state?.token) {
-          setupAxiosInterceptors(state.token);
+          setupApiInterceptors(state.token);
         }
       },
     }
   )
-);
-
-// Setup axios response interceptor for 401 errors
-axios.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Clear auth state and redirect to login
-      useAuthStore.getState().logout();
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
-  }
 );

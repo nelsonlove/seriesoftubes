@@ -151,18 +151,19 @@ nodes:
         value: inputs.value
         threshold: inputs.threshold
 
-  route:
-    type: route
+  route_decision:
+    type: conditional
     depends_on: [evaluate]
     description: Route based on evaluation
     config:
       condition: "{{ evaluate.is_high }}"
-      true_next: high_value_process
-      false_next: low_value_process
+      outputs:
+        true: high_value_process
+        false: low_value_process
 
   high_value_process:
     type: llm
-    depends_on: [route]
+    depends_on: [route_decision]
     description: Process high values
     config:
       prompt: |
@@ -174,7 +175,7 @@ nodes:
 
   low_value_process:
     type: llm
-    depends_on: [route]
+    depends_on: [route_decision]
     description: Process low values
     config:
       prompt: |
@@ -186,7 +187,7 @@ nodes:
 
 outputs:
   evaluation: evaluate
-  recommendation: route
+  recommendation: route_decision
 `,
   },
   {

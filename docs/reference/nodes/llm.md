@@ -40,7 +40,7 @@ Model identifier
 
 **Examples:**
 
-- `gpt-4`
+- `gpt-4o`
 - `claude-3-opus-20240229`
 
 ### `prompt`

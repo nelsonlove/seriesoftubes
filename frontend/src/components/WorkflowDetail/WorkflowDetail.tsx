@@ -142,8 +142,9 @@ export const WorkflowDetail: React.FC<WorkflowDetailProps> = ({ path }) => {
         </span>
       ),
       children: (
-        <Space direction="vertical" style={{ width: '100%' }} size="medium">
-          {Object.entries(workflow.nodes).map(([name, node]) => (
+        <div style={{ maxHeight: '600px', overflowY: 'auto', paddingRight: '8px' }}>
+          <Space direction="vertical" style={{ width: '100%' }} size="medium">
+            {Object.entries(workflow.nodes).map(([name, node]) => (
             <Card key={name} size="small">
               <Space direction="vertical" style={{ width: '100%' }}>
                 <Space>
@@ -165,6 +166,9 @@ export const WorkflowDetail: React.FC<WorkflowDetailProps> = ({ path }) => {
                     borderRadius: 4,
                     fontSize: 12,
                     overflow: 'auto',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                    maxWidth: '100%',
                   }}
                 >
                   {JSON.stringify(node.config, null, 2)}
@@ -172,7 +176,8 @@ export const WorkflowDetail: React.FC<WorkflowDetailProps> = ({ path }) => {
               </Space>
             </Card>
           ))}
-        </Space>
+          </Space>
+        </div>
       ),
     },
     {
