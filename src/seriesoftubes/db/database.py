@@ -42,17 +42,31 @@ def get_database_url() -> str:
 
 
 # Create async engine
-engine = create_async_engine(
-    get_database_url(),
-    echo=False,  # Set to True for SQL logging
-    poolclass=NullPool,  # Disable connection pooling for SQLite
-)
+db_url = get_database_url()
+engine_kwargs = {
+    "echo": False,  # Set to True for SQL logging
+}
+
+# Only use NullPool for SQLite, use default pool for PostgreSQL
+if db_url.startswith("sqlite"):
+    engine_kwargs["poolclass"] = NullPool
+else:
+    # For PostgreSQL, use default pool with optimized settings
+    engine_kwargs.update({
+        "pool_size": 20,
+        "max_overflow": 10,
+        "pool_timeout": 30,
+        "pool_recycle": 3600,  # Recycle connections after 1 hour
+        "pool_pre_ping": True,  # Check connection health before using
+    })
+
+engine = create_async_engine(db_url, **engine_kwargs)
 
 # Create session factory
 async_session = async_sessionmaker(
     engine,
     class_=AsyncSession,
-    expire_on_commit=False,
+    expire_on_commit=True,  # Free memory after commit
 )
 
 

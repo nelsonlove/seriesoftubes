@@ -121,10 +121,10 @@ class ExecutionManager:
 class DatabaseProgressTrackingEngine(WorkflowEngine):
     """Workflow engine that tracks progress in database"""
 
-    def __init__(self, execution_id: str, db_session: AsyncSession, user_id: str | None = None):
+    def __init__(self, execution_id: str, db_session: AsyncSession | None = None, user_id: str | None = None):
         super().__init__()
         self.execution_id = execution_id
-        self.db_session = db_session
+        self.db_session = db_session  # For backward compatibility, but we'll create our own sessions
         self.user_id = user_id
 
     async def execute(
@@ -167,29 +167,32 @@ class DatabaseProgressTrackingEngine(WorkflowEngine):
         from sqlalchemy import select, update
 
         from seriesoftubes.db.models import Execution
+        from seriesoftubes.db.database import async_session
 
         try:
-            # Get current progress
-            result_query = await self.db_session.execute(
-                select(Execution.progress).where(Execution.id == self.execution_id)
-            )
-            current_progress = result_query.scalar() or {}
-
-            # Set any "running" nodes to "failed" since execution has ended
-            cleanup_needed = False
-            for node_name, status in current_progress.items():
-                if status == "running":
-                    current_progress[node_name] = "failed"
-                    cleanup_needed = True
-
-            # Update database if cleanup was needed
-            if cleanup_needed:
-                await self.db_session.execute(
-                    update(Execution)
-                    .where(Execution.id == self.execution_id)
-                    .values(progress=current_progress)
+            # Create a new session for cleanup to avoid greenlet issues
+            async with async_session() as session:
+                # Get current progress
+                result_query = await session.execute(
+                    select(Execution.progress).where(Execution.id == self.execution_id)
                 )
-                await self.db_session.commit()
+                current_progress = result_query.scalar() or {}
+
+                # Set any "running" nodes to "failed" since execution has ended
+                cleanup_needed = False
+                for node_name, status in current_progress.items():
+                    if status == "running":
+                        current_progress[node_name] = "failed"
+                        cleanup_needed = True
+
+                # Update database if cleanup was needed
+                if cleanup_needed:
+                    await session.execute(
+                        update(Execution)
+                        .where(Execution.id == self.execution_id)
+                        .values(progress=current_progress)
+                    )
+                    await session.commit()
 
         except Exception as e:
             # Don't fail the execution just because cleanup failed
@@ -203,46 +206,56 @@ class DatabaseProgressTrackingEngine(WorkflowEngine):
         from sqlalchemy import select, update
 
         from seriesoftubes.db.models import Execution
+        from seriesoftubes.db.database import async_session
 
         try:
-            # Get current progress
-            result_query = await self.db_session.execute(
-                select(Execution.progress).where(Execution.id == self.execution_id)
-            )
-            current_progress = result_query.scalar() or {}
+            # Create a new session for each database operation to avoid greenlet issues
+            async with async_session() as session:
+                # Get current progress
+                result_query = await session.execute(
+                    select(Execution.progress).where(Execution.id == self.execution_id)
+                )
+                current_progress = result_query.scalar() or {}
 
-            # Update progress before execution - node is running
-            current_progress[node.name] = "running"
-            await self.db_session.execute(
-                update(Execution)
-                .where(Execution.id == self.execution_id)
-                .values(progress=current_progress)
-            )
-            await self.db_session.commit()
+                # Update progress before execution - node is running
+                current_progress[node.name] = "running"
+                await session.execute(
+                    update(Execution)
+                    .where(Execution.id == self.execution_id)
+                    .values(progress=current_progress)
+                )
+                await session.commit()
 
-            # Execute node
+            # Execute node (outside of session context to avoid holding connection)
             result = await super()._execute_node(node, context)
 
             # Update progress after execution with detailed info
-            if result.success:
-                current_progress[node.name] = {
-                    "status": "completed",
-                    "completed_at": datetime.now(timezone.utc).isoformat(),
-                    "output": result.output,
-                }
-            else:
-                current_progress[node.name] = {
-                    "status": "failed",
-                    "error": result.error or "Node execution failed",
-                    "completed_at": datetime.now(timezone.utc).isoformat(),
-                }
+            async with async_session() as session:
+                # Re-fetch current progress to avoid stale data
+                result_query = await session.execute(
+                    select(Execution.progress).where(Execution.id == self.execution_id)
+                )
+                current_progress = result_query.scalar() or {}
 
-            await self.db_session.execute(
-                update(Execution)
-                .where(Execution.id == self.execution_id)
-                .values(progress=current_progress)
-            )
-            await self.db_session.commit()
+                if result.success:
+                    current_progress[node.name] = {
+                        "status": "completed",
+                        "completed_at": datetime.now(timezone.utc).isoformat(),
+                        "output": result.output,
+                    }
+                else:
+                    current_progress[node.name] = {
+                        "status": "failed",
+                        "error": result.error or "Node execution failed",
+                        "completed_at": datetime.now(timezone.utc).isoformat(),
+                    }
+
+                await session.execute(
+                    update(Execution)
+                    .where(Execution.id == self.execution_id)
+                    .values(progress=current_progress)
+                )
+                await session.commit()
 
             return result
 

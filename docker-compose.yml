@@ -54,6 +54,7 @@ services:
       - MINIO_SECRET_KEY=minioadmin
       - MINIO_BUCKET=seriesoftubes
       - MINIO_SECURE=false
+      - GREENLET_USE_STANDARD_SWITCHING=yes
     volumes:
       - ./logs:/app/logs
       - ./workflows:/app/workflows:ro
@@ -93,6 +94,7 @@ services:
       - MINIO_SECRET_KEY=minioadmin
       - MINIO_BUCKET=seriesoftubes
       - MINIO_SECURE=false
+      - GREENLET_USE_STANDARD_SWITCHING=yes
     volumes:
       - ./src:/app/src  # Mount only source code for hot reload
       - ./tests:/app/tests  # Mount tests
