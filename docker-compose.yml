@@ -14,9 +14,11 @@ services:
       - /app/node_modules  # Prevent overwriting node_modules
     environment:
       - VITE_API_URL=http://localhost:${API_PORT:-8000}
+      - VITE_API_PROXY_URL=http://api-dev:8000
     profiles: ["dev"]  # Only starts with --profile dev
     depends_on:
       - api-dev
+    restart: unless-stopped
 
   # Frontend (Production build)
   frontend:
