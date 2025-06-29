@@ -8,7 +8,20 @@ from sqlalchemy import create_engine, select, update
 from sqlalchemy.orm import Session
 
 from seriesoftubes.engine import ExecutionContext, NodeResult, WorkflowEngine
-from seriesoftubes.models import Node, Workflow
+from seriesoftubes.models import Node, NodeType, Workflow
+from seriesoftubes.nodes import (
+    AggregateNodeExecutor,
+    ConditionalNodeExecutor,
+    FileNodeExecutor,
+    FilterNodeExecutor,
+    ForEachNodeExecutor,
+    JoinNodeExecutor,
+    LLMNodeExecutor,
+    PythonNodeExecutor,
+    SplitNodeExecutor,
+    TransformNodeExecutor,
+)
+from seriesoftubes.nodes.http_sync import SyncHTTPNodeExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +41,9 @@ class SyncDatabaseProgressTrackingEngine(WorkflowEngine):
         # Create synchronous engine
         sync_db_url = db_url.replace("+asyncpg", "")
         self.engine = create_engine(sync_db_url)
+        
+        # Override HTTP executor with synchronous version to avoid event loop issues
+        self.executors[NodeType.HTTP] = SyncHTTPNodeExecutor()
 
     async def execute(self, workflow: Workflow, inputs: dict[str, Any]) -> ExecutionContext:
         """Override execute to add cleanup logic and output storage"""

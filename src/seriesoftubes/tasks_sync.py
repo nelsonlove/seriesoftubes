@@ -94,6 +94,15 @@ def execute_workflow(
                         f"Completed execution {execution_id} with status: "
                         f"{'success' if not context.errors else 'failed'}"
                     )
+                    
+                    # Important: Clean up any pending tasks to avoid warnings
+                    pending = asyncio.all_tasks(loop)
+                    for task in pending:
+                        task.cancel()
+                    
+                    # Give cancelled tasks a chance to clean up
+                    if pending:
+                        loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
 
                     # Prepare outputs
                     outputs = {}
