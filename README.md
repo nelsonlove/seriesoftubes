@@ -17,8 +17,8 @@ pip install -e ".[dev]"
 cp .env.example .env
 # Edit .env and add your API keys (OPENAI_API_KEY or ANTHROPIC_API_KEY)
 
-# Optional: Start services with Docker
-docker-compose up -d               # Just databases (Redis + PostgreSQL)
+# Start services with Docker (see Docker Setup section below)
+docker-compose up -d               # Just databases (Redis + PostgreSQL + MinIO)
 # OR
 docker-compose --profile dev up -d # Full stack with hot reload
 
@@ -34,7 +34,7 @@ s10s list
 ```
 
 **Configuration**: See [docs/configuration-guide.md](docs/configuration-guide.md) for detailed configuration options.
-**Development**: See [docs/development-setup.md](docs/development-setup.md) for Docker setup with PostgreSQL and Redis.
+**Docker Setup**: See the [Docker Setup](#docker-setup) section below for complete Docker instructions.
 **Security**: See [docs/security.md](docs/security.md) for production security configuration.
 
 ## Key Commands
@@ -79,30 +79,169 @@ pre-commit run --all-files         # Run all linters
 - Workflow versioning and rollback
 - Real-time execution monitoring
 
-## Docker & API
+## Docker Setup
 
-### Quick Docker Commands
+SeriesOfTubes includes comprehensive Docker support for both development and production environments.
+
+### Docker Profiles
+
+The project uses Docker Compose profiles to control which services start:
+
+- **Default** (no profile): Only infrastructure services (PostgreSQL, Redis, MinIO)
+- **`dev` profile**: Full development stack with hot reload
+- **`prod` profile**: Production-ready frontend build
+- **`with-api` profile**: Production API server (used with `prod`)
+
+### Quick Start with Docker
 
 ```bash
-# Development with hot reload
+# 1. Copy environment files
+cp .env.example .env
+cp .tubes.example.yaml .tubes.yaml
+
+# 2. Edit .env and add your API keys (OPENAI_API_KEY or ANTHROPIC_API_KEY)
+
+# 3. Start services based on your needs:
+
+# Option A: Just infrastructure (PostgreSQL, Redis, MinIO)
+docker-compose up -d
+
+# Option B: Full development stack with hot reload
 docker-compose --profile dev up -d
 
-# Custom ports
-FRONTEND_PORT=3001 API_PORT=8001 docker-compose --profile dev up -d
-
-# Production mode
+# Option C: Production stack
 docker-compose --profile prod --profile with-api up -d
+```
+
+### Services Overview
+
+| Service | Port | Description | Profiles |
+|---------|------|-------------|----------|
+| postgres | 5432 | PostgreSQL database | Always running |
+| redis | 6379 | Redis cache | Always running |
+| minio | 9000/9001 | S3-compatible storage (API/Console) | Always running |
+| api-dev | 8000 | FastAPI with hot reload | `dev` |
+| frontend-dev | 3000 | React with hot reload | `dev` |
+| api | 8000 | FastAPI production | `with-api` |
+| frontend | 80 | React production build | `prod` |
+
+### Development Workflow
+
+```bash
+# Start development environment
+docker-compose --profile dev up -d
+
+# Check service health
+docker-compose ps
 
 # View logs
 docker-compose logs -f api-dev
+docker-compose logs -f frontend-dev
+
+# Access services
+# - Frontend: http://localhost:3000
+# - API: http://localhost:8000
+# - API Docs: http://localhost:8000/docs
+# - MinIO Console: http://localhost:9001 (minioadmin/minioadmin)
+
+# Stop all services
+docker-compose --profile dev down
+
+# Stop and remove volumes (clean slate)
+docker-compose --profile dev down -v
 ```
 
-### API Endpoints
+### Custom Configuration
 
-When running the API server:
-- API Documentation: http://localhost:8000/docs
-- Health Check: http://localhost:8000/health
-- Frontend: http://localhost:3000 (when using Docker)
+#### Custom Ports
+```bash
+# Use different ports if defaults are taken
+FRONTEND_PORT=3001 API_PORT=8001 docker-compose --profile dev up -d
+```
+
+#### Environment Variables
+The following environment variables can be configured in `.env`:
+- `OPENAI_API_KEY` - OpenAI API key
+- `ANTHROPIC_API_KEY` - Anthropic API key
+- `JWT_SECRET_KEY` - JWT secret (auto-generated for dev)
+- `CORS_ORIGINS` - Allowed CORS origins
+- `LOG_LEVEL` - Logging level (default: INFO)
+- `API_PORT` - API port (default: 8000)
+- `FRONTEND_PORT` - Frontend port (default: 3000)
+
+### Production Deployment
+
+```bash
+# Build and start production services
+docker-compose --profile prod --profile with-api up -d
+
+# Production services run on:
+# - Frontend: http://localhost (port 80)
+# - API: http://localhost:8000
+
+# Enable HTTPS with a reverse proxy (nginx example)
+# See docs/deployment-guide.md for full production setup
+```
+
+### Docker Images
+
+The project includes several Dockerfiles:
+
+- `Dockerfile` - Multi-stage production API build
+- `Dockerfile.dev` - Development API with hot reload
+- `frontend/Dockerfile` - Production frontend build (nginx)
+- `frontend/Dockerfile.dev` - Development frontend with Vite
+
+### Troubleshooting Docker
+
+#### Database Connection Issues
+```bash
+# Check if PostgreSQL is healthy
+docker-compose ps postgres
+docker-compose logs postgres
+
+# Manually test connection
+docker-compose exec postgres psql -U seriesoftubes -d seriesoftubes
+```
+
+#### API Not Starting
+```bash
+# Check API logs
+docker-compose logs api-dev
+
+# Common issues:
+# - Missing .env file or API keys
+# - Database not ready (wait for health checks)
+# - Port already in use (change with API_PORT env var)
+```
+
+#### Frontend Can't Connect to API
+```bash
+# Ensure API is running
+docker-compose ps api-dev
+
+# Check CORS settings in docker-compose.yml
+# Frontend uses VITE_API_PROXY_URL for container-to-container communication
+```
+
+#### Rebuilding After Code Changes
+```bash
+# Development mode auto-reloads, but if you change dependencies:
+docker-compose --profile dev build --no-cache
+docker-compose --profile dev up -d
+```
+
+### Data Persistence
+
+Docker volumes persist data between container restarts:
+- `postgres_data` - PostgreSQL database
+- `redis_data` - Redis cache
+- `minio_data` - Object storage files
+
+To reset everything:
+```bash
+docker-compose down -v  # Removes all volumes
+```
 
 ## Architecture
 
