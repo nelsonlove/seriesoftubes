@@ -317,16 +317,14 @@ class SecurePythonEngine:
         
         # We don't need to pre-import modules since imports work via __import__
         
-        # Add utility functions
-        safe_locals['_print'] = self._safe_print
+        # Add utility functions required by RestrictedPython
+        safe_locals['_print_'] = self._safe_print  # Note: RestrictedPython uses _print_ with trailing underscore
         safe_locals['_iter_unpack_sequence'] = guarded_iter_unpack_sequence
         safe_locals['_getattr_'] = safer_getattr
         
         # If context wasn't empty, also add it as 'context' variable
         if context:
             safe_locals['context'] = context
-        
-        return safe_locals
         
         return safe_locals
     
