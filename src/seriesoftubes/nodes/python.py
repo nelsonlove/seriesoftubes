@@ -132,10 +132,13 @@ class PythonNodeExecutor(NodeExecutor):
                 # Apply asyncio timeout
                 timeout_seconds = config.timeout or 30
                 try:
-                    result = await asyncio.wait_for(
-                        asyncio.get_event_loop().run_in_executor(None, execute_fn),
-                        timeout=timeout_seconds
-                    )
+                    # Create a limited thread pool executor to avoid too many threads
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                        result = await asyncio.wait_for(
+                            asyncio.get_event_loop().run_in_executor(executor, execute_fn),
+                            timeout=timeout_seconds
+                        )
                 except asyncio.TimeoutError:
                     return NodeResult(
                         output=None,
@@ -144,10 +147,18 @@ class PythonNodeExecutor(NodeExecutor):
                     )
                     
             except SecurePythonError as e:
+                error_msg = str(e)
+                # Check for common return statement error
+                if "Syntax error" in error_msg and "'return' outside function" in error_msg:
+                    error_msg = (
+                        "Python node code executes at module level. "
+                        "Use 'return <value>' to return a result (it will be transformed to 'result = <value>'). "
+                        "Original error: " + error_msg
+                    )
                 return NodeResult(
                     output=None,
                     success=False,
-                    error=f"Security error in Python node '{node.name}': {e}",
+                    error=f"Security error in Python node '{node.name}': {error_msg}",
                 )
 
             # Structure the output

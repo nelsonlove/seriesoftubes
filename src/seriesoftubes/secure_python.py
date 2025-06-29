@@ -105,6 +105,89 @@ class SecurePythonEngine:
         """Initialize the secure Python engine"""
         self.default_level = default_level
     
+    def _transform_module_returns(self, code: str) -> str:
+        """Transform module-level return statements to result assignments"""
+        try:
+            tree = ast.parse(code)
+        except SyntaxError:
+            # If parsing fails, return original code
+            return code
+        
+        class ReturnTransformer(ast.NodeTransformer):
+            def __init__(self):
+                self.in_function = False
+                self.transformed = False
+                
+            def visit_FunctionDef(self, node):
+                old_in_function = self.in_function
+                self.in_function = True
+                self.generic_visit(node)
+                self.in_function = old_in_function
+                return node
+                
+            def visit_AsyncFunctionDef(self, node):
+                old_in_function = self.in_function
+                self.in_function = True
+                self.generic_visit(node)
+                self.in_function = old_in_function
+                return node
+                
+            def visit_ClassDef(self, node):
+                old_in_function = self.in_function
+                self.in_function = True
+                self.generic_visit(node)
+                self.in_function = old_in_function
+                return node
+                
+            def visit_Return(self, node):
+                if not self.in_function:
+                    # Transform module-level return to assignment
+                    self.transformed = True
+                    if node.value is None:
+                        # return with no value -> result = None
+                        return ast.Assign(
+                            targets=[ast.Name(id='result', ctx=ast.Store())],
+                            value=ast.Constant(value=None)
+                        )
+                    else:
+                        # return value -> result = value
+                        return ast.Assign(
+                            targets=[ast.Name(id='result', ctx=ast.Store())],
+                            value=node.value
+                        )
+                return node
+        
+        transformer = ReturnTransformer()
+        new_tree = transformer.visit(tree)
+        
+        if transformer.transformed:
+            # Since we can't reliably convert AST back to source without external libraries,
+            # we'll use a regex-based approach for module-level returns
+            import re
+            
+            # Split code into lines
+            lines = code.split('\n')
+            modified_lines = []
+            
+            # Track indentation level to detect module-level code
+            for line in lines:
+                stripped = line.lstrip()
+                if stripped.startswith('return'):
+                    # Check if this is at module level (no indentation)
+                    indent = len(line) - len(stripped)
+                    if indent == 0:
+                        # Replace 'return' with 'result ='
+                        modified_line = line.replace('return', 'result =', 1)
+                        modified_lines.append(modified_line)
+                    else:
+                        modified_lines.append(line)
+                else:
+                    modified_lines.append(line)
+            
+            return '\n'.join(modified_lines)
+        
+        return code
+    
     def execute(
         self,
         code: str,
@@ -136,6 +219,9 @@ class SecurePythonEngine:
         
         if context is None:
             context = {}
+        
+        # Transform module-level returns to result assignments
+        code = self._transform_module_returns(code)
         
         # Validate code with AST first
         try:
