@@ -49,6 +49,11 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173,http://localhost}
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET=seriesoftubes
+      - MINIO_SECURE=false
     volumes:
       - ./logs:/app/logs
       - ./workflows:/app/workflows:ro
@@ -83,6 +88,11 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173,http://localhost}
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET=seriesoftubes
+      - MINIO_SECURE=false
     volumes:
       - ./src:/app/src  # Mount only source code for hot reload
       - ./tests:/app/tests  # Mount tests
@@ -139,6 +149,27 @@ services:
       timeout: 3s
       retries: 5
 
+  # MinIO for S3-compatible object storage
+  minio:
+    image: minio/minio:latest
+    container_name: seriesoftubes-minio
+    ports:
+      - "9000:9000"  # API port
+      - "9001:9001"  # Console port
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_DEFAULT_BUCKETS: seriesoftubes
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # Optional: Worker for background jobs (uncomment if needed)
   # worker:
   #   build:
@@ -162,3 +193,4 @@ volumes:
   redis_data:
   postgres_data:
   api-dev-cache:
+  minio_data:

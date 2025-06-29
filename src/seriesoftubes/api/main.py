@@ -20,6 +20,7 @@ load_dotenv()
 from seriesoftubes.api.auth_routes import router as auth_router
 from seriesoftubes.api.docs_routes import router as docs_router
 from seriesoftubes.api.execution_routes import router as execution_router
+from seriesoftubes.api.file_routes import router as file_router
 from seriesoftubes.api.workflow_routes import router as workflow_router
 from seriesoftubes.config_validation import validate_required_env_vars, validate_security_config
 from seriesoftubes.db import init_db
@@ -71,6 +72,7 @@ app.include_router(auth_router)
 app.include_router(docs_router, prefix="/api")
 app.include_router(workflow_router)
 app.include_router(execution_router)
+app.include_router(file_router, prefix="/api")
 
 
 @app.get("/")
