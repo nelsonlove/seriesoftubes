@@ -3,11 +3,10 @@
 import json
 from typing import Any
 
-import jinja2
-
 from seriesoftubes.models import Node, TransformNodeConfig
 from seriesoftubes.nodes.base import NodeContext, NodeExecutor, NodeResult
 from seriesoftubes.schemas import TransformNodeInput, TransformNodeOutput
+from seriesoftubes.template_engine import TemplateSecurityLevel, render_template
 
 
 class TransformNodeExecutor(NodeExecutor):
@@ -45,11 +44,6 @@ class TransformNodeExecutor(NodeExecutor):
             if is_parallel:
                 # For ForEach contexts, we don't need to look for item data - it's already in the context
                 # Just render the template with the current context
-                jinja_env = jinja2.Environment(
-                    loader=jinja2.BaseLoader(),
-                    undefined=jinja2.StrictUndefined,
-                    autoescape=True,
-                )
                 
                 try:
                     if isinstance(config.template, dict):
@@ -57,9 +51,13 @@ class TransformNodeExecutor(NodeExecutor):
                         transformed_item = {}
                         for field_name, field_template in config.template.items():
                             if isinstance(field_template, str):
-                                # Render template
-                                template = jinja_env.from_string(field_template)
-                                rendered_value = template.render(template_data)
+                                # Render template using secure template engine
+                                rendered_value = render_template(
+                                    field_template,
+                                    template_data,
+                                    level=TemplateSecurityLevel.SAFE_EXPRESSIONS,
+                                    node_type="transform"
+                                )
 
                                 # Try to parse as JSON if it looks like JSON
                                 try:
@@ -93,16 +91,12 @@ class TransformNodeExecutor(NodeExecutor):
                     elif isinstance(config.template, str):
                         # Template is a string - render with current context
                         try:
-                            template = jinja_env.from_string(config.template)
-                        except jinja2.TemplateSyntaxError as e:
-                            return NodeResult(
-                                output=None,
-                                success=False,
-                                error=f"Invalid template syntax: {e!s}",
+                            rendered_value = render_template(
+                                config.template,
+                                template_data,
+                                level=TemplateSecurityLevel.SAFE_EXPRESSIONS,
+                                node_type="transform"
                             )
-
-                        try:
-                            rendered_value = template.render(template_data)
 
                             # Try to parse as JSON
                             try:
@@ -118,13 +112,6 @@ class TransformNodeExecutor(NodeExecutor):
                                     success=True,
                                     metadata={"node_type": "transform", "parallel_execution": True},
                                 )
-
-                        except jinja2.TemplateError as e:
-                            return NodeResult(
-                                output=None,
-                                success=False,
-                                error=f"Template error: {e!s}",
-                            )
                     else:
                         return NodeResult(
                             output=None,
@@ -186,13 +173,6 @@ class TransformNodeExecutor(NodeExecutor):
                     error=f"Data to transform is not an array (got {type(array_data).__name__})",
                 )
 
-            # Set up Jinja2 environment for template rendering
-            jinja_env = jinja2.Environment(
-                loader=jinja2.BaseLoader(),
-                undefined=jinja2.StrictUndefined,
-                autoescape=True,
-            )
-
             # Handle different template types
             if isinstance(config.template, dict):
                 # Template is a dict structure - transform each field
@@ -210,9 +190,13 @@ class TransformNodeExecutor(NodeExecutor):
                         transformed_item = {}
                         for field_name, field_template in config.template.items():
                             if isinstance(field_template, str):
-                                # Render template
-                                template = jinja_env.from_string(field_template)
-                                rendered_value = template.render(item_context)
+                                # Render template using secure template engine
+                                rendered_value = render_template(
+                                    field_template,
+                                    item_context,
+                                    level=TemplateSecurityLevel.SAFE_EXPRESSIONS,
+                                    node_type="transform"
+                                )
 
                                 # Try to parse as JSON if it looks like JSON
                                 try:
@@ -245,7 +229,7 @@ class TransformNodeExecutor(NodeExecutor):
 
                         transformed_items.append(transformed_item)
 
-                    except jinja2.TemplateError as e:
+                    except Exception as e:
                         return NodeResult(
                             output=None,
                             success=False,
@@ -254,15 +238,6 @@ class TransformNodeExecutor(NodeExecutor):
 
             elif isinstance(config.template, str):
                 # Template is a string - render for each item
-                try:
-                    template = jinja_env.from_string(config.template)
-                except jinja2.TemplateSyntaxError as e:
-                    return NodeResult(
-                        output=None,
-                        success=False,
-                        error=f"Invalid template syntax: {e!s}",
-                    )
-
                 string_transformed_items: list[Any] = []
                 for item in array_data:
                     # Skip None items (filtered out items)
@@ -274,7 +249,12 @@ class TransformNodeExecutor(NodeExecutor):
                     item_context["item"] = item
 
                     try:
-                        rendered_value = template.render(item_context)
+                        rendered_value = render_template(
+                            config.template,
+                            item_context,
+                            level=TemplateSecurityLevel.SAFE_EXPRESSIONS,
+                            node_type="transform"
+                        )
 
                         # Try to parse as JSON
                         try:
@@ -283,7 +263,7 @@ class TransformNodeExecutor(NodeExecutor):
                         except json.JSONDecodeError:
                             string_transformed_items.append(rendered_value)
 
-                    except jinja2.TemplateError as e:
+                    except Exception as e:
                         return NodeResult(
                             output=None,
                             success=False,
