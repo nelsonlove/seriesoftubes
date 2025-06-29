@@ -697,7 +697,7 @@ async def run_workflow(
                         DatabaseProgressTrackingEngine,
                     )
 
-                    engine = DatabaseProgressTrackingEngine(execution.id, session)
+                    engine = DatabaseProgressTrackingEngine(execution.id, session, current_user.id)
                     context = await engine.execute(parsed, request.inputs)
 
                     # Prepare outputs from workflow context
@@ -714,15 +714,21 @@ async def run_workflow(
                     )
 
                     # Update execution as completed/failed
+                    execution_update = {
+                        "status": final_status,
+                        "outputs": outputs,
+                        "errors": context.errors if context.errors else None,
+                        "completed_at": datetime.now(timezone.utc),
+                    }
+                    
+                    # Add storage keys if available
+                    if hasattr(context, 'storage_keys') and context.storage_keys:
+                        execution_update["storage_keys"] = context.storage_keys
+                    
                     await session.execute(
                         update(Execution)
                         .where(Execution.id == execution.id)
-                        .values(
-                            status=final_status,
-                            outputs=outputs,
-                            errors=context.errors if context.errors else None,
-                            completed_at=datetime.now(timezone.utc),
-                        )
+                        .values(**execution_update)
                     )
                     await session.commit()
 

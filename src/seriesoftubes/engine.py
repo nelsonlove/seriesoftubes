@@ -1,10 +1,11 @@
 """DAG execution engine for seriesoftubes workflows"""
 
 import asyncio
+import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 from uuid import uuid4
 
 from seriesoftubes.cache import get_cache_backend
@@ -26,6 +27,7 @@ from seriesoftubes.nodes import (
     SplitNodeExecutor,
     TransformNodeExecutor,
 )
+from seriesoftubes.storage import StorageError, get_storage_backend
 
 
 class ExecutionContext:
@@ -39,6 +41,7 @@ class ExecutionContext:
         self.execution_id = str(uuid4())
         self.start_time = datetime.now(timezone.utc)
         self.validation_errors: dict[str, list[str]] = {}  # Node validation errors
+        self.storage_keys: dict[str, str] = {}  # Storage keys for outputs
 
         # Parallel execution support
         self.parallel_results: list[Any] = []  # Results from parallel processing
@@ -798,12 +801,99 @@ class WorkflowEngine:
             await self.cache_manager.close()
 
 
+async def save_outputs_to_storage(
+    execution_id: str,
+    workflow_name: str,
+    outputs: dict[str, Any],
+    user_id: Optional[str] = None,
+    storage_prefix: Optional[str] = None,
+) -> dict[str, str]:
+    """Save execution outputs to object storage
+    
+    Args:
+        execution_id: Unique execution ID
+        workflow_name: Name of the workflow
+        outputs: Dictionary of output name -> output data
+        user_id: Optional user ID for scoping storage
+        storage_prefix: Optional custom storage prefix
+        
+    Returns:
+        Dictionary mapping output names to storage keys
+    """
+    storage_keys = {}
+    
+    try:
+        storage = get_storage_backend()
+        await storage.initialize()
+        
+        # Determine base prefix
+        if storage_prefix:
+            base_prefix = storage_prefix
+        elif user_id:
+            base_prefix = f"{user_id}/executions/{execution_id}"
+        else:
+            base_prefix = f"executions/{execution_id}"
+        
+        # Save execution metadata
+        metadata = {
+            "execution_id": execution_id,
+            "workflow_name": workflow_name,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "output_count": len(outputs),
+        }
+        
+        metadata_key = f"{base_prefix}/metadata.json"
+        await storage.upload(
+            key=metadata_key,
+            content=json.dumps(metadata, indent=2).encode("utf-8"),
+            content_type="application/json",
+        )
+        storage_keys["__metadata__"] = metadata_key
+        
+        # Save each output
+        for output_name, output_data in outputs.items():
+            # Determine format based on data type
+            if isinstance(output_data, (dict, list)):
+                content = json.dumps(output_data, indent=2).encode("utf-8")
+                content_type = "application/json"
+                extension = "json"
+            else:
+                content = str(output_data).encode("utf-8")
+                content_type = "text/plain"
+                extension = "txt"
+            
+            # Create storage key
+            output_key = f"{base_prefix}/outputs/{output_name}.{extension}"
+            
+            # Upload to storage
+            await storage.upload(
+                key=output_key,
+                content=content,
+                content_type=content_type,
+                metadata={
+                    "execution_id": execution_id,
+                    "workflow_name": workflow_name,
+                    "output_name": output_name,
+                }
+            )
+            
+            storage_keys[output_name] = output_key
+            
+    except StorageError as e:
+        logging.error(f"Failed to save outputs to storage: {e}")
+        # Return partial results if some uploads succeeded
+        
+    return storage_keys
+
+
 async def run_workflow(
     workflow: Workflow,
     inputs: dict[str, Any] | None = None,
     *,
     save_outputs: bool = True,
     output_dir: Path | None = None,
+    save_to_storage: bool = False,
+    user_id: Optional[str] = None,
 ) -> dict[str, Any]:
     """High-level function to run a workflow
 
@@ -812,6 +902,8 @@ async def run_workflow(
         inputs: Input values
         save_outputs: Whether to save outputs to disk
         output_dir: Base directory for outputs (defaults to ./outputs)
+        save_to_storage: Whether to save outputs to object storage
+        user_id: Optional user ID for storage scoping
 
     Returns:
         Dictionary with execution results
@@ -835,15 +927,23 @@ async def run_workflow(
         if node_name in context.outputs:
             results["outputs"][output_name] = context.outputs[node_name]
 
-    # Save outputs if requested
+    # Save outputs to object storage if requested
+    if save_to_storage and results["outputs"]:
+        storage_keys = await save_outputs_to_storage(
+            execution_id=context.execution_id,
+            workflow_name=workflow.name,
+            outputs=results["outputs"],
+            user_id=user_id,
+        )
+        results["storage_keys"] = storage_keys
+
+    # Save outputs to disk if requested
     if save_outputs:
         base_dir = output_dir or Path("outputs")
         exec_output_dir = base_dir / context.execution_id
         exec_output_dir.mkdir(parents=True, exist_ok=True)
 
         # Save execution summary
-        import json  # noqa: PLC0415
-
         with open(exec_output_dir / "execution.json", "w") as f:
             json.dump(results, f, indent=2)
 

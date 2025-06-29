@@ -98,6 +98,26 @@ class FileNodeConfig(BaseNodeConfig):
     path: str | None = Field(None, description="Single file path (supports Jinja2)")
     pattern: str | None = Field(None, description="Glob pattern for multiple files")
 
+    # Storage configuration
+    storage_type: str = Field(
+        "local",
+        description="Storage type: local (filesystem) or object (S3/MinIO)",
+    )
+    storage_prefix: str | None = Field(
+        None,
+        description="Storage prefix for object storage (e.g., 'user-uploads/', 'workflow-outputs/')",
+    )
+
+    # Write mode configuration
+    mode: str = Field(
+        "read",
+        description="Mode: read (read files) or write (write output to storage)",
+    )
+    write_key: str | None = Field(
+        None,
+        description="Storage key for writing (supports Jinja2 templates)",
+    )
+
     # Format and parsing
     format_type: str = Field(
         "auto",
@@ -135,13 +155,21 @@ class FileNodeConfig(BaseNodeConfig):
 
     @model_validator(mode="after")
     def validate_paths(self) -> Self:
-        """Ensure either path or pattern is provided"""
-        if not self.path and not self.pattern:
-            msg = "Either 'path' or 'pattern' must be provided"
-            raise ValueError(msg)
-        if self.path and self.pattern:
-            msg = "Cannot specify both 'path' and 'pattern'"
-            raise ValueError(msg)
+        """Ensure configuration is valid for the mode"""
+        if self.mode == "read":
+            if not self.path and not self.pattern:
+                msg = "Either 'path' or 'pattern' must be provided for read mode"
+                raise ValueError(msg)
+            if self.path and self.pattern:
+                msg = "Cannot specify both 'path' and 'pattern'"
+                raise ValueError(msg)
+        elif self.mode == "write":
+            if not self.write_key:
+                msg = "'write_key' must be provided for write mode"
+                raise ValueError(msg)
+            if self.path or self.pattern:
+                msg = "'path' and 'pattern' are not used in write mode"
+                raise ValueError(msg)
         return self
 
 

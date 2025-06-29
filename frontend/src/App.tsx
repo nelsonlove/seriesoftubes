@@ -25,6 +25,7 @@ import {
 import { WorkflowsPage } from './pages/Workflows';
 import { ExecutionsPage } from './pages/Executions';
 import { ExecutionDetail } from './pages/Executions/ExecutionDetail';
+import FilesPage from './pages/Files/FilesPage';
 import { TestingPage } from './pages/Testing';
 import { DocumentationPage } from './pages/Documentation';
 import { LoginPage } from './pages/Auth/LoginPage';
@@ -201,6 +202,12 @@ function AppContent() {
       icon: <PlayCircleOutlined />,
       label: 'Executions',
       path: '/executions',
+    },
+    {
+      key: 'files',
+      icon: <FileOutlined />,
+      label: 'Files',
+      path: '/files',
     },
     {
       key: 'testing',
@@ -440,6 +447,14 @@ function AppContent() {
                 element={
                   <ProtectedRoute>
                     <ExecutionDetail />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/files"
+                element={
+                  <ProtectedRoute>
+                    <FilesPage />
                   </ProtectedRoute>
                 }
               />

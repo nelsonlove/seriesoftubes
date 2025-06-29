@@ -11,6 +11,7 @@ import {
   Button,
   Progress,
   Collapse,
+  message,
 } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -18,10 +19,13 @@ import {
   CloseCircleOutlined,
   LoadingOutlined,
   ClockCircleOutlined,
+  FileOutlined,
+  DownloadOutlined,
 } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { executionAPI, workflowAPI } from '../../api/client';
 import { useExecutionStore } from '../../stores/execution';
+import api from '../../api/client';
 import { useThemeStore } from '../../stores/theme';
 import type { ExecutionProgress } from '../../types/workflow';
 
@@ -428,6 +432,58 @@ export const ExecutionDetail: React.FC = () => {
           >
             {JSON.stringify(outputs, null, 2)}
           </pre>
+        </Card>
+      )}
+
+      {executionData.storage_keys && Object.keys(executionData.storage_keys).length > 0 && (
+        <Card title="Output Files">
+          <Space direction="vertical" style={{ width: '100%' }}>
+            {Object.entries(executionData.storage_keys).map(([key, storageKey]) => (
+              <div key={key} style={{ 
+                padding: '8px 12px',
+                background: themeMode === 'dark' ? '#1e293b' : '#f5f5f5',
+                borderRadius: '4px',
+                border: `1px solid ${themeMode === 'dark' ? '#475569' : '#e2e8f0'}`,
+              }}>
+                <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                  <Space>
+                    <FileOutlined />
+                    <Text strong>{key === '__metadata__' ? 'Execution Metadata' : key}</Text>
+                  </Space>
+                  <Button
+                    size="small"
+                    icon={<DownloadOutlined />}
+                    onClick={async () => {
+                      try {
+                        // Get pre-signed URL for direct download
+                        const response = await api.get<{ url: string; expires_in: number }>(
+                          `/api/files/download-by-key?key=${encodeURIComponent(storageKey)}`
+                        );
+                        
+                        // Download directly from the pre-signed URL
+                        window.open(response.data.url, '_blank');
+                        
+                        message.success('File download started');
+                      } catch (error) {
+                        // Fallback: try to construct a download URL
+                        try {
+                          const downloadUrl = `${api.defaults.baseURL}/api/files/download-by-key?key=${encodeURIComponent(storageKey)}`;
+                          window.open(downloadUrl, '_blank');
+                        } catch (fallbackError) {
+                          message.error('Failed to download file');
+                        }
+                      }
+                    }}
+                  >
+                    Download
+                  </Button>
+                </Space>
+                <Text type="secondary" style={{ fontSize: '12px' }}>
+                  {storageKey}
+                </Text>
+              </div>
+            ))}
+          </Space>
         </Card>
       )}
 

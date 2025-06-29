@@ -147,6 +147,7 @@ class Execution(Base):
     outputs: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     errors: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     progress: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    storage_keys: Mapped[dict[str, str] | None] = mapped_column(JSON, nullable=True)
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

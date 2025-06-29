@@ -1,5 +1,6 @@
 """File management API routes."""
 
+import io
 import os
 import uuid
 from datetime import datetime
@@ -9,7 +10,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..auth import get_current_user
+from .auth import get_current_user
 from ..db import get_db
 from ..db.models import User
 from ..storage import StorageError, get_storage_backend
@@ -313,5 +314,59 @@ async def delete_file(
         raise HTTPException(status_code=500, detail=f"Delete failed: {str(e)}")
 
 
-# Add this for the missing import
-import io
+
+
+@router.get("/download-by-key")
+async def download_by_key(
+    key: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Download a file by its storage key.
+    
+    This is useful for downloading execution outputs when you have the storage key.
+    """
+    try:
+        storage = get_storage_backend()
+        await storage.initialize()
+        
+        # Check if the user owns this file
+        # Storage keys are in format: user_id/executions/exec_id/outputs/name.ext
+        key_parts = key.split('/')
+        if len(key_parts) > 0 and key_parts[0] != current_user.id:
+            # Check if it's a public file
+            if not key.startswith('public/'):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Access denied to this file",
+                )
+        
+        # Download the file
+        content = await storage.download(key)
+        
+        # Get filename from key
+        filename = os.path.basename(key)
+        
+        # Determine content type
+        content_type = "application/octet-stream"
+        if filename.endswith('.json'):
+            content_type = "application/json"
+        elif filename.endswith('.txt'):
+            content_type = "text/plain"
+        elif filename.endswith('.csv'):
+            content_type = "text/csv"
+        
+        return StreamingResponse(
+            io.BytesIO(content),
+            media_type=content_type,
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"'
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except StorageError as e:
+        raise HTTPException(status_code=500, detail=f"Storage error: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Download failed: {str(e)}")

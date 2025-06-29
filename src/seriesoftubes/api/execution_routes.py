@@ -35,6 +35,7 @@ class ExecutionResponse(BaseModel):
     outputs: dict[str, Any] | None
     errors: dict[str, str] | None
     progress: dict[str, Any] | None
+    storage_keys: dict[str, str] | None
     started_at: str
     completed_at: str | None
 
@@ -78,6 +79,7 @@ async def list_executions(
             outputs=e.outputs,
             errors=e.errors,
             progress=e.progress or {},
+            storage_keys=e.storage_keys,
             started_at=e.started_at.isoformat(),
             completed_at=e.completed_at.isoformat() if e.completed_at else None,
         )
@@ -286,6 +288,7 @@ async def get_execution(
         outputs=execution.outputs,
         errors=execution.errors,
         progress=execution.progress or {},
+        storage_keys=execution.storage_keys,
         started_at=execution.started_at.isoformat(),
         completed_at=(
             execution.completed_at.isoformat() if execution.completed_at else None

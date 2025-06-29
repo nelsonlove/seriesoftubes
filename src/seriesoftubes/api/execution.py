@@ -121,18 +121,37 @@ class ExecutionManager:
 class DatabaseProgressTrackingEngine(WorkflowEngine):
     """Workflow engine that tracks progress in database"""
 
-    def __init__(self, execution_id: str, db_session: AsyncSession):
+    def __init__(self, execution_id: str, db_session: AsyncSession, user_id: str | None = None):
         super().__init__()
         self.execution_id = execution_id
         self.db_session = db_session
+        self.user_id = user_id
 
     async def execute(
         self, workflow: Workflow, inputs: dict[str, Any]
     ) -> ExecutionContext:
-        """Override execute to add cleanup logic"""
+        """Override execute to add cleanup logic and output storage"""
         try:
             # Execute the workflow normally
             context = await super().execute(workflow, inputs)
+
+            # Save outputs to object storage
+            if context.outputs:
+                from seriesoftubes.engine import save_outputs_to_storage
+                
+                storage_keys = await save_outputs_to_storage(
+                    execution_id=context.execution_id,
+                    workflow_name=workflow.name,
+                    outputs={
+                        output_name: context.outputs.get(node_name)
+                        for output_name, node_name in workflow.outputs.items()
+                        if node_name in context.outputs
+                    },
+                    user_id=self.user_id,
+                )
+                
+                # Store storage keys in context for later use
+                context.storage_keys = storage_keys
 
             # Clean up any remaining "running" nodes after execution completes
             await self._cleanup_running_nodes()
