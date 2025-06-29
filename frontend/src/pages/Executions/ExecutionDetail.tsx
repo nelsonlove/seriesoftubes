@@ -71,66 +71,100 @@ export const ExecutionDetail: React.FC = () => {
     }
   }, [initialData, id, setExecution]);
 
+  // Store initial status in a ref to prevent re-renders
+  const initialStatusRef = React.useRef<string | null>(null);
+  
+  // Set initial status once
+  React.useEffect(() => {
+    if (!initialStatusRef.current && (execution?.status || initialData?.status)) {
+      initialStatusRef.current = execution?.status || initialData?.status || null;
+    }
+  }, [execution?.status, initialData?.status]);
+
   // Set up SSE connection for real-time updates
   useEffect(() => {
     if (!id) return;
 
-    // Use initial data if execution is not yet in store
-    const currentExecution = execution || initialData;
-    if (!currentExecution) return;
-
-    // Only set up SSE for running executions
-    if (currentExecution.status !== 'running' && currentExecution.status !== 'pending') {
+    // Get initial status from ref
+    const initialStatus = initialStatusRef.current;
+    
+    // Only set up SSE for running/pending executions
+    if (!initialStatus || (initialStatus !== 'running' && initialStatus !== 'pending')) {
       return;
     }
 
-    const es = executionAPI.stream(id, (data: any) => {
-      console.log('SSE data received:', data);
+    // Create a stable reference for the event source
+    let es: EventSource | null = null;
+    let isSubscribed = true;
 
-      // Update execution with latest data from SSE
-      if (
-        data.type &&
-        (data.type === 'status' || data.type === 'update' || data.type === 'complete')
-      ) {
-        const updatedExecution = {
-          ...currentExecution,
-          status: data.status || currentExecution.status,
-          started_at: data.started_at || currentExecution.started_at,
-          completed_at: data.completed_at || currentExecution.completed_at,
-          outputs: data.outputs || currentExecution.outputs,
-          errors: data.errors || currentExecution.errors,
-          progress: data.progress || currentExecution.progress || {},
-        };
-        setExecution(updatedExecution);
+    const setupEventSource = () => {
+      if (!isSubscribed) return;
+
+      es = executionAPI.stream(id, (data: any) => {
+        if (!isSubscribed) return;
         
-        // If execution is complete, close the SSE connection
-        if (data.status === 'completed' || data.status === 'failed') {
-          es.close();
-        }
-      }
+        console.log('SSE data received:', data);
 
-      // Update progress for each node (if progress data is available)
-      if (data.progress) {
-        Object.entries(data.progress).forEach(([node, statusOrProgress]) => {
-          // Handle both string status and full progress object
-          if (typeof statusOrProgress === 'string') {
-            updateProgress(id, node, {
-              node,
-              status: statusOrProgress as any,
-            });
-          } else {
-            updateProgress(id, node, statusOrProgress as ExecutionProgress);
+        // Update execution with latest data from SSE
+        if (
+          data.type &&
+          (data.type === 'status' || data.type === 'update' || data.type === 'complete')
+        ) {
+          // Get the latest execution state to avoid stale closures
+          const currentExecution = useExecutionStore.getState().executions[id];
+          const baseData = currentExecution || initialData;
+          
+          const updatedExecution = {
+            ...baseData,
+            id: id,
+            status: data.status || baseData?.status,
+            started_at: data.started_at || baseData?.started_at,
+            completed_at: data.completed_at || baseData?.completed_at,
+            outputs: data.outputs || baseData?.outputs,
+            errors: data.errors || baseData?.errors,
+            error_details: data.error_details || baseData?.error_details,
+            progress: data.progress || baseData?.progress || {},
+          };
+          setExecution(updatedExecution);
+          
+          // If execution is complete, close the SSE connection
+          if (data.status === 'completed' || data.status === 'failed' || data.status === 'cancelled') {
+            if (es) {
+              es.close();
+              es = null;
+            }
           }
-        });
-      }
-    });
+        }
 
-    setEventSource(es);
+        // Update progress for each node (if progress data is available)
+        if (data.progress) {
+          Object.entries(data.progress).forEach(([node, statusOrProgress]) => {
+            // Handle both string status and full progress object
+            if (typeof statusOrProgress === 'string') {
+              updateProgress(id, node, {
+                node,
+                status: statusOrProgress as any,
+              });
+            } else {
+              updateProgress(id, node, statusOrProgress as ExecutionProgress);
+            }
+          });
+        }
+      });
+
+      setEventSource(es);
+    };
+
+    // Set up the event source
+    setupEventSource();
 
     return () => {
-      es.close();
+      isSubscribed = false;
+      if (es) {
+        es.close();
+      }
     };
-  }, [id, execution, initialData, updateProgress, setExecution]);
+  }, [id]); // Only depend on id
 
   if (isLoading || workflowLoading) {
     return (
