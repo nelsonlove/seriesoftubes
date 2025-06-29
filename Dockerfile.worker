@@ -15,9 +15,9 @@ WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY src/ ./src/
 
-# Install dependencies (no API dependencies needed for worker)
+# Install dependencies with Celery
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -e .
+    pip install --no-cache-dir -e ".[api]"
 
 # Runtime stage
 FROM python:3.12-slim
@@ -42,5 +42,5 @@ RUN mkdir -p /app/workflows /app/outputs /app/logs && \
 # Switch to non-root user
 USER appuser
 
-# Default command (can be overridden)
-CMD ["s10s", "--help"]
+# Default command for Celery worker
+CMD ["celery", "-A", "seriesoftubes.tasks", "worker", "--loglevel=info"]

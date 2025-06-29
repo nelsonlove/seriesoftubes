@@ -161,8 +161,8 @@ services:
       - "9000:9000"  # API port
       - "9001:9001"  # Console port
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
       MINIO_DEFAULT_BUCKETS: seriesoftubes
     volumes:
       - minio_data:/data
@@ -174,24 +174,41 @@ services:
       timeout: 5s
       retries: 5
 
-  # Optional: Worker for background jobs (uncomment if needed)
-  # worker:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile.worker
-  #   container_name: seriesoftubes-worker
-  #   environment:
-  #     - DATABASE_URL=postgresql://seriesoftubes:development-password@postgres:5432/seriesoftubes
-  #     - REDIS_URL=redis://redis:6379
-  #     - OPENAI_API_KEY=${OPENAI_API_KEY}
-  #     - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-  #   volumes:
-  #     - ./workflows:/app/workflows
-  #     - ./outputs:/app/outputs
-  #   depends_on:
-  #     - postgres
-  #     - redis
-  #   restart: unless-stopped
+  # Celery worker for background job execution
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker  # Use worker dockerfile with non-root user
+    container_name: seriesoftubes-worker
+    command: celery -A seriesoftubes.tasks worker --loglevel=info --queues=workflows,nodes
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://seriesoftubes:development-password@postgres:5432/seriesoftubes
+      - REDIS_URL=redis://redis:6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET=seriesoftubes
+      - MINIO_SECURE=false
+      - GREENLET_USE_STANDARD_SWITCHING=yes
+    volumes:
+      - ./src:/app/src
+      - ./workflows:/app/workflows
+      - ./outputs:/app/outputs
+      - ./logs:/app/logs
+      - ./.tubes.yaml:/app/.tubes.yaml:ro  # Mount tubes config file
+      - ./.env:/app/.env:ro  # Mount env file if exists
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles: ["dev", "with-worker"]  # Only starts with --profile dev or --profile with-worker
 
 volumes:
   redis_data:
