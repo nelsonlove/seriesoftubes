@@ -343,6 +343,8 @@ class ConditionalNodeConfig(BaseNodeConfig):
 
 class Node(BaseModel):
     """A node in the workflow DAG"""
+    
+    model_config = {"populate_by_name": True}
 
     name: str = Field(..., description="Unique node name", pattern=r"^[a-zA-Z0-9_-]+$")
     description: str | None = Field(
@@ -399,9 +401,12 @@ class Node(BaseModel):
 class WorkflowInput(BaseModel):
     """Workflow input definition"""
 
-    input_type: str = Field("string", description="Input type", alias="type")
+    type: str = Field("string", description="Data type (string, number, boolean, etc)")
     required: bool = Field(default=True, description="Is this input required")
     default: Any | None = Field(None, description="Default value if not provided")
+    description: str | None = Field(None, description="Input description")
+    # Custom input type for UI rendering (e.g., 'file' for file picker)
+    input_type: str | None = Field(None, description="Custom input type for UI rendering")
 
     @model_validator(mode="after")
     def validate_required_with_default(self) -> Self:

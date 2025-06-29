@@ -455,23 +455,27 @@ export const ExecutionDetail: React.FC = () => {
                     icon={<DownloadOutlined />}
                     onClick={async () => {
                       try {
-                        // Get pre-signed URL for direct download
-                        const response = await api.get<{ url: string; expires_in: number }>(
-                          `/api/files/download-by-key?key=${encodeURIComponent(storageKey)}`
+                        // Download file directly through API
+                        const response = await api.get(
+                          `/api/files/download-by-key?key=${encodeURIComponent(storageKey as string)}`,
+                          { responseType: 'blob' }
                         );
                         
-                        // Download directly from the pre-signed URL
-                        window.open(response.data.url, '_blank');
+                        // Create blob URL and trigger download
+                        const blob = new Blob([response.data]);
+                        const url = window.URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = key === '__metadata__' ? 'metadata.json' : `${key}.json`;
+                        document.body.appendChild(link);
+                        link.click();
+                        link.remove();
+                        window.URL.revokeObjectURL(url);
                         
-                        message.success('File download started');
+                        message.success('File downloaded successfully');
                       } catch (error) {
-                        // Fallback: try to construct a download URL
-                        try {
-                          const downloadUrl = `${api.defaults.baseURL}/api/files/download-by-key?key=${encodeURIComponent(storageKey)}`;
-                          window.open(downloadUrl, '_blank');
-                        } catch (fallbackError) {
-                          message.error('Failed to download file');
-                        }
+                        console.error('Download error:', error);
+                        message.error('Failed to download file');
                       }
                     }}
                   >

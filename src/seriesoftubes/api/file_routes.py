@@ -3,11 +3,12 @@
 import io
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .auth import get_current_user
@@ -28,7 +29,7 @@ class FileUploadResponse(SuccessResponse):
     upload_time: datetime
 
 
-class FileInfo:
+class FileInfo(BaseModel):
     """File information response."""
     file_id: str
     filename: str
@@ -36,6 +37,7 @@ class FileInfo:
     content_type: Optional[str]
     last_modified: datetime
     is_public: bool = False
+    storage_key: Optional[str] = None
 
 
 class FileListResponse(SuccessResponse):
@@ -84,7 +86,7 @@ async def upload_file(
             metadata={
                 "user_id": current_user.id,
                 "original_filename": file.filename,
-                "upload_time": datetime.utcnow().isoformat(),
+                "upload_time": datetime.now(timezone.utc).isoformat(),
             }
         )
         
@@ -95,7 +97,7 @@ async def upload_file(
             filename=file.filename,
             size=stored_file.size,
             content_type=file.content_type,
-            upload_time=datetime.utcnow(),
+            upload_time=datetime.now(timezone.utc),
         )
         
     except StorageError as e:
@@ -237,6 +239,7 @@ async def list_files(
                     content_type=f.content_type,
                     last_modified=f.last_modified,
                     is_public=False,
+                    storage_key=f.key,
                 ))
         
         # List public files if requested
@@ -261,6 +264,7 @@ async def list_files(
                         content_type=f.content_type,
                         last_modified=f.last_modified,
                         is_public=True,
+                        storage_key=f.key,
                     ))
         
         return FileListResponse(

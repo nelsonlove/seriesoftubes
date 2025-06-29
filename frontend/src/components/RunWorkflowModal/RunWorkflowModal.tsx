@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { Modal, Form, Input, InputNumber, Switch, Button, Alert, Space } from 'antd';
+import { Modal, Form, Input, InputNumber, Switch, Button, Alert, Space, Select } from 'antd';
+import { FileOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import type { WorkflowDetail, ExecutionInput } from '../../types/workflow';
-import { workflowAPI } from '../../api/client';
+import { workflowAPI, filesAPI } from '../../api/client';
 
 interface RunWorkflowModalProps {
   workflow: WorkflowDetail;
@@ -15,6 +17,13 @@ export const RunWorkflowModal: React.FC<RunWorkflowModalProps> = ({ workflow, op
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Fetch user files for file picker
+  const { data: filesData } = useQuery({
+    queryKey: ['user-files'],
+    queryFn: () => filesAPI.list({ limit: 100 }),
+    enabled: open,
+  });
 
   const handleSubmit = async () => {
     try {
@@ -60,6 +69,36 @@ export const RunWorkflowModal: React.FC<RunWorkflowModalProps> = ({ workflow, op
 
   const renderInputField = (name: string, input: any) => {
     const rules = input.required ? [{ required: true, message: `${name} is required` }] : [];
+
+    // Check for input_type first (custom input types)
+    if (input.input_type === 'file') {
+      return (
+        <Form.Item 
+          key={name} 
+          name={name} 
+          label={name} 
+          rules={rules} 
+          initialValue={input.default}
+          extra={input.description || 'Select a file from your uploaded files'}
+        >
+          <Select
+            showSearch
+            placeholder="Select a file"
+            suffixIcon={<FileOutlined />}
+            optionFilterProp="label"
+            filterOption={(input, option) =>
+              (option?.label as string)?.toLowerCase().includes(input.toLowerCase())
+            }
+            options={filesData?.files?.map((file) => ({
+              label: file.filename,
+              value: file.storage_key || `${file.file_id}/${file.filename}`,
+            })) || []}
+            loading={!filesData}
+            notFoundContent={filesData?.files?.length === 0 ? 'No files uploaded yet' : null}
+          />
+        </Form.Item>
+      );
+    }
 
     switch (input.type) {
       case 'string':

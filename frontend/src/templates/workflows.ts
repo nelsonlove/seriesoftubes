@@ -192,25 +192,26 @@ outputs:
   },
   {
     name: 'File Processing',
-    description: 'Read and process file content',
+    description: 'Read and process uploaded file content',
     yaml: `name: file-processing-example
 version: "1.0.0"
-description: Read a file and process its content
+description: Read and analyze an uploaded file
 
 inputs:
-  file_path:
+  input_file:
     type: string
+    input_type: file
     required: true
-    description: Path to the file to process
+    description: Select a file to analyze
 
 nodes:
   read_file:
     type: file
     description: Read file content
     config:
-      operation: read
-      path: "{{ inputs.file_path }}"
-      encoding: utf-8
+      path: "{{ inputs.input_file }}"
+      storage_type: object
+      format_type: auto
 
   analyze_content:
     type: llm
@@ -224,13 +225,116 @@ nodes:
         3. Any notable patterns or insights
 
         File content:
-        {{ read_file }}
+        {{ read_file.data }}
       model: gpt-4
       temperature: 0.5
 
+  save_analysis:
+    type: file
+    depends_on: [analyze_content]
+    description: Save analysis results
+    config:
+      mode: write
+      write_key: "outputs/analysis_{{ execution_id }}.json"
+      storage_type: object
+      format_type: json
+
 outputs:
-  content: read_file
+  original_content: read_file.data
   analysis: analyze_content
+  saved_file: save_analysis.key
+`,
+  },
+  {
+    name: 'Data Processing Pipeline',
+    description: 'Process CSV data and generate insights',
+    yaml: `name: data-processing-pipeline
+version: "1.0.0"
+description: Process CSV data, analyze it, and save results
+
+inputs:
+  data_file:
+    type: string
+    input_type: file
+    required: true
+    description: Select a CSV file with data to process
+
+nodes:
+  load_data:
+    type: file
+    description: Load CSV data
+    config:
+      path: "{{ inputs.data_file }}"
+      storage_type: object
+      format_type: csv
+
+  process_data:
+    type: python
+    depends_on: [load_data]
+    description: Process and analyze the data
+    config:
+      code: |
+        import pandas as pd
+        import json
+        
+        # Data is already loaded as a list of dicts from CSV
+        data = context['data']
+        df = pd.DataFrame(data)
+        
+        # Basic statistics
+        stats = {
+          'row_count': len(df),
+          'columns': list(df.columns),
+          'numeric_columns': list(df.select_dtypes(include=['int64', 'float64']).columns),
+          'summary': {}
+        }
+        
+        # Generate summary statistics for numeric columns
+        for col in stats['numeric_columns']:
+          stats['summary'][col] = {
+            'mean': float(df[col].mean()),
+            'median': float(df[col].median()),
+            'min': float(df[col].min()),
+            'max': float(df[col].max()),
+            'std': float(df[col].std())
+          }
+        
+        return stats
+      context:
+        data: load_data.data
+
+  generate_report:
+    type: llm
+    depends_on: [process_data]
+    description: Generate insights report
+    config:
+      prompt: |
+        Based on the following data analysis, generate a comprehensive report:
+        
+        {{ process_data }}
+        
+        Please provide:
+        1. Executive summary of the data
+        2. Key findings from the statistics
+        3. Potential insights or patterns
+        4. Recommendations for further analysis
+      model: gpt-4
+      temperature: 0.7
+
+  save_results:
+    type: file
+    depends_on: [process_data, generate_report]
+    description: Save processing results
+    config:
+      mode: write
+      write_key: "outputs/data_analysis_{{ execution_id }}.json"
+      storage_type: object
+      format_type: json
+
+outputs:
+  statistics: process_data
+  report: generate_report
+  output_file: save_results.key
 `,
   },
 ];

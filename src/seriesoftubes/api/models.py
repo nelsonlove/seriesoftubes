@@ -5,6 +5,13 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
+class SuccessResponse(BaseModel):
+    """Generic success response"""
+    
+    success: bool = Field(default=True, description="Whether the operation was successful")
+    message: str = Field(..., description="Success message")
+
+
 class WorkflowRunRequest(BaseModel):
     """Request to run a workflow"""
 

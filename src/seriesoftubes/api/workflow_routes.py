@@ -254,9 +254,11 @@ async def get_workflow(
             "description": parsed.description,
             "inputs": {
                 name: {
-                    "type": input_def.input_type,
+                    "type": input_def.type,
                     "required": input_def.required,
                     "default": input_def.default,
+                    "description": input_def.description,
+                    "input_type": input_def.input_type,
                 }
                 for name, input_def in parsed.inputs.items()
             },

@@ -65,8 +65,38 @@ class NodeExecutor(ABC):
 
         # Add mapped context from node config
         if node.config.context:
-            for var_name, node_name in node.config.context.items():
-                data[var_name] = context.get_output(node_name)
+            for var_name, node_ref in node.config.context.items():
+                # Handle nested attribute access (e.g., "extract_profile.structured_output")
+                if "." in node_ref:
+                    parts = node_ref.split(".", 1)
+                    node_name = parts[0]
+                    attr_path = parts[1]
+                    
+                    # Get the node output
+                    node_output = context.get_output(node_name)
+                    
+                    # Navigate through nested attributes
+                    if node_output is not None:
+                        try:
+                            # Split the attribute path and navigate through it
+                            attrs = attr_path.split(".")
+                            current = node_output
+                            for attr in attrs:
+                                if isinstance(current, dict):
+                                    current = current.get(attr)
+                                else:
+                                    current = getattr(current, attr, None)
+                                if current is None:
+                                    break
+                            data[var_name] = current
+                        except (AttributeError, KeyError, TypeError):
+                            # If we can't access the attribute, set None
+                            data[var_name] = None
+                    else:
+                        data[var_name] = None
+                else:
+                    # Simple node reference without nested attributes
+                    data[var_name] = context.get_output(node_ref)
 
         # Add inputs - get all inputs from the workflow context
         data["inputs"] = {}
@@ -75,6 +105,16 @@ class NodeExecutor(ABC):
 
         # Add environment variables
         data["env"] = dict(os.environ)
+        
+        # Add execution metadata if available
+        if hasattr(context, "execution_id"):
+            data["execution_id"] = context.execution_id
+        if hasattr(context, "workflow") and context.workflow:
+            data["workflow_id"] = context.workflow.name
+        if hasattr(context, "node") and hasattr(context.node, "name"):
+            data["node_name"] = context.node.name
+        elif hasattr(node, "name"):
+            data["node_name"] = node.name
 
         # Add split item data if available (for parallel execution contexts)
         if hasattr(context, "outputs"):

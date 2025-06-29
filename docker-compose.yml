@@ -99,6 +99,8 @@ services:
       - ./workflows:/app/workflows  # Mount example workflows
       - ./logs:/app/logs
       - ./docs:/app/docs  # Mount docs directory
+      - ./alembic:/app/alembic  # Mount alembic migrations
+      - ./alembic.ini:/app/alembic.ini:ro  # Mount alembic config
       - ./.env:/app/.env:ro  # Mount env file if exists
       - ./.tubes.yaml:/app/.tubes.yaml:ro  # Mount tubes config file
     depends_on:

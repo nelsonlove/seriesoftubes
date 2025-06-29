@@ -100,8 +100,14 @@ class FileNodeExecutor(NodeExecutor):
     ) -> NodeResult:
         """Execute file node in write mode - save data to storage"""
         try:
-            # Get data to write from node inputs
-            data = context_data.get("inputs", {})
+            # Get data to write from node inputs or context mapping
+            # First check if there's a specific "data" field in inputs
+            inputs = context_data.get("inputs", {})
+            if isinstance(inputs, dict) and "data" in inputs:
+                data = inputs["data"]
+            else:
+                # Otherwise use the entire inputs
+                data = inputs
             
             # Render the write key
             write_key = self._render_template(config.write_key, context_data)

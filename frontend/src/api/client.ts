@@ -310,4 +310,56 @@ export const docsAPI = {
   },
 };
 
+export interface FileInfo {
+  file_id: string;
+  filename: string;
+  size: number;
+  content_type: string;
+  uploaded_at: string;
+  is_public: boolean;
+  storage_key?: string;
+}
+
+export interface FilesListResponse {
+  success: boolean;
+  files: FileInfo[];
+  total: number;
+}
+
+export const filesAPI = {
+  // List user files
+  list: async (params?: { prefix?: string; limit?: number }) => {
+    const response = await api.get<FilesListResponse>('/api/files', { params });
+    return response.data;
+  },
+
+  // Upload a file
+  upload: async (file: File, isPublic: boolean = false) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await api.post('/api/files/upload', formData, {
+      params: { is_public: isPublic },
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  // Download a file
+  download: async (fileId: string) => {
+    const response = await api.get(`/api/files/${fileId}/download`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+
+  // Delete a file
+  delete: async (fileId: string) => {
+    const response = await api.delete(`/api/files/${fileId}`);
+    return response.data;
+  },
+};
+
 export default api;

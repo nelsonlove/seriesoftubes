@@ -575,7 +575,7 @@ def test(
                 default_str = (
                     f" (default: {inp.default})" if inp.default is not None else ""
                 )
-                console.print(f"    • {name}: {inp.input_type} {req_str}{default_str}")
+                console.print(f"    • {name}: {inp.type} {req_str}{default_str}")
 
             console.print(f"  Nodes: {len(wf.nodes)}")
             for name, node in wf.nodes.items():

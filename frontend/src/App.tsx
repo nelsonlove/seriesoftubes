@@ -15,6 +15,7 @@ import {
   PlayCircleOutlined,
   ExperimentOutlined,
   BookOutlined,
+  FileOutlined,
   // UserOutlined,
   LogoutOutlined,
   MoonOutlined,

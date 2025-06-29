@@ -229,7 +229,7 @@ class WorkflowEngine:
 
         for input_name, input_def in workflow.inputs.items():
             if input_name in provided_inputs:
-                # TODO: Add type validation based on input_def.input_type
+                # TODO: Add type validation based on input_def.type
                 validated[input_name] = provided_inputs[input_name]
             elif input_def.required:
                 msg = f"Required input '{input_name}' not provided"

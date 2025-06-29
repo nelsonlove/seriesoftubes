@@ -25,9 +25,10 @@ import {
   FileWordOutlined,
   MoreOutlined,
   SearchOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
 import type { UploadProps, ColumnsType } from 'antd/es/upload';
-import { useAuthStore } from '../../stores/authStore';
+import { useAuthStore } from '../../stores/auth';
 import api from '../../api/client';
 
 const { Title } = Typography;
@@ -284,9 +285,13 @@ const FilesPage: React.FC = () => {
             <Upload {...uploadProps}>
               <Button icon={<UploadOutlined />}>Upload File</Button>
             </Upload>
-            <Button onClick={fetchFiles} loading={loading}>
-              Refresh
-            </Button>
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={fetchFiles}
+              loading={loading}
+              size="large"
+              title="Refresh files"
+            />
           </Space>
           
           <Search

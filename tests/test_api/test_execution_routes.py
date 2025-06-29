@@ -151,6 +151,7 @@ class TestExecutionRoutes:
             execution.outputs = {"result": f"output-{i}"}
             execution.errors = None
             execution.progress = {}
+            execution.storage_keys = {}
             execution.started_at = datetime.now(timezone.utc)
             execution.completed_at = datetime.now(timezone.utc)
             executions.append(execution)
