@@ -1,11 +1,14 @@
 """Anthropic LLM provider"""
 
 import json
+import logging
 from typing import Any, ClassVar
 
 import httpx
 
 from seriesoftubes.providers.base import LLMProvider
+
+logger = logging.getLogger(__name__)
 
 
 class AnthropicProvider(LLMProvider):
@@ -29,6 +32,12 @@ class AnthropicProvider(LLMProvider):
         if not self.api_key:
             msg = "Anthropic API key not configured"
             raise ValueError(msg)
+
+        # Log the exact prompt being sent
+        logger.info(f"LLM Request - Model: {model}, Temperature: {temperature}")
+        logger.info(f"LLM Request - Prompt: {prompt}")
+        if schema:
+            logger.info(f"LLM Request - Schema: {json.dumps(schema, indent=2)}")
 
         async with httpx.AsyncClient() as client:
             request_data: dict[str, Any] = {
@@ -60,11 +69,15 @@ class AnthropicProvider(LLMProvider):
             # Parse JSON if schema was specified
             if schema:
                 try:
-                    return json.loads(content)
+                    parsed = json.loads(content)
+                    logger.info(f"LLM Response - Parsed JSON: {json.dumps(parsed)}")
+                    return parsed
                 except json.JSONDecodeError:
                     # Return raw content if JSON parsing fails
+                    logger.warning(f"LLM Response - Failed to parse JSON, returning raw content: {content[:200]}...")
                     return content
 
+            logger.info(f"LLM Response - Content: {content[:500]}..." if len(content) > 500 else f"LLM Response - Content: {content}")
             return content
 
     def validate_model(self, model: str) -> bool:

@@ -34,6 +34,7 @@ class ExecutionResponse(BaseModel):
     inputs: dict[str, Any]
     outputs: dict[str, Any] | None
     errors: dict[str, str] | None
+    error_details: dict[str, dict[str, Any]] | None
     progress: dict[str, Any] | None
     storage_keys: dict[str, str] | None
     started_at: str
@@ -78,6 +79,7 @@ async def list_executions(
             inputs=e.inputs or {},
             outputs=e.outputs,
             errors=e.errors,
+            error_details=e.error_details,
             progress=e.progress or {},
             storage_keys=e.storage_keys,
             started_at=e.started_at.isoformat(),
@@ -181,6 +183,7 @@ async def stream_execution(
                         'completed_at': current_execution.completed_at.isoformat() if current_execution.completed_at else None,
                         'outputs': current_execution.outputs,
                         'errors': current_execution.errors,
+                        'error_details': current_execution.error_details,
                         'progress': current_execution.progress or {},
                     })}\n\n"
 
@@ -214,6 +217,7 @@ async def stream_execution(
                                 'completed_at': current_execution.completed_at.isoformat() if current_execution.completed_at else None,
                                 'outputs': current_execution.outputs,
                                 'errors': current_execution.errors,
+                                'error_details': current_execution.error_details,
                                 'progress': current_progress,
                             })}\n\n"
                             last_status = current_status
@@ -229,6 +233,7 @@ async def stream_execution(
                                 'completed_at': current_execution.completed_at.isoformat() if current_execution.completed_at else None,
                                 'outputs': current_execution.outputs,
                                 'errors': current_execution.errors,
+                                'error_details': current_execution.error_details,
                                 'progress': current_progress,
                                 'done': True
                             })}\n\n"
@@ -287,6 +292,7 @@ async def get_execution(
         inputs=execution.inputs or {},
         outputs=execution.outputs,
         errors=execution.errors,
+        error_details=execution.error_details,
         progress=execution.progress or {},
         storage_keys=execution.storage_keys,
         started_at=execution.started_at.isoformat(),

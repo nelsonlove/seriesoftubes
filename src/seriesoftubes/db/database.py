@@ -19,6 +19,9 @@ def get_database_url() -> str:
         # Handle Heroku-style postgres:// URLs
         if db_url.startswith("postgres://"):
             db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
+        # Convert regular postgresql:// to async
+        elif db_url.startswith("postgresql://"):
+            db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
         return db_url
 
     # Fall back to config

@@ -96,6 +96,11 @@ export interface ExecutionResponse {
   end_time?: string;
   outputs?: Record<string, any>;
   errors?: Record<string, string>;
+  error_details?: Record<string, {
+    error: string;
+    inputs: Record<string, any>;
+    timestamp: string;
+  }>;
   error?: string;
   progress?: Record<string, string | ExecutionProgress>;
 }

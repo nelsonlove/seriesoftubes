@@ -3,6 +3,7 @@
 import asyncio
 import io
 import json
+import logging
 import tempfile
 import zipfile
 from datetime import datetime, timezone
@@ -21,6 +22,8 @@ from seriesoftubes.api.auth import get_current_active_user
 from seriesoftubes.db import Execution, User, Workflow, get_db
 from seriesoftubes.db import ExecutionStatus as DBExecutionStatus
 from seriesoftubes.parser import parse_workflow_yaml, validate_dag
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/workflows", tags=["workflows"])
 
@@ -700,7 +703,9 @@ async def run_workflow(
                     )
 
                     engine = DatabaseProgressTrackingEngine(execution.id, session, current_user.id)
+                    logger.info(f"Starting execution {execution.id} for workflow {workflow.name}")
                     context = await engine.execute(parsed, request.inputs)
+                    logger.info(f"Completed execution {execution.id} with status: {'success' if not context.errors else 'failed'}")
 
                     # Prepare outputs from workflow context
                     outputs = {}
@@ -722,6 +727,10 @@ async def run_workflow(
                         "errors": context.errors if context.errors else None,
                         "completed_at": datetime.now(timezone.utc),
                     }
+                    
+                    # Add error details if available
+                    if hasattr(context, 'error_details') and context.error_details:
+                        execution_update["error_details"] = context.error_details
                     
                     # Add storage keys if available
                     if hasattr(context, 'storage_keys') and context.storage_keys:

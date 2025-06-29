@@ -146,6 +146,7 @@ class Execution(Base):
     inputs: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     outputs: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     errors: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    error_details: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     progress: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     storage_keys: Mapped[dict[str, str] | None] = mapped_column(JSON, nullable=True)
     started_at: Mapped[datetime] = mapped_column(

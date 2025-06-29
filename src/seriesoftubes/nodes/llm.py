@@ -1,6 +1,7 @@
 """LLM node executor implementation"""
 
 import json
+import logging
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -12,6 +13,8 @@ from seriesoftubes.providers import get_provider
 from seriesoftubes.schemas import LLMNodeInput, LLMNodeOutput
 from seriesoftubes.template_engine import TemplateSecurityLevel, render_template
 
+logger = logging.getLogger(__name__)
+
 
 class LLMNodeExecutor(NodeExecutor):
     """Executor for LLM nodes"""
@@ -21,6 +24,8 @@ class LLMNodeExecutor(NodeExecutor):
 
     async def execute(self, node: Node, context: NodeContext) -> NodeResult:
         """Execute an LLM node"""
+        logger.info(f"Executing LLM node: {node.name}")
+        
         if not isinstance(node.config, LLMNodeConfig):
             return NodeResult(
                 output=None,

@@ -115,6 +115,12 @@ class OpenAIProvider(LLMProvider):
             raise ValueError(msg)
 
         messages = [{"role": "user", "content": prompt}]
+        
+        # Log the exact prompt being sent
+        logger.info(f"LLM Request - Model: {model}, Temperature: {temperature}")
+        logger.info(f"LLM Request - Prompt: {prompt}")
+        if schema:
+            logger.info(f"LLM Request - Schema: {json.dumps(schema, indent=2)}")
 
         try:
             # Use structured outputs for supported models
@@ -144,10 +150,15 @@ class OpenAIProvider(LLMProvider):
 
                 # Return parsed structured output
                 if hasattr(message, "parsed") and message.parsed:
-                    return message.parsed.model_dump()
+                    result = message.parsed.model_dump()
+                    logger.info(f"LLM Response - Structured output: {json.dumps(result)}")
+                    return result
                 else:
                     # Fallback to content parsing
-                    return json.loads(message.content or "{}")
+                    content = message.content or "{}"
+                    result = json.loads(content)
+                    logger.info(f"LLM Response - Parsed from content: {json.dumps(result)}")
+                    return result
 
             else:
                 # Fall back to regular completions API
@@ -182,6 +193,7 @@ class OpenAIProvider(LLMProvider):
                         msg = f"Failed to parse JSON response: {e}"
                         raise ValueError(msg) from e
 
+                logger.info(f"LLM Response - Content: {content[:500]}..." if len(content) > 500 else f"LLM Response - Content: {content}")
                 return content
 
         except Exception as e:

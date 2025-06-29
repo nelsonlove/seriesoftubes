@@ -339,24 +339,51 @@ export const ExecutionDetail: React.FC = () => {
 
                   {/* Show error details directly for failed nodes */}
                   {status === 'failed' && (
-                    <div
-                      style={{
-                        padding: '8px',
-                        background: themeMode === 'dark' ? '#431417' : '#fff2f0',
-                        border: `1px solid ${themeMode === 'dark' ? '#7f1d1d' : '#ffccc7'}`,
-                        borderRadius: '4px',
-                        fontFamily: 'monospace',
-                        fontSize: '12px',
-                        color: themeMode === 'dark' ? '#fca5a5' : '#a8071a',
-                      }}
-                    >
-                      {/* Try to get error from new progress format first, then fall back to old errors format */}
-                      {isProgressObject && nodeProgress.error
-                        ? nodeProgress.error
-                        : executionData.errors && executionData.errors[nodeName]
-                          ? executionData.errors[nodeName]
-                          : 'Node execution failed (no error details available)'}
-                    </div>
+                    <Space direction="vertical" style={{ width: '100%' }}>
+                      <div
+                        style={{
+                          padding: '8px',
+                          background: themeMode === 'dark' ? '#431417' : '#fff2f0',
+                          border: `1px solid ${themeMode === 'dark' ? '#7f1d1d' : '#ffccc7'}`,
+                          borderRadius: '4px',
+                          fontFamily: 'monospace',
+                          fontSize: '12px',
+                          color: themeMode === 'dark' ? '#fca5a5' : '#a8071a',
+                        }}
+                      >
+                        {/* Try to get error from new progress format first, then fall back to old errors format */}
+                        {isProgressObject && nodeProgress.error
+                          ? nodeProgress.error
+                          : executionData.errors && executionData.errors[nodeName]
+                            ? executionData.errors[nodeName]
+                            : 'Node execution failed (no error details available)'}
+                      </div>
+                      
+                      {/* Show detailed error information if available */}
+                      {executionData.error_details && executionData.error_details[nodeName] && (
+                        <div>
+                          <Text strong style={{ display: 'block', marginBottom: '4px' }}>Node Inputs:</Text>
+                          <pre
+                            style={{
+                              margin: '0',
+                              fontSize: '11px',
+                              background: themeMode === 'dark' ? '#1e293b' : '#f5f5f5',
+                              color: themeMode === 'dark' ? '#f1f5f9' : '#0f172a',
+                              padding: '8px',
+                              borderRadius: '4px',
+                              border: `1px solid ${themeMode === 'dark' ? '#475569' : '#d9d9d9'}`,
+                              whiteSpace: 'pre-wrap',
+                              wordWrap: 'break-word',
+                              overflowWrap: 'break-word',
+                              maxWidth: '100%',
+                              overflow: 'hidden',
+                            }}
+                          >
+                            {JSON.stringify(executionData.error_details[nodeName].inputs, null, 2)}
+                          </pre>
+                        </div>
+                      )}
+                    </Space>
                   )}
 
                   {/* Detailed progress object (if available) */}

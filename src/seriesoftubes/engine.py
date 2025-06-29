@@ -29,6 +29,8 @@ from seriesoftubes.nodes import (
 )
 from seriesoftubes.storage import StorageError, get_storage_backend
 
+logger = logging.getLogger(__name__)
+
 
 class ExecutionContext:
     """Context for workflow execution"""
@@ -38,6 +40,7 @@ class ExecutionContext:
         self.inputs = inputs
         self.outputs: dict[str, Any] = {}
         self.errors: dict[str, str] = {}
+        self.error_details: dict[str, dict[str, Any]] = {}  # Detailed error info including inputs
         self.execution_id = str(uuid4())
         self.start_time = datetime.now(timezone.utc)
         self.validation_errors: dict[str, list[str]] = {}  # Node validation errors
@@ -68,6 +71,15 @@ class ExecutionContext:
     def set_error(self, node_name: str, error: str) -> None:
         """Store error from a node"""
         self.errors[node_name] = error
+    
+    def set_error_with_details(self, node_name: str, error: str, node_inputs: dict[str, Any] | None = None) -> None:
+        """Store error from a node with additional details"""
+        self.errors[node_name] = error
+        self.error_details[node_name] = {
+            "error": error,
+            "inputs": node_inputs or {},
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
 
     def add_validation_error(self, node_name: str, error: str) -> None:
         """Add a validation error for a node"""
@@ -301,6 +313,9 @@ class WorkflowEngine:
                     )
 
                     if cached_result is not None:
+                        # Log cache hit
+                        logger.info(f"Cache hit for node '{node.name}' (type: {node_type})")
+                        
                         # Return cached result
                         result = NodeResult(
                             output=cached_result,
@@ -320,9 +335,10 @@ class WorkflowEngine:
                         return result
                 except Exception as e:
                     # Cache read error - continue with normal execution
-                    logging.warning(f"Cache read error for node {node.name}: {e}")
+                    logger.warning(f"Cache read error for node {node.name}: {e}")
 
         # Execute the node normally
+        logger.info(f"Executing node '{node.name}' (type: {node.node_type.value if hasattr(node.node_type, 'value') else str(node.node_type)})")
         result = await executor.execute(node, context)
 
         # Cache successful results
@@ -366,7 +382,7 @@ class WorkflowEngine:
 
                 except Exception as e:
                     # Cache write error - don't fail the execution
-                    logging.warning(f"Cache write error for node {node.name}: {e}")
+                    logger.warning(f"Cache write error for node {node.name}: {e}")
 
         # If execution was successful, validate output against downstream requirements
         if result.success:
@@ -393,9 +409,32 @@ class WorkflowEngine:
             if result.success:
                 context.set_output(node_name, result.output)
             else:
-                context.set_error(node_name, result.error or "Unknown error")
+                # Prepare node inputs for error context
+                executor = self.executors.get(node.node_type)
+                node_inputs = {}
+                if executor:
+                    try:
+                        context_data = executor.prepare_context_data(node, context)
+                        node_inputs = {
+                            "context_mapping": node.config.context if hasattr(node.config, 'context') else {},
+                            "workflow_inputs": context.inputs,
+                            "resolved_context": context_data
+                        }
+                    except Exception:
+                        # If we can't prepare context data, at least include basic info
+                        node_inputs = {
+                            "context_mapping": node.config.context if hasattr(node.config, 'context') else {},
+                            "workflow_inputs": context.inputs
+                        }
+                
+                context.set_error_with_details(node_name, result.error or "Unknown error", node_inputs)
         except Exception as e:
-            context.set_error(node_name, str(e))
+            # Capture basic node configuration on exception
+            node_inputs = {
+                "node_config": node.config.model_dump() if hasattr(node.config, 'model_dump') else str(node.config),
+                "workflow_inputs": context.inputs
+            }
+            context.set_error_with_details(node_name, str(e), node_inputs)
 
     async def _execute_split_node(
         self, _node_name: str, node: Node, context: ExecutionContext
