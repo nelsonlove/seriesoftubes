@@ -112,6 +112,12 @@ class TransformNodeExecutor(NodeExecutor):
                                     success=True,
                                     metadata={"node_type": "transform", "parallel_execution": True},
                                 )
+                        except Exception as e:
+                            return NodeResult(
+                                output=None,
+                                success=False,
+                                error=f"Template error: {e!s}",
+                            )
                     else:
                         return NodeResult(
                             output=None,
