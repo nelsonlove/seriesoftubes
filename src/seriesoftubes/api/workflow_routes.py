@@ -161,12 +161,16 @@ async def create_workflow(
             detail=f"Workflow {parsed.name} v{parsed.version} already exists",
         )
 
+    # Store user data before any commits
+    user_id = current_user.id
+    username = current_user.username
+    
     # Create database entry
     workflow = Workflow(
         name=parsed.name,
         version=parsed.version,
         description=parsed.description,
-        user_id=current_user.id,
+        user_id=user_id,
         is_public=workflow_data.is_public,
         package_path="",  # No longer using filesystem
         yaml_content=workflow_data.yaml_content,
@@ -181,7 +185,7 @@ async def create_workflow(
         version=workflow.version,
         description=workflow.description,
         user_id=workflow.user_id,
-        username=current_user.username,
+        username=username,
         is_public=workflow.is_public,
         created_at=workflow.created_at.isoformat(),
         updated_at=workflow.updated_at.isoformat(),
