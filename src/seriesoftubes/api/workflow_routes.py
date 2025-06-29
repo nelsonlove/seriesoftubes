@@ -356,6 +356,9 @@ async def update_workflow(
             )
 
     # Update workflow
+    # Store user data before any commits
+    username = current_user.username
+    
     workflow.name = parsed.name
     workflow.version = parsed.version
     workflow.description = parsed.description
@@ -373,7 +376,7 @@ async def update_workflow(
         version=workflow.version,
         description=workflow.description,
         user_id=workflow.user_id,
-        username=current_user.username,
+        username=username,
         is_public=workflow.is_public,
         created_at=workflow.created_at.isoformat(),
         updated_at=workflow.updated_at.isoformat(),
