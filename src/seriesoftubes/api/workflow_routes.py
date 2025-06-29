@@ -685,7 +685,7 @@ async def run_workflow(
 
     # Check if Celery is available
     try:
-        from seriesoftubes.tasks import execute_workflow
+        from seriesoftubes.tasks_sync import execute_workflow
         use_celery = True
     except ImportError:
         use_celery = False

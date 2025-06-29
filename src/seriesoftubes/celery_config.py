@@ -22,8 +22,8 @@ task_acks_late = True  # Tasks are acknowledged after they complete
 task_reject_on_worker_lost = True  # Reject tasks if worker dies
 
 # Task time limits
-task_soft_time_limit = 300  # 5 minutes soft limit (raises exception)
-task_time_limit = 600  # 10 minutes hard limit (kills task)
+task_soft_time_limit = 1800  # 30 minutes soft limit (raises exception)
+task_time_limit = 3600  # 60 minutes hard limit (kills task)
 
 # Result backend settings
 result_expires = 3600  # Results expire after 1 hour

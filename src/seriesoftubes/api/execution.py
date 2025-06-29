@@ -14,7 +14,7 @@ from seriesoftubes.engine import (
     WorkflowEngine,
     run_workflow,
 )
-from seriesoftubes.models import Node, Workflow
+from seriesoftubes.models import Node, Workflow, PythonNodeConfig
 from seriesoftubes.parser import parse_workflow_yaml
 
 
@@ -202,14 +202,18 @@ class DatabaseProgressTrackingEngine(WorkflowEngine):
             logger.warning(f"Failed to cleanup running nodes: {e}")
 
     async def _execute_node(self, node: Node, context: ExecutionContext) -> NodeResult:
-        """Override to track progress in database"""
+        """Override to track progress in database with streaming support for Python nodes"""
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"DatabaseProgressTrackingEngine._execute_node called for node: {node.name}")
+        
         from sqlalchemy import select, update
 
         from seriesoftubes.db.models import Execution
         from seriesoftubes.db.database import async_session
 
+        # Create a new session for each database operation to avoid greenlet issues
         try:
-            # Create a new session for each database operation to avoid greenlet issues
             async with async_session() as session:
                 # Get current progress
                 result_query = await session.execute(
@@ -225,9 +229,88 @@ class DatabaseProgressTrackingEngine(WorkflowEngine):
                     .values(progress=current_progress)
                 )
                 await session.commit()
+                
+                # Log the update
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.info(f"Updated progress for execution {self.execution_id}: {current_progress}")
 
-            # Execute node (outside of session context to avoid holding connection)
-            result = await super()._execute_node(node, context)
+            # Execute the node
+            try:
+                # Check if this is a Python node that should stream output
+                # DISABLED: Streaming causes event loop issues in Celery context
+                if False and node.node_type == "python" and isinstance(node.config, PythonNodeConfig):
+                    # Use streaming executor for Python nodes
+                    from seriesoftubes.nodes.python_streaming import StreamingPythonNodeExecutor
+                    
+                    # Create streaming callback to update progress with output
+                    async def stream_callback(node_name: str, output_type: str, text: str):
+                        try:
+                            async with async_session() as session:
+                                # Get current progress
+                                result_query = await session.execute(
+                                    select(Execution.progress).where(Execution.id == self.execution_id)
+                                )
+                                current_progress = result_query.scalar() or {}
+                                
+                                # Update with streaming output
+                                if node_name not in current_progress:
+                                    current_progress[node_name] = {"status": "running"}
+                                
+                                if isinstance(current_progress[node_name], dict):
+                                    # Append to output buffers
+                                    if "output" not in current_progress[node_name]:
+                                        current_progress[node_name]["output"] = {
+                                            "stdout": "",
+                                            "stderr": ""
+                                        }
+                                    
+                                    if output_type == "stdout":
+                                        current_progress[node_name]["output"]["stdout"] += text
+                                    elif output_type == "stderr":
+                                        current_progress[node_name]["output"]["stderr"] += text
+                                    
+                                    # Limit stored output size to prevent DB bloat
+                                    max_size = 50000  # 50KB per stream
+                                    if len(current_progress[node_name]["output"]["stdout"]) > max_size:
+                                        current_progress[node_name]["output"]["stdout"] = (
+                                            current_progress[node_name]["output"]["stdout"][-max_size:]
+                                            + "\n[Output truncated...]"
+                                        )
+                                    if len(current_progress[node_name]["output"]["stderr"]) > max_size:
+                                        current_progress[node_name]["output"]["stderr"] = (
+                                            current_progress[node_name]["output"]["stderr"][-max_size:]
+                                            + "\n[Output truncated...]"
+                                        )
+                                
+                                await session.execute(
+                                    update(Execution)
+                                    .where(Execution.id == self.execution_id)
+                                    .values(progress=current_progress)
+                                )
+                                await session.commit()
+                        except Exception as e:
+                            # Don't fail execution if we can't update streaming output
+                            import logging
+                            logger = logging.getLogger(__name__)
+                            logger.warning(f"Failed to update streaming output: {e}")
+                    
+                    # Execute with streaming
+                    executor = StreamingPythonNodeExecutor(stream_callback=stream_callback)
+                    result = await executor.execute(node, context)
+                else:
+                    # Execute node normally (outside of session context to avoid holding connection)
+                    result = await super()._execute_node(node, context)
+            except Exception as e:
+                # Node execution failed - create error result
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Node {node.name} execution failed: {e}")
+                result = NodeResult(
+                    output=None,
+                    success=False,
+                    error=f"Node execution error: {str(e)}"
+                )
 
             # Update progress after execution with detailed info
             async with async_session() as session:
@@ -238,16 +321,32 @@ class DatabaseProgressTrackingEngine(WorkflowEngine):
                 current_progress = result_query.scalar() or {}
 
                 if result.success:
+                    # Preserve streaming output if it exists
+                    existing_output = {}
+                    if (node.name in current_progress and 
+                        isinstance(current_progress[node.name], dict) and
+                        "output" in current_progress[node.name]):
+                        existing_output = current_progress[node.name]["output"]
+                    
                     current_progress[node.name] = {
                         "status": "completed",
                         "completed_at": datetime.now(timezone.utc).isoformat(),
                         "output": result.output,
+                        "streaming_output": existing_output,
                     }
                 else:
+                    # Preserve streaming output if it exists
+                    existing_output = {}
+                    if (node.name in current_progress and 
+                        isinstance(current_progress[node.name], dict) and
+                        "output" in current_progress[node.name]):
+                        existing_output = current_progress[node.name]["output"]
+                    
                     current_progress[node.name] = {
                         "status": "failed",
                         "error": result.error or "Node execution failed",
                         "completed_at": datetime.now(timezone.utc).isoformat(),
+                        "streaming_output": existing_output,
                     }
 
                 await session.execute(
@@ -260,15 +359,17 @@ class DatabaseProgressTrackingEngine(WorkflowEngine):
             return result
 
         except Exception as e:
-            # If we fail to update progress, still try to execute the node
-            # but make sure to return an error result
-            try:
-                result = await super()._execute_node(node, context)
-                return result
-            except Exception:
-                return NodeResult(
-                    output=None, success=False, error=f"Node execution failed: {e}"
-                )
+            # Log the error but don't fail the node execution
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to update progress for node {node.name}: {e}")
+            
+            # Return a failed result so the execution stops
+            return NodeResult(
+                output=None, 
+                success=False, 
+                error=f"Database error while executing node: {str(e)}"
+            )
 
 
 # For backward compatibility

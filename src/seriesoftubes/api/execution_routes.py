@@ -4,7 +4,7 @@ import asyncio
 import json
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from jose import JWTError, jwt
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sse_starlette.sse import EventSourceResponse
 
-from seriesoftubes.api.auth import get_current_active_user
+from seriesoftubes.api.auth import get_current_active_user, get_current_user_sse
 from seriesoftubes.db import Execution, User, get_db
 from seriesoftubes.db.database import async_session
 
@@ -105,14 +105,14 @@ async def list_executions(
 @router.get("/{execution_id}/stream")
 async def stream_execution(
     execution_id: str,
-    token: str | None = None,
+    token: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
 ) -> EventSourceResponse:
     """Stream execution updates via Server-Sent Events"""
     import logging
 
     logger = logging.getLogger(__name__)
-    logger.info(f"SSE stream request for execution {execution_id}")
+    logger.info(f"SSE stream request for execution {execution_id}, token present: {bool(token)}")
 
     # Validate authentication token (SSE doesn't support headers)
     if not token:
@@ -354,3 +354,141 @@ async def get_execution(
             execution.completed_at.isoformat() if execution.completed_at else None
         ),
     )
+
+
+@router.get("/executions/{execution_id}/stream/{node_name}")
+async def stream_node_output(
+    execution_id: str,
+    node_name: str,
+    current_user: User = Depends(get_current_user_sse),
+    session: AsyncSession = Depends(get_db),
+) -> EventSourceResponse:
+    """Stream real-time output from a specific node (e.g., Python node stdout/stderr)"""
+    logger.info(f"Streaming output for node {node_name} in execution {execution_id}")
+
+    async def event_generator():
+        """Generate SSE events for node output streaming"""
+        try:
+            # Verify user owns this execution
+            result = await session.execute(
+                select(Execution)
+                .where(Execution.id == execution_id)
+                .where(Execution.user_id == current_user.id)
+            )
+            execution = result.scalar_one_or_none()
+            
+            if not execution:
+                yield f"data: {json.dumps({
+                    'type': 'error',
+                    'message': 'Execution not found'
+                })}\n\n"
+                return
+            
+            # Send initial state
+            if execution.progress and node_name in execution.progress:
+                node_progress = execution.progress[node_name]
+                if isinstance(node_progress, dict) and "output" in node_progress:
+                    yield f"data: {json.dumps({
+                        'type': 'initial',
+                        'node_name': node_name,
+                        'output': node_progress['output']
+                    })}\n\n"
+            
+            # Poll for updates
+            last_output = {"stdout": "", "stderr": ""}
+            poll_count = 0
+            max_polls = 300  # 10 minutes maximum for long-running nodes
+            
+            while poll_count < max_polls:
+                try:
+                    async with async_session() as session:
+                        result = await session.execute(
+                            select(Execution.progress, Execution.status)
+                            .where(Execution.id == execution_id)
+                        )
+                        row = result.one_or_none()
+                        
+                        if row:
+                            progress, status = row
+                            
+                            # Check if node has output
+                            if progress and node_name in progress:
+                                node_progress = progress[node_name]
+                                
+                                if isinstance(node_progress, dict):
+                                    # Check for streaming output
+                                    if "output" in node_progress:
+                                        current_output = node_progress["output"]
+                                        
+                                        # Send new stdout
+                                        if current_output.get("stdout", "") != last_output["stdout"]:
+                                            new_stdout = current_output["stdout"][len(last_output["stdout"]):]
+                                            if new_stdout:
+                                                yield f"data: {json.dumps({
+                                                    'type': 'stdout',
+                                                    'text': new_stdout
+                                                })}\n\n"
+                                            last_output["stdout"] = current_output.get("stdout", "")
+                                        
+                                        # Send new stderr
+                                        if current_output.get("stderr", "") != last_output["stderr"]:
+                                            new_stderr = current_output["stderr"][len(last_output["stderr"]):]
+                                            if new_stderr:
+                                                yield f"data: {json.dumps({
+                                                    'type': 'stderr',
+                                                    'text': new_stderr
+                                                })}\n\n"
+                                            last_output["stderr"] = current_output.get("stderr", "")
+                                    
+                                    # Check if node completed
+                                    node_status = node_progress.get("status")
+                                    if node_status in ["completed", "failed"]:
+                                        # Send final result if available
+                                        if "streaming_output" in node_progress:
+                                            yield f"data: {json.dumps({
+                                                'type': 'complete',
+                                                'status': node_status,
+                                                'final_output': node_progress.get('streaming_output', {})
+                                            })}\n\n"
+                                        else:
+                                            yield f"data: {json.dumps({
+                                                'type': 'complete',
+                                                'status': node_status
+                                            })}\n\n"
+                                        break
+                            
+                            # Check if execution completed
+                            if status in ["COMPLETED", "FAILED", "CANCELLED"]:
+                                yield f"data: {json.dumps({
+                                    'type': 'execution_complete',
+                                    'status': status
+                                })}\n\n"
+                                break
+                        
+                        await session.close()
+                    
+                except Exception as e:
+                    logger.error(f"Error streaming node output: {e}")
+                    yield f"data: {json.dumps({
+                        'type': 'error',
+                        'message': str(e)
+                    })}\n\n"
+                    break
+                
+                await asyncio.sleep(0.5)  # Poll more frequently for real-time output
+                poll_count += 1
+            
+            if poll_count >= max_polls:
+                yield f"data: {json.dumps({
+                    'type': 'timeout',
+                    'message': 'Streaming timeout reached'
+                })}\n\n"
+        
+        except Exception as e:
+            logger.error(f"Error in node output stream: {e}")
+            yield f"data: {json.dumps({
+                'type': 'error',
+                'message': str(e)
+            })}\n\n"
+    
+    return EventSourceResponse(event_generator())

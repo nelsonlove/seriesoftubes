@@ -28,6 +28,7 @@ import { useExecutionStore } from '../../stores/execution';
 import api from '../../api/client';
 import { useThemeStore } from '../../stores/theme';
 import type { ExecutionProgress } from '../../types/workflow';
+import { PythonNodeOutput } from '../../components/PythonNodeOutput';
 
 const { Title, Text } = Typography;
 // Removed Panel import - using items prop instead
@@ -88,10 +89,8 @@ export const ExecutionDetail: React.FC = () => {
     // Get initial status from ref
     const initialStatus = initialStatusRef.current;
     
-    // Only set up SSE for running/pending executions
-    if (!initialStatus || (initialStatus !== 'running' && initialStatus !== 'pending')) {
-      return;
-    }
+    // Always set up SSE connection - let backend handle when to close
+    console.log('Setting up SSE for execution:', id, 'Initial status:', initialStatus);
 
     // Create a stable reference for the event source
     let es: EventSource | null = null;
@@ -340,8 +339,24 @@ export const ExecutionDetail: React.FC = () => {
               ),
               children: hasContent ? (
                 <Space direction="vertical" style={{ width: '100%' }}>
-                  {/* Show actual output for completed nodes */}
-                  {status === 'completed' && (
+                  {/* Check if this is a Python node with streaming output */}
+                  {workflowData?.nodes?.find((n: any) => n.name === nodeName)?.type === 'python' && (
+                    <PythonNodeOutput
+                      executionId={id!}
+                      nodeName={nodeName}
+                      nodeStatus={status}
+                      initialOutput={
+                        isProgressObject && nodeProgress.output
+                          ? nodeProgress.output
+                          : isProgressObject && nodeProgress.streaming_output
+                          ? nodeProgress.streaming_output
+                          : undefined
+                      }
+                    />
+                  )}
+
+                  {/* Show actual output for completed nodes (non-Python nodes) */}
+                  {status === 'completed' && workflowData?.nodes?.find((n: any) => n.name === nodeName)?.type !== 'python' && (
                     <div>
                       {outputs && outputs[nodeName] ? (
                         <div>

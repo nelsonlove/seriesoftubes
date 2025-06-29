@@ -180,7 +180,7 @@ services:
       context: .
       dockerfile: Dockerfile.worker  # Use worker dockerfile with non-root user
     container_name: seriesoftubes-worker
-    command: celery -A seriesoftubes.tasks worker --loglevel=info --queues=workflows,nodes
+    command: celery -A seriesoftubes.tasks_sync worker --loglevel=info --queues=workflows,nodes
     environment:
       - DATABASE_URL=postgresql+asyncpg://seriesoftubes:development-password@postgres:5432/seriesoftubes
       - REDIS_URL=redis://redis:6379
@@ -206,6 +206,28 @@ services:
       redis:
         condition: service_healthy
       minio:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles: ["dev", "with-worker"]  # Only starts with --profile dev or --profile with-worker
+
+  # Celery beat scheduler for periodic tasks
+  beat:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: seriesoftubes-beat
+    command: celery -A seriesoftubes.tasks_sync beat --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://seriesoftubes:development-password@postgres:5432/seriesoftubes
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - ./src:/app/src
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: unless-stopped
     profiles: ["dev", "with-worker"]  # Only starts with --profile dev or --profile with-worker

@@ -1,0 +1,53 @@
+name: streaming_python_test
+version: 1.0.0
+description: Test Python node streaming output
+
+inputs:
+  iterations:
+    type: integer
+    default: 10
+    description: Number of iterations to demonstrate streaming
+
+nodes:
+  - name: long_running_task
+    type: python
+    config:
+      code: |
+        import time
+        
+        iterations = context.get('iterations', 10)
+        print(f"Starting long-running task with {iterations} iterations...")
+        
+        results = []
+        for i in range(iterations):
+            print(f"Processing iteration {i+1}/{iterations}...")
+            
+            # Simulate some work
+            time.sleep(1)
+            
+            # Do some computation
+            result = i ** 2
+            results.append(result)
+            
+            # Show progress
+            progress = (i + 1) / iterations * 100
+            print(f"Progress: {progress:.1f}% - Result: {result}")
+            
+            # Simulate occasional warnings
+            if i % 3 == 2:
+                import sys
+                print(f"Warning: High value detected at iteration {i+1}", file=sys.stderr)
+        
+        print("\nTask completed successfully!")
+        print(f"Final results: {results}")
+        
+        return {
+            "iterations": iterations,
+            "results": results,
+            "sum": sum(results),
+            "average": sum(results) / len(results) if results else 0
+        }
+
+outputs:
+  task_results:
+    from: long_running_task

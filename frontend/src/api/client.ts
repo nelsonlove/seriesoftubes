@@ -198,11 +198,11 @@ export const executionAPI = {
   // Stream execution progress
   stream: (id: string, onUpdate: (data: any) => void) => {
     const token = useAuthStore.getState().token;
-    // Use full backend URL for EventSource since proxy might not work with SSE
-    const backendUrl = 'http://localhost:8000';
+    // Use API URL from environment or default
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
     const url = token
-      ? `${backendUrl}/api/executions/${id}/stream?token=${encodeURIComponent(token)}`
-      : `${backendUrl}/api/executions/${id}/stream`;
+      ? `${apiUrl}/api/executions/${id}/stream?token=${encodeURIComponent(token)}`
+      : `${apiUrl}/api/executions/${id}/stream`;
 
     console.log('Connecting to SSE URL:', url);
     const eventSource = new EventSource(url);
@@ -275,7 +275,12 @@ export const executionAPI = {
 
     eventSource.onerror = (error) => {
       console.error('SSE error:', error, 'readyState:', eventSource.readyState);
-      eventSource.close();
+      if (eventSource.readyState === EventSource.CONNECTING) {
+        console.log('SSE reconnecting...');
+      } else if (eventSource.readyState === EventSource.CLOSED) {
+        console.log('SSE connection closed');
+      }
+      // Don't close on error - let it retry
     };
 
     return eventSource;
