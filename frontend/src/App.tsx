@@ -1,5 +1,5 @@
 // Testing pre-commit hooks
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   BrowserRouter as Router,
   Routes,
@@ -180,6 +180,14 @@ function AppContent() {
   const location = useLocation();
   const { user, logout, isAuthenticated } = useAuthStore();
   const { mode: themeMode, toggleTheme } = useThemeStore();
+  const [searchValue, setSearchValue] = useState('');
+
+  // Clear search when location changes
+  useEffect(() => {
+    if (!location.pathname.includes('/workflows')) {
+      setSearchValue('');
+    }
+  }, [location]);
 
   const menuItems = [
     {
@@ -303,6 +311,13 @@ function AppContent() {
                   border: `1px solid ${themeMode === 'dark' ? '#475569' : '#e2e8f0'}`,
                 }}
                 size="large"
+                value={searchValue}
+                onChange={(e) => setSearchValue(e.target.value)}
+                onPressEnter={() => {
+                  if (searchValue.trim()) {
+                    navigate(`/workflows?search=${encodeURIComponent(searchValue.trim())}`);
+                  }
+                }}
               />
             </div>
           )}

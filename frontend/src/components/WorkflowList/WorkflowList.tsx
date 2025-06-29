@@ -17,12 +17,18 @@ const { Text } = Typography;
 
 interface WorkflowListProps {
   onSelectWorkflow: (path: string) => void;
+  searchQuery?: string;
 }
 
-export const WorkflowList: React.FC<WorkflowListProps> = ({ onSelectWorkflow }) => {
-  const [searchTerm, setSearchTerm] = useState('');
+export const WorkflowList: React.FC<WorkflowListProps> = ({ onSelectWorkflow, searchQuery = '' }) => {
+  const [searchTerm, setSearchTerm] = useState(searchQuery);
   const [selectedTag, setSelectedTag] = useState<string | undefined>();
   const [showNewWorkflowModal, setShowNewWorkflowModal] = useState(false);
+
+  // Update search term when searchQuery prop changes
+  React.useEffect(() => {
+    setSearchTerm(searchQuery);
+  }, [searchQuery]);
 
   const {
     data: workflows,

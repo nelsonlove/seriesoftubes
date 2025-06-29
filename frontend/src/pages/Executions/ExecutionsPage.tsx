@@ -80,11 +80,32 @@ export const ExecutionsPage: React.FC = () => {
       render: (_: any, record: ExecutionResponse) => {
         const endTime = record.completed_at || record.end_time;
         const startTime = record.created_at || record.start_time;
-        if (!endTime || !startTime) return 'In Progress';
+        
+        // If no start time, can't calculate duration
+        if (!startTime) return 'N/A';
+        
+        // For running/pending workflows without end time
+        if (!endTime && (record.status === 'running' || record.status === 'pending')) {
+          return 'In Progress';
+        }
+        
+        // For completed/failed workflows, use current time if no end time
         const start = new Date(startTime).getTime();
-        const end = new Date(endTime).getTime();
+        const end = endTime ? new Date(endTime).getTime() : Date.now();
         const duration = Math.round((end - start) / 1000);
-        return `${duration}s`;
+        
+        // Format duration nicely
+        if (duration < 60) {
+          return `${duration}s`;
+        } else if (duration < 3600) {
+          const minutes = Math.floor(duration / 60);
+          const seconds = duration % 60;
+          return `${minutes}m ${seconds}s`;
+        } else {
+          const hours = Math.floor(duration / 3600);
+          const minutes = Math.floor((duration % 3600) / 60);
+          return `${hours}h ${minutes}m`;
+        }
       },
     },
     {

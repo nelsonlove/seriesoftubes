@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Row, Col, Card, Typography } from 'antd';
 import { AppstoreOutlined } from '@ant-design/icons';
+import { useSearchParams } from 'react-router-dom';
 import { WorkflowList } from '../../components/WorkflowList';
 import { WorkflowDetail } from '../../components/WorkflowDetail';
 
@@ -8,6 +9,8 @@ const { Title } = Typography;
 
 export const WorkflowsPage: React.FC = () => {
   const [selectedWorkflow, setSelectedWorkflow] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const searchQuery = searchParams.get('search') || '';
 
   return (
     <div style={{ height: 'calc(100vh - 232px)', display: 'flex', flexDirection: 'column' }}>
@@ -37,7 +40,7 @@ export const WorkflowsPage: React.FC = () => {
 
       <Row gutter={32} style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
         <Col span={10}>
-          <WorkflowList onSelectWorkflow={setSelectedWorkflow} />
+          <WorkflowList onSelectWorkflow={setSelectedWorkflow} searchQuery={searchQuery} />
         </Col>
         <Col span={14} style={{ height: '100%' }}>
           {selectedWorkflow ? (
