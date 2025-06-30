@@ -1,0 +1,86 @@
+name: cache-config-demo
+version: 1.0.0
+description: |
+  Demonstrates node-level cache configuration features.
+  This workflow shows how to override cache settings for individual nodes.
+
+inputs:
+  company_name:
+    type: string
+    required: true
+    description: Company name to research
+    default: "Anthropic"
+
+nodes:
+  # This node uses default cache settings for LLM nodes (1 hour TTL)
+  company_summary:
+    type: llm
+    description: Generate a brief company summary
+    config:
+      model: gpt-4o-mini
+      prompt: |
+        Provide a brief 2-3 sentence summary of {{ inputs.company_name }}.
+        Focus on what the company does and its main products/services.
+
+  # This node has caching disabled - useful for real-time data
+  current_news:
+    type: llm
+    description: Get current news (should not be cached)
+    depends_on: [company_summary]
+    cache:
+      enabled: false  # Disable caching for real-time news
+    config:
+      model: gpt-4o-mini
+      prompt: |
+        What are the latest news or developments about {{ inputs.company_name }}?
+        Note: This is a demo, so just make up some plausible recent news.
+
+  # This node has extended cache TTL for stable data
+  company_history:
+    type: llm
+    description: Get company history (can be cached longer)
+    depends_on: [company_summary]
+    cache:
+      enabled: true
+      ttl: 7200  # 2 hours - history doesn't change often
+    config:
+      model: gpt-4o-mini
+      prompt: |
+        Provide a brief history of {{ inputs.company_name }}.
+        Include founding date, founders, and major milestones.
+
+  # This node uses custom cache key fields
+  analyze_sector:
+    type: llm
+    description: Analyze the company's sector
+    depends_on: [company_summary]
+    cache:
+      enabled: true
+      ttl: 3600
+      key_fields: ["inputs"]  # Only cache based on inputs, not other context
+    config:
+      model: gpt-4o-mini
+      prompt: |
+        What industry sector does {{ inputs.company_name }} operate in?
+        What are the key characteristics of this sector?
+
+  # Transform node with caching enabled (now supported!)
+  format_report:
+    type: transform
+    description: Format all information into a structured report
+    depends_on: [company_summary, current_news, company_history, analyze_sector]
+    cache:
+      enabled: true
+      ttl: 900  # 15 minutes
+    config:
+      template:
+        company: "{{ inputs.company_name }}"
+        summary: "{{ company_summary.response }}"
+        current_news: "{{ current_news.response }}"
+        history: "{{ company_history.response }}"
+        sector_analysis: "{{ analyze_sector.response }}"
+        report_generated_at: "{{ 'now' | date('%Y-%m-%d %H:%M:%S') }}"
+
+outputs:
+  company_report: format_report
+  sector_info: analyze_sector

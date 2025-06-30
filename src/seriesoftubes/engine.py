@@ -55,6 +55,13 @@ class ExecutionContext:
         self.parent_context: ExecutionContext | None = (
             None  # Parent context for parallel execution
         )
+        
+        # Cache statistics
+        self.cache_stats: dict[str, dict[str, int]] = {
+            "hits": {},
+            "misses": {},
+            "errors": {}
+        }
 
     def get_output(self, node_name: str) -> Any:
         """Get output from a previous node"""
@@ -112,8 +119,22 @@ class WorkflowEngine:
             try:
                 config = get_config()
                 if config.cache.enabled:
+                    # Auto-detect Redis availability
+                    backend_type = config.cache.backend
+                    if backend_type == "memory":
+                        # Try to use Redis if available (for distributed caching)
+                        try:
+                            import redis
+                            # Test Redis connection
+                            r = redis.from_url(config.cache.redis_url)
+                            r.ping()
+                            backend_type = "redis"
+                            logger.info("Redis available, using Redis cache backend for distributed caching")
+                        except Exception:
+                            logger.info("Redis not available, using memory cache backend")
+                    
                     backend = get_cache_backend(
-                        backend_type=config.cache.backend,
+                        backend_type=backend_type,
                         redis_url=config.cache.redis_url,
                         db=config.cache.redis_db,
                         key_prefix=config.cache.key_prefix,
@@ -291,13 +312,30 @@ class WorkflowEngine:
                 else str(node.node_type)
             )
             cache_settings = CACHE_SETTINGS.get(node_type, {})
+            
+            # Check if caching is enabled (node-level overrides type-level)
+            cache_enabled = cache_settings.get("enabled", False)
+            if node.cache and node.cache.enabled is not None:
+                cache_enabled = node.cache.enabled
 
-            if cache_settings.get("enabled", False):
+            if cache_enabled:
                 # Prepare context data for caching
-                context_data = {
-                    "inputs": context.inputs,
-                    "outputs": dict(context.outputs.items()),
-                }
+                if node.cache and node.cache.key_fields:
+                    # Use only specified fields for cache key
+                    context_data = {}
+                    for field in node.cache.key_fields:
+                        if field == "inputs":
+                            context_data["inputs"] = context.inputs
+                        elif field == "outputs":
+                            context_data["outputs"] = dict(context.outputs.items())
+                        elif field in context.inputs:
+                            context_data[field] = context.inputs[field]
+                else:
+                    # Use default context data
+                    context_data = {
+                        "inputs": context.inputs,
+                        "outputs": dict(context.outputs.items()),
+                    }
 
                 # Get exclude keys from cache settings
                 exclude_keys = cache_settings.get("exclude_context_keys", [])
@@ -316,6 +354,11 @@ class WorkflowEngine:
                         # Log cache hit
                         logger.info(f"Cache hit for node '{node.name}' (type: {node_type})")
                         
+                        # Track cache hit
+                        if node.name not in context.cache_stats["hits"]:
+                            context.cache_stats["hits"][node.name] = 0
+                        context.cache_stats["hits"][node.name] += 1
+                        
                         # Return cached result
                         result = NodeResult(
                             output=cached_result,
@@ -333,9 +376,20 @@ class WorkflowEngine:
                                     context.add_validation_error(node.name, error)
 
                         return result
+                    else:
+                        # Track cache miss
+                        if node.name not in context.cache_stats["misses"]:
+                            context.cache_stats["misses"][node.name] = 0
+                        context.cache_stats["misses"][node.name] += 1
+                        logger.debug(f"Cache miss for node '{node.name}' (type: {node_type})")
+                        
                 except Exception as e:
                     # Cache read error - continue with normal execution
                     logger.warning(f"Cache read error for node {node.name}: {e}")
+                    # Track cache error
+                    if node.name not in context.cache_stats["errors"]:
+                        context.cache_stats["errors"][node.name] = 0
+                    context.cache_stats["errors"][node.name] += 1
 
         # Execute the node normally
         logger.info(f"Executing node '{node.name}' (type: {node.node_type.value if hasattr(node.node_type, 'value') else str(node.node_type)})")
@@ -354,16 +408,37 @@ class WorkflowEngine:
             )
             cache_settings = CACHE_SETTINGS.get(node_type, {})
 
-            if cache_settings.get("enabled", False):
+            # Check if caching is enabled (node-level overrides type-level)
+            cache_enabled = cache_settings.get("enabled", False)
+            if node.cache and node.cache.enabled is not None:
+                cache_enabled = node.cache.enabled
+                
+            if cache_enabled:
                 try:
-                    # Prepare context data for caching
-                    context_data = {
-                        "inputs": context.inputs,
-                        "outputs": dict(context.outputs.items()),
-                    }
+                    # Prepare context data for caching (same logic as retrieval)
+                    if node.cache and node.cache.key_fields:
+                        # Use only specified fields for cache key
+                        context_data = {}
+                        for field in node.cache.key_fields:
+                            if field == "inputs":
+                                context_data["inputs"] = context.inputs
+                            elif field == "outputs":
+                                context_data["outputs"] = dict(context.outputs.items())
+                            elif field in context.inputs:
+                                context_data[field] = context.inputs[field]
+                    else:
+                        # Use default context data
+                        context_data = {
+                            "inputs": context.inputs,
+                            "outputs": dict(context.outputs.items()),
+                        }
 
                     exclude_keys = cache_settings.get("exclude_context_keys", [])
+                    
+                    # Get TTL (node-level overrides type-level)
                     cache_ttl = cache_settings.get("ttl")
+                    if node.cache and node.cache.ttl is not None:
+                        cache_ttl = node.cache.ttl
 
                     await self.cache_manager.cache_result(
                         node_type=node_type,

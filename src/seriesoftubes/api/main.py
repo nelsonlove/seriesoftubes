@@ -18,6 +18,7 @@ from pydantic import BaseModel
 load_dotenv()
 
 from seriesoftubes.api.auth_routes import router as auth_router
+from seriesoftubes.api.cache_routes import router as cache_router
 from seriesoftubes.api.docs_routes import router as docs_router
 from seriesoftubes.api.execution_routes import router as execution_router
 from seriesoftubes.api.file_routes import router as file_router
@@ -69,6 +70,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(auth_router)
+app.include_router(cache_router)
 app.include_router(docs_router, prefix="/api")
 app.include_router(workflow_router)
 app.include_router(execution_router)

@@ -341,6 +341,23 @@ class ConditionalNodeConfig(BaseNodeConfig):
     )
 
 
+class CacheConfig(BaseModel):
+    """Cache configuration for a node"""
+    
+    enabled: bool | None = Field(
+        None, 
+        description="Override default cache behavior for this node type"
+    )
+    ttl: int | None = Field(
+        None, 
+        description="Time to live in seconds (overrides default)"
+    )
+    key_fields: list[str] | None = Field(
+        None,
+        description="Specific context fields to include in cache key"
+    )
+
+
 class Node(BaseModel):
     """A node in the workflow DAG"""
     
@@ -355,6 +372,9 @@ class Node(BaseModel):
         default_factory=list, description="List of node dependencies"
     )
     config: BaseNodeConfig = Field(..., description="Node-specific configuration")
+    cache: CacheConfig | None = Field(
+        None, description="Cache configuration for this node"
+    )
 
     @field_validator("config", mode="before")
     @classmethod

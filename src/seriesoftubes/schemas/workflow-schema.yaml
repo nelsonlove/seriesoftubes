@@ -83,6 +83,23 @@ properties:
             - $ref: "#/definitions/join_config"
             - $ref: "#/definitions/foreach_config"
             - $ref: "#/definitions/conditional_config"
+            
+        cache:
+          type: object
+          description: Cache configuration for this node
+          properties:
+            enabled:
+              type: boolean
+              description: Override default cache behavior for this node type
+            ttl:
+              type: integer
+              description: Time to live in seconds (overrides default)
+              minimum: 0
+            key_fields:
+              type: array
+              items:
+                type: string
+              description: Specific context fields to include in cache key
 
   outputs:
     type: object

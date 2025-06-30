@@ -139,12 +139,17 @@ CACHE_SETTINGS = {
         "exclude_context_keys": ["execution_id", "timestamp"],
         "enabled": True,
     },
-    # Data flow nodes generally shouldn't be cached as they're transformations
-    "split": {"enabled": False},
-    "aggregate": {"enabled": False},
-    "filter": {"enabled": False},
-    "transform": {"enabled": False},
-    "join": {"enabled": False},
-    "foreach": {"enabled": False},
-    "conditional": {"enabled": False},
+    # Transform nodes can benefit from caching when they do complex transformations
+    "transform": {
+        "ttl": 1800,  # 30 minutes
+        "exclude_context_keys": ["execution_id", "timestamp"],
+        "enabled": True,
+    },
+    # Data flow nodes that shouldn't be cached
+    "split": {"enabled": False},  # Lightweight operation
+    "aggregate": {"enabled": False},  # Usually depends on all inputs
+    "filter": {"enabled": False},  # Usually lightweight
+    "join": {"enabled": False},  # Depends on multiple inputs
+    "foreach": {"enabled": False},  # Complex execution pattern
+    "conditional": {"enabled": False},  # Routing logic
 }
